@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     AWS_ACCESS_KEY_ID: str = "mock-key"
     AWS_SECRET_ACCESS_KEY: str = "mock-secret"
     AWS_REGION: str = "us-east-1"
+    # Redis — used as the background job queue broker and L2 cache.
+    # Never store canonical data here; it is a pure acceleration layer.
+    REDIS_URL: str = "redis://localhost:6379"
     # Set DEBUG_SQL=true in .env to log all SQL statements (development only).
     # NEVER enable this in production — it degrades throughput 10-20% and floods stdout.
     DEBUG_SQL: bool = False
