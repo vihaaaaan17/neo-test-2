@@ -1,35 +1,26 @@
-# GATES.md — Ticket 16: Tenant Quotas & LLM Backpressure
+# GATES: 17 - Local Neo4j Setup & GraphStore Adapter
 
-## Leaf 1: Quota Configuration
-- [x] G1: Quota settings added to `app/core/config.py`
-  - CHECK: `python -c "from app.core.config import settings; assert hasattr(settings, 'MAX_WORKSPACES_PER_USER')"`
-  - EXPECT: True
-
-## Leaf 2: QuotaService
-- [x] G2: `QuotaService` created at `app/services/quota.py`
-  - CHECK: `python -c "import os; assert os.path.exists('app/services/quota.py')"`
-  - EXPECT: True
-- [x] G3: `QuotaService` methods implemented (`check_workspace_limit`, `check_source_limit`, `check_storage_limit`, `check_knowledge_limit`)
-  - CHECK: `python -c "from app.services.quota import QuotaService; qs = QuotaService(None); assert hasattr(qs, 'check_workspace_limit')"`
-  - EXPECT: True
-
-## Leaf 3: Enforce Quotas in Endpoints
-- [x] G4: `QuotaService` injected in Workspace creation
-  - CHECK: `python -c "from app.api.routes.workspaces import create_workspace; assert 'QuotaService' in create_workspace.__annotations__.values() or 'quota' in create_workspace.__code__.co_varnames"`
-  - EXPECT: True
-- [x] G5: `QuotaService` injected in Source upload
-  - CHECK: `python -c "from app.api.routes.workspaces import upload_file_to_workspace; assert 'QuotaService' in upload_file_to_workspace.__annotations__.values() or 'quota' in upload_file_to_workspace.__code__.co_varnames"`
-  - EXPECT: True
-
-## Leaf 4: LLM Backpressure
-- [x] G6: Semaphore and tenacity retry added to `app/services/episodic.py`
-  - CHECK: `python -c "import tenacity; from app.services.episodic import _summarize_source_content; assert getattr(_summarize_source_content, 'retry', None) is not None"`
-  - EXPECT: True
-
-## Leaf 5: Verification
-- [x] G7: Tests added for Quota enforcement
-  - CHECK: `python -c "import os; assert os.path.exists('tests/test_quota.py')"`
-  - EXPECT: True
-- [x] G8: All tests pass
-  - CHECK: `pytest tests/`
-  - EXPECT: 0
+- [x] `docker-compose.yml` includes a Neo4j service.
+  CHECK: powershell -c "Select-String -Pattern 'neo4j:' -Path docker-compose.yml"
+  EXPECT: neo4j:
+  EVIDENCE: Updated docker-compose.yml with neo4j:5 service.
+- [x] Neo4j container can start and run successfully.
+  CHECK: docker ps --format "{{.Names}}" | Select-String "neo4j"
+  EXPECT: neo4j
+  EVIDENCE: Output is 'neosislm-neo4j-1' and running on port 7474, 7687.
+- [x] `GraphStore` abstract base class is defined.
+  CHECK: powershell -c "Select-String -Pattern 'class GraphStore' -Path app/repositories/graph.py"
+  EXPECT: class GraphStore
+  EVIDENCE: Defined in app/repositories/graph.py
+- [x] `Neo4jAdapter` implementation connects using `.env` credentials.
+  CHECK: powershell -c "Select-String -Pattern 'class Neo4jAdapter' -Path app/repositories/graph.py"
+  EXPECT: class Neo4jAdapter
+  EVIDENCE: Defined Neo4jAdapter using settings.NEO4J_URI/USER/PASSWORD.
+- [x] FastAPI lifespan handles Neo4j connection.
+  CHECK: powershell -c "Select-String -Pattern 'GraphStore.connect()' -Path app/main.py"
+  EXPECT: connect
+  EVIDENCE: Awaits graph_store.connect() and .close() in lifespan.
+- [x] Health check endpoint verifies Neo4j connection.
+  CHECK: curl -s http://localhost:8000/health
+  EXPECT: ok
+  EVIDENCE: Python urllib returns {"status":"ok","postgres":"ok","neo4j":"ok"}

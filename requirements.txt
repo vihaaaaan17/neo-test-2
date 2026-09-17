@@ -20,3 +20,4 @@ arq
 slowapi
 gunicorn
 tenacity
+neo4j

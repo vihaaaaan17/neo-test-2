@@ -66,6 +66,14 @@ All outputs from Ground Mode or Research Mode are strictly **tagged** (e.g. `gro
    - **Ports and Adapters**: Infrastructure is hidden behind interfaces (`ProviderAdapter`, `GraphStore`).
    - **Canonical Relational Truth**: PostgreSQL is the single source of canonical truth. Neo4j graphs are projections.
 
+### Phase 3 Specific Implementation Decisions (Internal KG & Ground Mode)
+
+1. **Graph Database Provider**: The Internal KG will be backed by a **local Docker Neo4j** container for the free-tier and local development. This ensures zero-cost local sandboxing while keeping the door open for Neo4j Aura at scale.
+2. **Ground Mode Orchestration**: Ground Mode will use a **simplified LangGraph** (e.g., Retrieve -> Validate -> Answer). This bypasses the heavy autonomous loop but maintains architectural consistency with the `WorkingMemory` state engine used in Research Mode.
+3. **Hybrid Retrieval**: Retrieval will combine **Postgres Full-Text Search (FTS)** and **`pgvector`**. To ensure this is scalable to 1000 users without standing up Elasticsearch, we will heavily index the FTS TSVECTOR columns and strictly scope all queries by `workspace_id`.
+4. **Provenance Enforcement**: Ground Mode outputs will use **Structured JSON (Pydantic)** to enforce provenance. Responses will strictly decouple the generated prose from a structured `list[EvidenceRef]` pointing back to precise Neo4j node IDs and Postgres chunk IDs.
+5. **Graph Synchronization**: Neo4j is a projection of Postgres. Synchronization will be handled asynchronously using the **`arq` background job queue** (built in Phase 2.5). The API will write to Postgres, enqueue a sync job, and return, preventing API latency spikes during complex entity extraction.
+
 ## Testing Decisions
 - Testing will target the highest seam possible (e.g., Domain Service Interfaces).
 - Evaluation via LangSmith for groundedness and citation coverage.

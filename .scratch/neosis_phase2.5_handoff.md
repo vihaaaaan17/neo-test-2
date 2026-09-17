@@ -1,4 +1,4 @@
-# Handoff: NeosisLM (Phase 1 & 2 Completed)
+# Handoff: NeosisLM (Phases 1, 2 & 2.5 Completed)
 
 ## Context
 We are building a research workspace blending grounded source QA and autonomous deep-research. The project relies strictly on application-level tenant isolation, LangGraph state management, and strict provenance tagging for AI outputs. 
@@ -14,12 +14,25 @@ We are building a research workspace blending grounded source QA and autonomous 
   - `MemoryRouter` successfully gates the database to ensure `source_mode` provenance.
   - `WorkingMemory` (LangGraph `StateGraph`) engine configured with ephemeral `MemorySaver` and `operator.add` reducers to give agents isolated scratchpads based on `thread_id`.
   - `EpisodicMemoryService` pipeline completed and tested (mocks an abstract LLM gateway to compress working memory arrays into dense summaries and saves them).
+- **Phase 2.5 (Scalability & Hardening)**: 
+  - Tickets 13-16 are complete.
+  - **Database Hardening:** PostgreSQL connection pool (`size=20`) and 9 multi-column composite indexes via Alembic for fast tenant-scoped queries.
+  - **Job Queue:** `arq` and Redis integrated. Parsing, chunking, and LLM episodic compression tasks moved to a headless background worker (`app/workers/tasks.py`).
+  - **API Hardening:** `slowapi` rate-limiting, 50MB payload limits, CORS, deep health checks, and `gunicorn` with `UvicornWorker` threads for multi-core scaling.
+  - **Quotas & Backpressure:** `QuotaService` strictly blocks abuse. LLM Gateway wrapped in an `asyncio.Semaphore(5)` and `tenacity` exponential backoff retries.
 
 ## Relevant References
 - Master Architecture Spec: `d:\koding\codes\NeosisLM\.scratch\neosis-architecture\spec.md`
 - Master Implementation Inventory: `d:\koding\codes\NeosisLM\inital-plan.md`
 - Completed Phase 1 Tickets: `d:\koding\codes\NeosisLM\.scratch\phase1-foundations\issues\`
 - Completed Phase 2 Tickets: `d:\koding\codes\NeosisLM\.scratch\phase2-memory-state\issues\`
+- Completed Phase 2.5 Tickets: `d:\koding\codes\NeosisLM\.scratch\phase2.5-scalability\issues\`
+
+## Local Dev Environment
+- The user has Docker Desktop running. PostgreSQL and Redis can be started via `docker compose up -d`.
+- Local tests can be run via `pytest tests/`. (All 25 tests currently pass).
+- The user uses Windows Command Prompt (`cmd`), so activation requires `.\venv\Scripts\activate.bat`.
+- Background worker is started via `python -m arq app.workers.settings.WorkerSettings`.
 
 ## Next Steps
 - The likely next objective is breaking down **Phase 3: Internal KG & Ground Mode** from `inital-plan.md` into actionable tracer-bullet tickets.
@@ -29,3 +42,4 @@ We are building a research workspace blending grounded source QA and autonomous 
 - `to-tickets`: To break the Phase 3 specs and `inital-plan.md` into actionable vertical slice tickets.
 - `implement`: To systematically plan and execute each ticket.
 - `unlazy`: To maintain the strict GATES-driven testing discipline applied in Phases 1 & 2.
+- `tdd`: For test-driven development on the complex KG routing logic.

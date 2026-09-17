@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     # Redis — used as the background job queue broker and L2 cache.
     # Never store canonical data here; it is a pure acceleration layer.
     REDIS_URL: str = "redis://localhost:6379"
+    # Neo4j
+    NEO4J_URI: str = "bolt://localhost:7687"
+    NEO4J_USER: str = "neo4j"
+    NEO4J_PASSWORD: str = "password"
+
     # CORS
     ALLOWED_ORIGINS: list[str] = ["*"]
     

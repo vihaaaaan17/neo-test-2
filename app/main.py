@@ -13,6 +13,7 @@ from app.api.deps.rate_limit import limiter
 from app.core.config import settings
 from app.core.telemetry import setup_telemetry
 from app.core.database import engine
+from app.repositories.graph import graph_store
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry import trace
 
@@ -39,10 +40,14 @@ async def lifespan(app: FastAPI):
     s3_context = session.client("s3", endpoint_url=settings.S3_ENDPOINT_URL)
     app.state.s3_client = await s3_context.__aenter__()
     
+    # Connect to internal KG
+    await graph_store.connect()
+    
     yield
     
     # Shutdown
     logger.info("Shutting down NeosisLM API")
+    await graph_store.close()
     await s3_context.__aexit__(None, None, None)
     await engine.dispose()
     
@@ -98,14 +103,24 @@ FastAPIInstrumentor.instrument_app(app)
 @app.get("/health")
 @app.get("/api/v1/health")
 async def health_check():
-    """Deep health check verifying Postgres connectivity."""
+    """Deep health check verifying Postgres and Neo4j connectivity."""
+    status = {"status": "ok", "postgres": "ok", "neo4j": "ok"}
     try:
         async with engine.connect() as conn:
             await conn.execute(select(1))
-        return {"status": "ok"}
     except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return {"status": "degraded"}
+        logger.error(f"Postgres health check failed: {e}")
+        status["status"] = "degraded"
+        status["postgres"] = "failed"
+        
+    try:
+        await graph_store.execute_query("RETURN 1")
+    except Exception as e:
+        logger.error(f"Neo4j health check failed: {e}")
+        status["status"] = "degraded"
+        status["neo4j"] = "failed"
+        
+    return status
 
 from app.api.routes.workspaces import router as workspaces_router
 # Limit the workspace router routes explicitly if needed, but slowapi works automatically
