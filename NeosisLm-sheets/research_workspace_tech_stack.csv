@@ -1,0 +1,18 @@
+﻿Category,Initial / Free Tier,Why Initial,Scale-Up,Migration Trigger,Abstraction Boundary
+Web,Next.js + React + TypeScript,"Mature, reusable UI ecosystem",Managed/edge deployment as needed,Traffic/latency,HTTP/API contract
+Backend,FastAPI + Python,Agent ecosystem + typed APIs,Service decomposition,Team/traffic growth,Domain service interfaces
+Relational DB,PostgreSQL via Supabase or equivalent,Canonical source of truth; pgvector available,Managed Postgres cluster/read replicas,Connection/storage/throughput,Repository layer
+Vector,pgvector,Avoid extra service early,Qdrant/dedicated vector DB,Recall/latency/index size,VectorStore
+Graph,Neo4j Aura Free/local,Proper graph semantics,Managed Neo4j cluster,Graph size/query load,GraphStore
+Cache/Queue,Redis,Simple cache + queue primitives,Managed Redis / broker,Queue volume/HA needs,CacheProvider + QueueProvider
+Object storage,Supabase Storage/S3-compatible,Simple and portable,S3/R2/GCS,Storage/cost/egress,ObjectStore
+Agent orchestration,LangGraph,Explicit state/checkpoint model,Durable workflow platform,Run volume/availability,Workflow interface
+Notebook/RAG,Open Notebook,Avoid rebuilding ingestion/chat/source management,Custom specialized services,Upstream divergence or scale,Notebook adapter
+Research,STORM/GPT Researcher patterns,Reuse research decomposition ideas,Custom research workers,Latency/cost/control needs,ResearchAgent interface
+Parsing,Docling,Strong multimodal/document parsing baseline,Specialized parsing/OCR services,Format coverage/volume,Parser interface
+LLM gateway,LiteLLM,Provider abstraction and routing,Dedicated model gateway,Provider count/traffic,LLMProvider
+Evaluation,LangChain/LangSmith,User requested LangChain evals,Dedicated eval platform if needed,Eval scale/enterprise controls,Evaluator interface
+Observability,OpenTelemetry,Vendor-neutral instrumentation,Managed backend,Scale/retention,Telemetry interface
+Browser,Playwright,Reliable open-source browser automation,Browser fleet/service,Concurrency/anti-bot,BrowserTool
+Math,SymPy + Python,Deterministic local calculations,Sandbox compute service,Compute limits,ComputeTool
+Execution sandbox,Docker/container isolation,Simple initial containment,gVisor/Firecracker/K8s jobs,Security/concurrency,ExecutionService

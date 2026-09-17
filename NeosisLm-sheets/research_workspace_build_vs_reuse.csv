@@ -1,0 +1,21 @@
+﻿Component,Do We Build?,Reuse/Reference,Expected Custom Work
+Notebook/RAG UI backend,"No, adapt",Open Notebook,"Fork/integrate ingestion, sources, chat with shared state contract"
+Deep research loop,No from scratch,"STORM, GPT Researcher, Open Deep Research patterns","Implement custom graph nodes, evidence policies, state integration"
+Agent orchestration,No from scratch,LangGraph,"Define workflows, state schema, reducers, policies"
+Document parsing,No from scratch,Docling,Adapter + post-processing
+Browser automation,No from scratch,Playwright,"Tool wrapper, sandbox, source policy"
+Math engine,No from scratch,SymPy,Sandbox wrapper + provenance
+LLM provider abstraction,No from scratch,LiteLLM,"Routing policy, model registry"
+Evals,No from scratch,LangChain/LangSmith,"Datasets, custom graders, research rubrics"
+Telemetry,No from scratch,OpenTelemetry,Instrumentation + dashboards
+Cache,No from scratch,Redis,Key policy + cache invalidation
+Primary relational DB,Use managed open source,PostgreSQL/Supabase,"Domain schema, migrations, RLS"
+Graph storage,Use managed open source,Neo4j,"Ontology, projections, integrity checks"
+Memory fabric,Yes,Build product-specific,6 logical memories + router + compaction + provenance
+State engine,Yes + LangGraph,LangGraph,8 state domains + reducers + transitions
+Internal KG,"Yes, product-specific",Neo4j storage,Ontology + projections + lifecycle
+Research Output KG,"Yes, product-specific",Neo4j storage,Curation rules + visible ontology + segmentation
+Git-like research versioning,Yes,Git concepts,Commit/change-set model over research workspace
+Provenance model,Yes,Pydantic/Postgres/graph,Grounded vs derived model; claim/evidence links
+Mode toggle/shared context,Yes,Custom,"Same workspace/state, different execution policies"
+Prompt/memory routing,Yes,Custom,"Selective memory retrieval, token budgets, compaction"

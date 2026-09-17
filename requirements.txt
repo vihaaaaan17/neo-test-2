@@ -17,3 +17,5 @@ python-multipart
 docling
 langgraph
 arq
+slowapi
+gunicorn

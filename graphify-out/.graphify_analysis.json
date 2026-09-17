@@ -1,0 +1,132 @@
+{
+  "communities": {
+    "0": [
+      "agents_skills_wizard_template",
+      "agents_skills_wizard_template_confirm",
+      "agents_skills_wizard_template_finish",
+      "agents_skills_wizard_template_note",
+      "agents_skills_wizard_template_open_url",
+      "agents_skills_wizard_template_set_secret",
+      "agents_skills_wizard_template_set_var",
+      "agents_skills_wizard_template_warn"
+    ],
+    "1": [
+      "agents_skills_wizard_template_ask",
+      "agents_skills_wizard_template_ask_secret",
+      "agents_skills_wizard_template_existing",
+      "agents_skills_wizard_template_say",
+      "agents_skills_wizard_template_sh__entry",
+      "agents_skills_wizard_template_step",
+      "agents_skills_wizard_template_write_env"
+    ],
+    "2": [
+      "agents_skills_diagnosing_bugs_scripts_hitl_loop_template",
+      "agents_skills_diagnosing_bugs_scripts_hitl_loop_template_capture",
+      "agents_skills_diagnosing_bugs_scripts_hitl_loop_template_sh__entry",
+      "agents_skills_diagnosing_bugs_scripts_hitl_loop_template_step"
+    ],
+    "3": [
+      "agents_skills_wizard_template_banner",
+      "agents_skills_wizard_template_clear",
+      "agents_skills_wizard_template_pause",
+      "agents_skills_wizard_template_stage"
+    ]
+  },
+  "cohesion": {
+    "0": 0.42857142857142855,
+    "1": 0.3333333333333333,
+    "2": 0.8333333333333334,
+    "3": 0.5
+  },
+  "gods": [
+    {
+      "id": "agents_skills_wizard_template_sh__entry",
+      "label": "template.sh script",
+      "degree": 11
+    },
+    {
+      "id": "agents_skills_wizard_template_warn",
+      "label": "warn()",
+      "degree": 5
+    },
+    {
+      "id": "agents_skills_wizard_template_finish",
+      "label": "finish()",
+      "degree": 5
+    },
+    {
+      "id": "agents_skills_wizard_template_clear",
+      "label": "_clear()",
+      "degree": 4
+    },
+    {
+      "id": "agents_skills_wizard_template_banner",
+      "label": "banner()",
+      "degree": 4
+    },
+    {
+      "id": "agents_skills_diagnosing_bugs_scripts_hitl_loop_template_sh__entry",
+      "label": "hitl-loop.template.sh script",
+      "degree": 3
+    },
+    {
+      "id": "agents_skills_wizard_template_stage",
+      "label": "stage()",
+      "degree": 3
+    },
+    {
+      "id": "agents_skills_wizard_template_open_url",
+      "label": "open_url()",
+      "degree": 3
+    },
+    {
+      "id": "agents_skills_wizard_template_existing",
+      "label": "_existing()",
+      "degree": 3
+    },
+    {
+      "id": "agents_skills_wizard_template_ask",
+      "label": "ask()",
+      "degree": 3
+    }
+  ],
+  "surprises": [
+    {
+      "source": "template.sh script",
+      "target": "banner()",
+      "source_files": [
+        ".agents/skills/wizard/template.sh",
+        ".agents/skills/wizard/template.sh"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 1 \u2192 community 3"
+    },
+    {
+      "source": "template.sh script",
+      "target": "finish()",
+      "source_files": [
+        ".agents/skills/wizard/template.sh",
+        ".agents/skills/wizard/template.sh"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 1 \u2192 community 0"
+    },
+    {
+      "source": "finish()",
+      "target": "_clear()",
+      "source_files": [
+        ".agents/skills/wizard/template.sh",
+        ".agents/skills/wizard/template.sh"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 3 \u2192 community 0"
+    }
+  ],
+  "tokens": {
+    "input": 0,
+    "output": 0
+  }
+}

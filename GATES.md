@@ -1,62 +1,54 @@
-# GATES.md — Ticket 14: Background Job Queue (arq + Redis)
+# GATES.md — Ticket 15: API Hardening
 
-## Leaf 1: Infrastructure (docker-compose + config + requirements)
-- [ ] G1: Redis service present in docker-compose.yml
-  - CHECK: `python -c "import yaml; d=yaml.safe_load(open('docker-compose.yml')); print('redis' in d['services'])"`
+## Leaf 1: Rate Limiting & Dependencies
+- [ ] G1: `slowapi` added to `requirements.txt`
+  - CHECK: `python -c "assert 'slowapi' in open('requirements.txt').read()"`
   - EXPECT: True
-- [ ] G2: REDIS_URL in Settings
-  - CHECK: `python -c "from app.core.config import settings; print(hasattr(settings, 'REDIS_URL'))"`
+- [ ] G2: Rate limit middleware added to FastAPI app
+  - CHECK: `python -c "from app.main import app; from slowapi.middleware import SlowAPIMiddleware; assert any(isinstance(m.app, SlowAPIMiddleware) for m in app.user_middleware)"`
   - EXPECT: True
-- [ ] G3: arq importable
-  - CHECK: `.\venv\Scripts\python.exe -c "import arq; print('ok')"`
-  - EXPECT: ok
-
-## Leaf 2: Worker tasks (app/workers/)
-- [ ] G4: workers/__init__.py exists
-  - CHECK: `python -c "import os; print(os.path.exists('app/workers/__init__.py'))"`
-  - EXPECT: True
-- [ ] G5: parse_and_chunk_job is importable
-  - CHECK: `python -c "from app.workers.tasks import parse_and_chunk_job; print('ok')"`
-  - EXPECT: ok
-- [ ] G6: compress_episodic_job is importable
-  - CHECK: `python -c "from app.workers.tasks import compress_episodic_job; print('ok')"`
-  - EXPECT: ok
-- [ ] G7: WorkerSettings is importable with correct functions registered
-  - CHECK: `python -c "from app.workers.settings import WorkerSettings; fns=[f.__name__ for f in WorkerSettings.functions]; print(sorted(fns))"`
-  - EXPECT: `['compress_episodic_job', 'parse_and_chunk_job']`
-- [ ] G8: Job idempotency — parse_and_chunk_job checks snapshot status before executing
-  - EVIDENCE: app/workers/tasks.py line 65 checks `if source.processing_status != "pending":` and returns skipped
-
-## Leaf 3: Source model + status field
-- [ ] G9: Source model has `processing_status` column
-  - CHECK: `python -c "from app.models.source import Source; print('processing_status' in [c.name for c in Source.__table__.columns])"`
-  - EXPECT: True
-- [ ] G10: Alembic migration for processing_status column exists
-  - CHECK: `python -c "import os; files=os.listdir('alembic/versions'); print(any('processing_status' in f for f in files))"`
+- [ ] G3: 50MB Max upload size configured via middleware
+  - CHECK: `python -c "from app.main import app; from starlette.middleware.base import BaseHTTPMiddleware; assert any(m.kwargs.get('dispatch').__name__ == 'limit_upload_size' for m in app.user_middleware if isinstance(m.app, BaseHTTPMiddleware) or hasattr(m, 'kwargs'))"`
   - EXPECT: True
 
-## Leaf 4: Upload endpoint -> 202 Accepted
-- [ ] G11: Upload endpoint returns 202 (not 201)
-  - CHECK: `.\venv\Scripts\python.exe -m pytest tests/test_workspaces.py::test_upload_file_to_workspace -v`
+## Leaf 2: CORS Middleware
+- [ ] G4: ALLOWED_ORIGINS in Settings
+  - CHECK: `python -c "from app.core.config import settings; print(hasattr(settings, 'ALLOWED_ORIGINS'))"`
+  - EXPECT: True
+- [ ] G5: CORSMiddleware registered on app
+  - CHECK: `python -c "from app.main import app; from fastapi.middleware.cors import CORSMiddleware; assert any(isinstance(m.app, CORSMiddleware) for m in app.user_middleware)"`
+  - EXPECT: True
+
+## Leaf 3: API Versioning
+- [ ] G6: Routes prefixed with `/api/v1`
+  - CHECK: `python -c "from app.main import app; assert any(r.path.startswith('/api/v1/workspaces') for r in app.routes)"`
+  - EXPECT: True
+- [ ] G7: `/health` unversioned route exists
+  - CHECK: `python -c "from app.main import app; assert any(r.path == '/health' for r in app.routes)"`
+  - EXPECT: True
+
+## Leaf 4: FastAPI Lifespan & S3 Connection Pooling
+- [ ] G8: `S3ObjectStore` accepts initialized aioboto3 Session/Client
+  - CHECK: `python -c "import inspect; from app.services.storage import S3ObjectStore; assert 's3_client' in inspect.signature(S3ObjectStore.__init__).parameters"`
+  - EXPECT: True
+- [ ] G9: Lifespan handler initializes S3 and stores on `app.state`
+  - CHECK: `python -c "from app.main import app; assert hasattr(app, 'router') and app.router.lifespan_context is not None"`
+  - EXPECT: True
+
+## Leaf 5: Deep Health Check
+- [ ] G10: Health check verifies Postgres (`SELECT 1`)
+  - CHECK: `.\venv\Scripts\python.exe -m pytest tests/test_health.py -v`
   - EXPECT: PASSED
-- [ ] G12: Response body contains source_id and status pending
-  - EVIDENCE: tests/test_workspaces.py line 191 asserts data contains source_id
-- [ ] G13: Endpoint does NOT call parser or chunking inline
-  - EVIDENCE: app/api/routes/workspaces.py line 102 calls `await arq_redis.enqueue_job("parse_and_chunk_job", ...)`
 
-## Leaf 5: Job status endpoint
-- [ ] G14: GET /workspaces/{workspace_id}/sources/{source_id}/status exists and tested
-  - CHECK: `.\venv\Scripts\python.exe -m pytest tests/test_workspaces.py::test_source_status_endpoint -v`
-  - EXPECT: PASSED
-- [ ] G15: Status endpoint returns one of pending/processing/completed/failed
-  - EVIDENCE: tests/test_workspaces.py line 230 asserts `status_resp.json()["status"] == "processing"`
-
-## Leaf 6: Episodic compression as background job
-- [ ] G16: EpisodicMemoryService has enqueue_compression method
-  - CHECK: `python -c "from app.services.episodic import EpisodicMemoryService; print(hasattr(EpisodicMemoryService, 'enqueue_compression'))"`
+## Leaf 6: Multi-Worker Deployment
+- [ ] G11: Dockerfile uses Gunicorn with Uvicorn worker
+  - CHECK: `python -c "assert 'gunicorn' in open('Dockerfile').read()"`
+  - EXPECT: True
+- [ ] G12: Dockerfile installs gunicorn
+  - CHECK: `python -c "assert 'gunicorn' in open('requirements.txt').read()"`
   - EXPECT: True
 
-## Integration gate
-- [ ] G17: Full test suite 0 failures
+## Integration Gate
+- [ ] G13: Full test suite passes
   - CHECK: `.\venv\Scripts\python.exe -m pytest tests/ -v --ignore=tests/test_db.py`
   - EXPECT: no failures

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
@@ -11,6 +11,7 @@ from app.schemas.source import SourceResponse
 from app.repositories.source import SourceRepository
 from app.services.storage import ObjectStoreProtocol, get_object_store
 from app.api.deps.arq import get_arq_redis
+from app.api.deps.rate_limit import limiter
 from arq import ArqRedis
 import hashlib
 
@@ -64,7 +65,9 @@ async def delete_workspace(
         raise HTTPException(status_code=404, detail="Workspace not found")
 
 @router.post("/{workspace_id}/files", response_model=SourceResponse, status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("10/minute")
 async def upload_file_to_workspace(
+    request: Request,
     workspace_id: UUID,
     file: UploadFile = File(...),
     current_user_id: UUID = Depends(get_current_user),

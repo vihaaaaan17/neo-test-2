@@ -1,0 +1,20 @@
+{
+  ".agents/skills/diagnosing-bugs/scripts/hitl-loop.template.sh": {
+    "mtime": 1789579222.2049334,
+    "seen": 1789579867.1107242,
+    "ast_hash": "798a4f0d6a526f8dda2494b6f6d39d79",
+    "semantic_hash": "798a4f0d6a526f8dda2494b6f6d39d79"
+  },
+  ".agents/skills/wizard/template.sh": {
+    "mtime": 1789579222.2182646,
+    "seen": 1789579867.1107242,
+    "ast_hash": "a355842d1be697f4115d7075f372d6d1",
+    "semantic_hash": "a355842d1be697f4115d7075f372d6d1"
+  },
+  "skills-lock.json": {
+    "mtime": 1789579287.0335965,
+    "seen": 1789579867.1107242,
+    "ast_hash": "25be229386c78a5590387d8878680ec3",
+    "semantic_hash": "25be229386c78a5590387d8878680ec3"
+  }
+}

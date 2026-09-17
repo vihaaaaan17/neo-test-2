@@ -117,14 +117,14 @@ def test_unauthorized_access():
     # Remove auth override to test actual security guard
     app.dependency_overrides.pop(get_current_user, None)
     try:
-        response = client.get(f"/workspaces/{uuid4()}")
+        response = client.get(f"/api/v1/workspaces/{uuid4()}")
         assert response.status_code in (401, 403) # HTTPBearer returns 401 or 403 without credentials
     finally:
         # Restore override for other tests
         app.dependency_overrides[get_current_user] = mock_get_current_user
 
 def test_create_workspace():
-    response = client.post("/workspaces/", json={})
+    response = client.post("/api/v1/workspaces/", json={})
     assert response.status_code == 201
     data = response.json()
     assert data["owner_id"] == str(TEST_USER_ID)
@@ -132,51 +132,51 @@ def test_create_workspace():
     assert "workspace_id" in data
 
 def test_get_workspace():
-    create_response = client.post("/workspaces/", json={})
+    create_response = client.post("/api/v1/workspaces/", json={})
     workspace_id = create_response.json()["workspace_id"]
     
-    response = client.get(f"/workspaces/{workspace_id}")
+    response = client.get(f"/api/v1/workspaces/{workspace_id}")
     assert response.status_code == 200
     assert response.json()["workspace_id"] == workspace_id
 
 def test_cross_tenant_isolation():
     # Create workspace with User A
-    create_response = client.post("/workspaces/", json={})
+    create_response = client.post("/api/v1/workspaces/", json={})
     workspace_id = create_response.json()["workspace_id"]
     
     # Simulate request from User B
     app.dependency_overrides[get_current_user] = lambda: uuid4()
     
-    response = client.get(f"/workspaces/{workspace_id}")
+    response = client.get(f"/api/v1/workspaces/{workspace_id}")
     assert response.status_code == 404
     
     # Restore User A
     app.dependency_overrides[get_current_user] = mock_get_current_user
 
 def test_update_workspace():
-    create_response = client.post("/workspaces/", json={})
+    create_response = client.post("/api/v1/workspaces/", json={})
     workspace_id = create_response.json()["workspace_id"]
     
-    response = client.patch(f"/workspaces/{workspace_id}", json={"status": "archived"})
+    response = client.patch(f"/api/v1/workspaces/{workspace_id}", json={"status": "archived"})
     assert response.status_code == 200
     assert response.json()["status"] == "archived"
 
 def test_delete_workspace():
-    create_response = client.post("/workspaces/", json={})
+    create_response = client.post("/api/v1/workspaces/", json={})
     workspace_id = create_response.json()["workspace_id"]
     
-    response = client.delete(f"/workspaces/{workspace_id}")
+    response = client.delete(f"/api/v1/workspaces/{workspace_id}")
     assert response.status_code == 204
     
-    response2 = client.get(f"/workspaces/{workspace_id}")
+    response2 = client.get(f"/api/v1/workspaces/{workspace_id}")
     assert response2.status_code == 404
 
 def test_upload_file_to_workspace():
-    create_response = client.post("/workspaces/", json={})
+    create_response = client.post("/api/v1/workspaces/", json={})
     workspace_id = create_response.json()["workspace_id"]
     
     files = {"file": ("test.pdf", b"dummy content", "application/pdf")}
-    response = client.post(f"/workspaces/{workspace_id}/files", files=files)
+    response = client.post(f"/api/v1/workspaces/{workspace_id}/files", files=files)
     
     assert response.status_code == 202
     data = response.json()
@@ -196,11 +196,11 @@ def test_upload_file_to_workspace():
     assert last_job[2]["workspace_id"] == workspace_id
     
 def test_source_status_endpoint():
-    create_response = client.post("/workspaces/", json={})
+    create_response = client.post("/api/v1/workspaces/", json={})
     workspace_id = create_response.json()["workspace_id"]
     
     files = {"file": ("test.pdf", b"dummy content", "application/pdf")}
-    upload_resp = client.post(f"/workspaces/{workspace_id}/files", files=files)
+    upload_resp = client.post(f"/api/v1/workspaces/{workspace_id}/files", files=files)
     source_id = upload_resp.json()["source_id"]
     
     # Needs a mock source in DB
@@ -215,19 +215,19 @@ def test_source_status_endpoint():
             return mock_source_repo.db.get(id)
     mock_source_repo.session = MockSession()
     
-    status_resp = client.get(f"/workspaces/{workspace_id}/sources/{source_id}/status")
+    status_resp = client.get(f"/api/v1/workspaces/{workspace_id}/sources/{source_id}/status")
     assert status_resp.status_code == 200
     assert status_resp.json()["status"] == "processing"
 
 def test_upload_file_cross_tenant_isolation():
-    create_response = client.post("/workspaces/", json={})
+    create_response = client.post("/api/v1/workspaces/", json={})
     workspace_id = create_response.json()["workspace_id"]
     
     app.dependency_overrides[get_current_user] = lambda: uuid4()
     
     try:
         files = {"file": ("test.pdf", b"dummy content", "application/pdf")}
-        response = client.post(f"/workspaces/{workspace_id}/files", files=files)
+        response = client.post(f"/api/v1/workspaces/{workspace_id}/files", files=files)
         assert response.status_code == 404
     finally:
         app.dependency_overrides[get_current_user] = mock_get_current_user

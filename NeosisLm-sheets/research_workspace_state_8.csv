@@ -1,0 +1,10 @@
+﻿State Type,Definition,Core Fields,Transitions,Retention,Canonical Store,Who Can Mutate
+Workspace State,Current active project context,workspace_id; active_branch; active_mode; state_version,created→active→archived,Long-lived,PostgreSQL,User + system
+Research State,Overall investigation status,research_id; objective; status; state_version,planned→running→blocked→completed/abandoned,Long-lived,PostgreSQL,Agent through reducers + user
+Plan State,Current research strategy,plan_id; version; steps; status,draft→active→revised→completed,Versioned,PostgreSQL/Run Checkpoints,Agent through planner/reducer
+Task State,Subtask lifecycle,task_id; objective; status; parent_task_id,queued→running→blocked→completed/failed,Long-lived,PostgreSQL,Orchestrator
+Run State,Single execution checkpoint,run_id; step; status; state_version,created→running→paused→completed/failed,Retained,LangGraph/PostgreSQL,Orchestrator
+Tool State,Tool-call execution state,tool_call_id; tool; status; retry_count,requested→running→succeeded/failed,Per run + audit,Event Log,Tool runner
+Evidence State,Support/verification status,evidence_id; status; refs; version,discovered→unverified→verified/conflicting/rejected,Long-lived,PostgreSQL,Verifier + user review
+Graph State,Graph mutation/projection state,graph_id; version; change_set_id; status,pending→applied→verified,Versioned,Neo4j + commit metadata,Graph service/reducer
+Version State,Git-like research history,commit_id; parent_id; branch; change_set,commit→branch→merge/revert,Long-lived,PostgreSQL + Object Store,System + user action
