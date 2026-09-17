@@ -4,9 +4,9 @@
 
 **Blocked by:** 17
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A new `sync_knowledge_to_graph` task is registered in `app/workers/tasks.py`.
-- [ ] The `MemoryRouter` (or relevant repository) triggers this task asynchronously via the Redis queue whenever a new memory object is created.
-- [ ] The background task reads the memory object from Postgres and upserts corresponding nodes and edges into Neo4j via the `GraphStore`.
-- [ ] The task is idempotent (re-running it on the same memory ID updates existing nodes rather than duplicating them).
+- [x] A new `sync_knowledge_to_graph` task is registered in `app/workers/tasks.py`.
+- [x] The `MemoryRouter` (or relevant repository) triggers this task asynchronously via the Redis queue whenever a new memory object is created.
+- [x] The background task reads the memory object from Postgres and upserts corresponding nodes and edges into Neo4j via the `GraphStore`.
+- [x] The task is idempotent (re-running it on the same memory ID updates existing nodes rather than duplicating them).

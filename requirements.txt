@@ -21,3 +21,8 @@ slowapi
 gunicorn
 tenacity
 neo4j
+pgvector
+tavily-python
+litellm
+google-genai
+streamlit

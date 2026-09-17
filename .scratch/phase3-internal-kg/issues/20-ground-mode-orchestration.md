@@ -4,10 +4,10 @@
 
 **Blocked by:** 18
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A new `GroundModeOrchestrator` is implemented (e.g. `app/orchestration/ground_mode.py`).
-- [ ] It defines a LangGraph `StateGraph` with states conforming to our existing `WorkingMemory` contract.
-- [ ] The graph implements a fast `Retrieve` node (calling `HybridRetrievalService`) and an `Answer` node.
-- [ ] The graph explicitly checks that any generated answer does not rely on information outside the retrieved context (hallucination prevention).
-- [ ] Unit/Integration tests verify that the orchestrator compiles and runs isolated test queries successfully.
+- [x] A new `GroundModeOrchestrator` is implemented (e.g. `app/orchestration/ground_mode.py`).
+- [x] It defines a LangGraph `StateGraph` with states conforming to our existing `WorkingMemory` contract.
+- [x] The graph implements a fast `Retrieve` node (calling `HybridRetrievalService`) and an `Answer` node.
+- [x] The graph explicitly checks that any generated answer does not rely on information outside the retrieved context (hallucination prevention).
+- [x] Unit/Integration tests verify that the orchestrator compiles and runs isolated test queries successfully.

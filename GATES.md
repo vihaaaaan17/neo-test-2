@@ -1,26 +1,22 @@
-# GATES: 17 - Local Neo4j Setup & GraphStore Adapter
+# GATES: 18 - Hybrid Retrieval Service
 
-- [x] `docker-compose.yml` includes a Neo4j service.
-  CHECK: powershell -c "Select-String -Pattern 'neo4j:' -Path docker-compose.yml"
-  EXPECT: neo4j:
-  EVIDENCE: Updated docker-compose.yml with neo4j:5 service.
-- [x] Neo4j container can start and run successfully.
-  CHECK: docker ps --format "{{.Names}}" | Select-String "neo4j"
-  EXPECT: neo4j
-  EVIDENCE: Output is 'neosislm-neo4j-1' and running on port 7474, 7687.
-- [x] `GraphStore` abstract base class is defined.
-  CHECK: powershell -c "Select-String -Pattern 'class GraphStore' -Path app/repositories/graph.py"
-  EXPECT: class GraphStore
-  EVIDENCE: Defined in app/repositories/graph.py
-- [x] `Neo4jAdapter` implementation connects using `.env` credentials.
-  CHECK: powershell -c "Select-String -Pattern 'class Neo4jAdapter' -Path app/repositories/graph.py"
-  EXPECT: class Neo4jAdapter
-  EVIDENCE: Defined Neo4jAdapter using settings.NEO4J_URI/USER/PASSWORD.
-- [x] FastAPI lifespan handles Neo4j connection.
-  CHECK: powershell -c "Select-String -Pattern 'GraphStore.connect()' -Path app/main.py"
-  EXPECT: connect
-  EVIDENCE: Awaits graph_store.connect() and .close() in lifespan.
-- [x] Health check endpoint verifies Neo4j connection.
-  CHECK: curl -s http://localhost:8000/health
-  EXPECT: ok
-  EVIDENCE: Python urllib returns {"status":"ok","postgres":"ok","neo4j":"ok"}
+- [ ] `pgvector` extension is enabled in Postgres.
+  CHECK: powershell -c "venv\Scripts\python -c \"import asyncio; from sqlalchemy import text; from app.core.database import engine; async def main(): async with engine.connect() as conn: res = await conn.execute(text('SELECT extname FROM pg_extension WHERE extname = ''vector''')); print(res.scalar()); asyncio.run(main())\""
+  EXPECT: vector
+  EVIDENCE: pending
+- [ ] `document_blocks` table has `embedding` column of type `vector`.
+  CHECK: powershell -c "venv\Scripts\python -c \"import asyncio; from sqlalchemy import text; from app.core.database import engine; async def main(): async with engine.connect() as conn: res = await conn.execute(text('SELECT data_type FROM information_schema.columns WHERE table_name = ''document_blocks'' AND column_name = ''embedding''')); print(res.scalar()); asyncio.run(main())\""
+  EXPECT: USER-DEFINED
+  EVIDENCE: pending
+- [ ] `document_blocks` table has `search_vector` column of type `tsvector`.
+  CHECK: powershell -c "venv\Scripts\python -c \"import asyncio; from sqlalchemy import text; from app.core.database import engine; async def main(): async with engine.connect() as conn: res = await conn.execute(text('SELECT data_type FROM information_schema.columns WHERE table_name = ''document_blocks'' AND column_name = ''search_vector''')); print(res.scalar()); asyncio.run(main())\""
+  EXPECT: tsvector
+  EVIDENCE: pending
+- [ ] `HybridRetrievalService` is implemented.
+  CHECK: powershell -c "Test-Path app/services/hybrid_retrieval.py"
+  EXPECT: True
+  EVIDENCE: pending
+- [ ] Unit tests for `HybridRetrievalService` pass.
+  CHECK: venv\Scripts\python -m pytest tests/test_hybrid_retrieval.py
+  EXPECT: pass
+  EVIDENCE: pending

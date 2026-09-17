@@ -27,6 +27,8 @@ from app.services.parsing import DocumentParser
 from app.services.chunking import ChunkingService
 from app.repositories.block import BlockRepository
 from app.repositories.episodic import EpisodicRepository
+from app.repositories.knowledge import KnowledgeRepository
+from app.repositories.graph import graph_store
 from app.schemas.episodic import EpisodicMemoryCreate
 from app.schemas.working_memory import WorkingMemoryState
 
@@ -230,3 +232,205 @@ async def compress_episodic_job(
                 workspace_id, run_id, exc
             )
             return {"status": "failed", "workspace_id": workspace_id, "error": str(exc)}
+
+# --------------------------------------------------------------------------- #
+# sync_knowledge_to_graph_job
+# --------------------------------------------------------------------------- #
+
+async def sync_knowledge_to_graph_job(
+    ctx: dict,
+    *,
+    knowledge_id: str,
+) -> dict[str, Any]:
+    """
+    Background job: synchronizes a KnowledgeMemory row from Postgres to the Neo4j Graph.
+
+    Idempotency contract:
+    - Re-running on the same knowledge_id will run a Neo4j MERGE, which safely
+      updates properties without duplicating the node or edge.
+    """
+    k_uuid = UUID(knowledge_id)
+
+    async with async_session_maker() as session:
+        repo = KnowledgeRepository(session)
+        # We don't have the owner_id in the payload, but get_knowledge requires it.
+        # Let's query by knowledge_id directly.
+        result = await session.execute(
+            select(repo.session.info.get("model", __import__("app.models.knowledge", fromlist=["KnowledgeMemory"]).KnowledgeMemory))
+            .where(__import__("app.models.knowledge", fromlist=["KnowledgeMemory"]).KnowledgeMemory.knowledge_id == k_uuid)
+        )
+        knowledge = result.scalars().first()
+
+        if not knowledge:
+            logger.error("sync_knowledge_to_graph_job: knowledge_id %s not found", knowledge_id)
+            return {"status": "not_found", "knowledge_id": knowledge_id}
+
+        try:
+            # Ensure GraphStore is connected
+            await graph_store.connect()
+
+            query = """
+            MERGE (k:Knowledge {id: $knowledge_id})
+            SET k.workspace_id = $workspace_id,
+                k.owner_id = $owner_id,
+                k.type = $knowledge_type,
+                k.content = $content,
+                k.status = $status,
+                k.domain = $domain,
+                k.version = $version
+            WITH k
+            MERGE (w:Workspace {id: $workspace_id})
+            MERGE (w)-[:CONTAINS]->(k)
+            """
+            
+            params = {
+                "knowledge_id": str(knowledge.knowledge_id),
+                "workspace_id": str(knowledge.workspace_id),
+                "owner_id": str(knowledge.owner_id),
+                "knowledge_type": knowledge.knowledge_type,
+                "content": knowledge.content,
+                "status": knowledge.status,
+                "domain": knowledge.domain,
+                "version": knowledge.version,
+            }
+
+            await graph_store.execute_query(query, params)
+            logger.info("sync_knowledge_to_graph_job: upserted knowledge_id %s to graph", knowledge_id)
+            
+            return {"status": "completed", "knowledge_id": knowledge_id}
+
+        except Exception as exc:
+            logger.exception("sync_knowledge_to_graph_job: failed to sync knowledge_id %s: %s", knowledge_id, exc)
+            return {"status": "failed", "knowledge_id": knowledge_id, "error": str(exc)}
+
+# --------------------------------------------------------------------------- #
+# run_research_agent_job
+# --------------------------------------------------------------------------- #
+
+async def run_research_agent_job(
+    ctx: dict,
+    *,
+    workspace_id: str,
+    objective: str,
+) -> dict[str, Any]:
+    """
+    Background job: Runs the ResearchModeOrchestrator and streams events to Redis.
+    """
+    import json
+    from uuid import UUID
+    from app.orchestration.research_mode import ResearchModeOrchestrator
+    from app.services.web_search import WebSearchTool
+
+    job_id = ctx.get("job_id")
+    if not job_id:
+        logger.error("run_research_agent_job: No job_id found in context")
+        return {"status": "failed", "error": "No job_id"}
+        
+    redis = ctx.get("redis")
+    channel_name = f"research:{job_id}"
+    
+    async def publish_event(event_data: dict):
+        if redis:
+            await redis.publish(channel_name, json.dumps(event_data))
+
+    await publish_event({"status": "starting", "message": "Initializing research agent..."})
+
+    # Get LLM Gateway (same pattern as compress_episodic_job)
+    async def llm_gateway(prompt: str) -> str:
+        llm_fn = ctx.get("llm_call")
+        if llm_fn is None:
+            # Fallback for tests if not provided
+            raise RuntimeError("llm_call not found in context")
+        return await llm_fn(prompt, model="gpt-4o", provider="openai")
+
+    search_tool = WebSearchTool()
+    orchestrator = ResearchModeOrchestrator(
+        llm_gateway=llm_gateway,
+        search_tool=search_tool
+    )
+    
+    initial_state = {
+        "workspace_id": UUID(workspace_id),
+        "objective": objective,
+        "plan": [],
+        "current_task_index": 0,
+        "gathered_evidence": [],
+        "final_graph": None
+    }
+    
+    try:
+        # We use astream to yield after each node
+        async for step in orchestrator.graph.astream(initial_state):
+            # step is a dict like {'planner': {'plan': [...]}}
+            node_name = list(step.keys())[0]
+            state = step[node_name]
+            
+            if node_name == "planner":
+                await publish_event({
+                    "status": "planning", 
+                    "message": "Generated research plan", 
+                    "plan": state.get("plan", [])
+                })
+            elif node_name == "executor":
+                idx = state.get("current_task_index", 1) - 1
+                plan = state.get("plan", [])
+                if idx < len(plan):
+                    await publish_event({
+                        "status": "executing", 
+                        "message": f"Executed search: {plan[idx]}"
+                    })
+            elif node_name == "synthesizer":
+                await publish_event({
+                    "status": "synthesizing", 
+                    "message": "Synthesized final graph"
+                })
+
+        await publish_event({"status": "completed", "message": "Research complete"})
+        
+        final_graph = state.get("final_graph") if 'state' in locals() else None
+        if final_graph and redis:
+            await redis.enqueue_job(
+                "project_output_graph_job",
+                workspace_id=workspace_id,
+                graph_dict=final_graph
+            )
+            
+        return {"status": "completed", "workspace_id": workspace_id}
+
+    except Exception as exc:
+        logger.exception("run_research_agent_job: failed for workspace %s: %s", workspace_id, exc)
+        await publish_event({"status": "failed", "error": str(exc)})
+        return {"status": "failed", "workspace_id": workspace_id, "error": str(exc)}
+
+# --------------------------------------------------------------------------- #
+# project_output_graph_job
+# --------------------------------------------------------------------------- #
+
+async def project_output_graph_job(
+    ctx: dict,
+    *,
+    workspace_id: str,
+    graph_dict: dict
+) -> dict[str, Any]:
+    """
+    Background job: Projects the final OutputGraph from the research agent into Neo4j.
+    """
+    from uuid import UUID
+    from app.schemas.graph import OutputGraph
+    from app.repositories.graph import graph_store, GraphRepository
+    
+    workspace_uuid = UUID(workspace_id)
+    
+    try:
+        # Reconstruct Pydantic model
+        graph = OutputGraph(**graph_dict)
+        
+        repo = GraphRepository(graph_store)
+        await repo.project_output_graph(workspace_uuid, graph)
+        
+        logger.info(f"project_output_graph_job: Successfully projected graph for workspace {workspace_id}")
+        return {"status": "completed", "workspace_id": workspace_id}
+        
+    except Exception as exc:
+        logger.exception("project_output_graph_job: failed to project graph for workspace %s: %s", workspace_id, exc)
+        return {"status": "failed", "workspace_id": workspace_id, "error": str(exc)}

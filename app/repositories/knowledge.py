@@ -16,7 +16,7 @@ class KnowledgeRepository:
             knowledge_type=data.knowledge_type,
             content=data.content,
             status=data.status,
-            provenance=data.provenance.model_dump(),
+            provenance=data.provenance.model_dump(mode='json'),
             confidence=data.confidence,
             tags=data.tags,
             entities=data.entities,
@@ -36,11 +36,14 @@ class KnowledgeRepository:
         )
         return result.scalars().first()
 
-    async def list_workspace_knowledge(self, workspace_id: UUID, owner_id: UUID) -> Sequence[KnowledgeMemory]:
-        result = await self.session.execute(
-            select(KnowledgeMemory)
-            .where(KnowledgeMemory.workspace_id == workspace_id)
-            .where(KnowledgeMemory.owner_id == owner_id)
-            .order_by(KnowledgeMemory.created_at.desc())
+    async def list_workspace_knowledge(self, workspace_id: UUID, owner_id: UUID, allowed_ids: list[UUID] | None = None) -> Sequence[KnowledgeMemory]:
+        stmt = select(KnowledgeMemory).where(
+            KnowledgeMemory.workspace_id == workspace_id,
+            KnowledgeMemory.owner_id == owner_id
         )
+        if allowed_ids is not None:
+            stmt = stmt.where(KnowledgeMemory.knowledge_id.in_(allowed_ids))
+        
+        stmt = stmt.order_by(KnowledgeMemory.created_at.desc())
+        result = await self.session.execute(stmt)
         return result.scalars().all()

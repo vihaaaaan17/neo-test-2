@@ -10,7 +10,10 @@ ctx["llm_call"] is populated in on_startup for use by compress_episodic_job.
 import logging
 from arq.connections import RedisSettings
 from app.core.config import settings
-from app.workers.tasks import parse_and_chunk_job, compress_episodic_job
+from app.workers.tasks import (
+    parse_and_chunk_job, compress_episodic_job, sync_knowledge_to_graph_job,
+    run_research_agent_job, project_output_graph_job
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +35,10 @@ async def shutdown(ctx: dict) -> None:
 class WorkerSettings:
     """arq worker settings class. Discovered by: python -m arq app.workers.settings.WorkerSettings"""
 
-    functions = [parse_and_chunk_job, compress_episodic_job]
+    functions = [
+        parse_and_chunk_job, compress_episodic_job, sync_knowledge_to_graph_job,
+        run_research_agent_job, project_output_graph_job
+    ]
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(settings.REDIS_URL)

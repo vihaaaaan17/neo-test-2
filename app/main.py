@@ -123,5 +123,7 @@ async def health_check():
     return status
 
 from app.api.routes.workspaces import router as workspaces_router
+from app.api.routes.jobs import router as jobs_router
 # Limit the workspace router routes explicitly if needed, but slowapi works automatically
 app.include_router(workspaces_router, prefix="/api/v1")
+app.include_router(jobs_router, prefix="/api/v1")

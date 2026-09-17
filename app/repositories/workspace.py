@@ -1,7 +1,7 @@
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from app.models.workspace import Workspace
+from app.models.workspace import Workspace, WorkspaceCommit
 from app.schemas.workspace import WorkspaceCreate, WorkspaceUpdate
 
 class WorkspaceRepository:
@@ -41,3 +41,37 @@ class WorkspaceRepository:
         workspace.status = "archived"
         await self.session.commit()
         return True
+
+    async def create_commit(self, workspace_id: UUID, parent_id: UUID | None, active_knowledge_ids: list[UUID]) -> WorkspaceCommit:
+        commit = WorkspaceCommit(
+            workspace_id=workspace_id,
+            parent_id=parent_id,
+            active_knowledge_ids=[str(k_id) for k_id in active_knowledge_ids]
+        )
+        self.session.add(commit)
+        await self.session.commit()
+        await self.session.refresh(commit)
+        return commit
+
+    async def get_commit(self, commit_id: UUID, workspace_id: UUID) -> WorkspaceCommit | None:
+        result = await self.session.execute(
+            select(WorkspaceCommit).where(
+                WorkspaceCommit.commit_id == commit_id,
+                WorkspaceCommit.workspace_id == workspace_id
+            )
+        )
+        return result.scalars().first()
+
+    async def set_active_commit(self, workspace_id: UUID, commit_id: UUID) -> Workspace | None:
+        result = await self.session.execute(
+            select(Workspace).where(
+                Workspace.workspace_id == workspace_id
+            )
+        )
+        workspace = result.scalars().first()
+        if not workspace:
+            return None
+        workspace.active_commit_id = commit_id
+        await self.session.commit()
+        await self.session.refresh(workspace)
+        return workspace
