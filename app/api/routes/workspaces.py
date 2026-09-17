@@ -10,6 +10,7 @@ from app.schemas.file import FileUploadResponse
 from app.schemas.source import SourceResponse
 from app.repositories.source import SourceRepository
 from app.services.storage import ObjectStoreProtocol, get_object_store
+from app.services.quota import QuotaService, get_quota_service
 from app.api.deps.arq import get_arq_redis
 from app.api.deps.rate_limit import limiter
 from arq import ArqRedis
@@ -23,12 +24,17 @@ def get_workspace_repository(db: AsyncSession = Depends(get_db)) -> WorkspaceRep
 def get_source_repository(db: AsyncSession = Depends(get_db)) -> SourceRepository:
     return SourceRepository(db)
 
+def get_quota(db: AsyncSession = Depends(get_db)) -> QuotaService:
+    return get_quota_service(db)
+
 @router.post("/", response_model=WorkspaceResponse, status_code=status.HTTP_201_CREATED)
 async def create_workspace(
     workspace_in: WorkspaceCreate,
     current_user_id: UUID = Depends(get_current_user),
-    repo: WorkspaceRepository = Depends(get_workspace_repository)
+    repo: WorkspaceRepository = Depends(get_workspace_repository),
+    quota: QuotaService = Depends(get_quota)
 ):
+    await quota.check_workspace_limit(current_user_id)
     return await repo.create_workspace(owner_id=current_user_id)
 
 @router.get("/{workspace_id}", response_model=WorkspaceResponse)
@@ -74,13 +80,18 @@ async def upload_file_to_workspace(
     repo: WorkspaceRepository = Depends(get_workspace_repository),
     source_repo: SourceRepository = Depends(get_source_repository),
     storage: ObjectStoreProtocol = Depends(get_object_store),
-    arq_redis: ArqRedis = Depends(get_arq_redis)
+    arq_redis: ArqRedis = Depends(get_arq_redis),
+    quota: QuotaService = Depends(get_quota)
 ):
     workspace = await repo.get_workspace(workspace_id, current_user_id)
     if not workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
+        
+    await quota.check_source_limit(workspace_id)
     
     file_bytes = await file.read()
+    await quota.check_storage_limit(workspace_id, len(file_bytes))
+    
     checksum_sha256 = hashlib.sha256(file_bytes).hexdigest()
     file_uri = await storage.upload_file(workspace_id, file_bytes, file.filename)
     

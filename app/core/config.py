@@ -17,6 +17,14 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379"
     # CORS
     ALLOWED_ORIGINS: list[str] = ["*"]
+    
+    # Quotas
+    MAX_WORKSPACES_PER_USER: int = 5
+    MAX_SOURCES_PER_WORKSPACE: int = 50
+    MAX_STORAGE_BYTES_PER_WORKSPACE: int = 500_000_000  # 500MB
+    MAX_KNOWLEDGE_PER_WORKSPACE: int = 1000
+    MAX_CONCURRENT_LLM_CALLS: int = 5
+
     # Set DEBUG_SQL=true in .env to log all SQL statements (development only).
     # NEVER enable this in production — it degrades throughput 10-20% and floods stdout.
     DEBUG_SQL: bool = False

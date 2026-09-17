@@ -7,7 +7,8 @@ from app.main import app
 from app.api.routes.workspaces import (
     get_workspace_repository, 
     get_object_store, 
-    get_source_repository
+    get_source_repository,
+    get_quota
 )
 from app.api.deps.arq import get_arq_redis
 from app.api.deps.auth import get_current_user
@@ -112,6 +113,19 @@ class MockArqRedis:
 
 mock_arq_redis = MockArqRedis()
 app.dependency_overrides[get_arq_redis] = lambda: mock_arq_redis
+
+class MockQuotaService:
+    async def check_workspace_limit(self, owner_id):
+        pass
+    async def check_source_limit(self, workspace_id):
+        pass
+    async def check_storage_limit(self, workspace_id, new_bytes):
+        pass
+    async def check_knowledge_limit(self, workspace_id):
+        pass
+
+mock_quota = MockQuotaService()
+app.dependency_overrides[get_quota] = lambda: mock_quota
 
 def test_unauthorized_access():
     # Remove auth override to test actual security guard
