@@ -35,7 +35,7 @@ def upgrade() -> None:
 
     # knowledge_memories — workspace-scoped memory reads
     op.create_index('ix_knowledge_memories_workspace_id', 'knowledge_memories', ['workspace_id'])
-    op.create_index('ix_knowledge_memories_workspace_source_mode', 'knowledge_memories', ['workspace_id', 'source_mode'])
+    op.execute("CREATE INDEX ix_knowledge_memories_workspace_source_mode ON knowledge_memories (workspace_id, (provenance->>'source_mode'))")
 
     # episodic_memories — workspace-scoped episode reads
     op.create_index('ix_episodic_memories_workspace_id', 'episodic_memories', ['workspace_id'])
@@ -45,7 +45,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index('ix_episodic_memories_workspace_created', table_name='episodic_memories')
     op.drop_index('ix_episodic_memories_workspace_id', table_name='episodic_memories')
-    op.drop_index('ix_knowledge_memories_workspace_source_mode', table_name='knowledge_memories')
+    op.execute("DROP INDEX IF EXISTS ix_knowledge_memories_workspace_source_mode")
     op.drop_index('ix_knowledge_memories_workspace_id', table_name='knowledge_memories')
     op.drop_index('ix_source_snapshots_source_id', table_name='source_snapshots')
     op.drop_index('ix_sources_workspace_id', table_name='sources')
