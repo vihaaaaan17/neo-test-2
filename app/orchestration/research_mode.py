@@ -26,10 +26,13 @@ class ResearchModeOrchestrator:
     def __init__(
         self,
         llm_gateway: Callable[[str], Awaitable[str]],
-        search_tool: WebSearchTool
+        search_tool: WebSearchTool,
+        memory_router: Any = None
     ):
+        from app.services.memory_router import MemoryRouterService
         self.llm_gateway = llm_gateway
         self.search_tool = search_tool
+        self.memory_router = memory_router or MemoryRouterService()
         self.graph = self._build_graph()
         
     def _build_graph(self):
@@ -113,7 +116,19 @@ class ResearchModeOrchestrator:
     async def synthesizer_node(self, state: ResearchState) -> dict:
         logger.info("Synthesizing gathered evidence into OutputGraph")
         ctx = state.get("context", ResearchContext())
-        evidence_text = "\n\n".join(ctx.gathered_evidence)
+        
+        from app.schemas.context import MemoryItem
+        import uuid
+        
+        # Treat each gathered evidence as a 'source' memory item
+        items = [
+            MemoryItem(id=str(uuid.uuid4()), type="source", text=ev, metadata={})
+            for ev in ctx.gathered_evidence
+        ]
+        
+        bundle = self.memory_router.build_context(items, token_budget=8000)
+        
+        evidence_text = "\n\n".join(item.text for item in bundle.items)
         
         prompt = (
             "You are a research synthesis agent.\n"

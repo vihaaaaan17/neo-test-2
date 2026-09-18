@@ -10,7 +10,7 @@ class GroundModeState(TypedDict):
     workspace_id: UUID
     query: str
     query_embedding: list[float]
-    context_blocks: list[Any]
+    context_bundle: dict
     answer: str
     evidence: list[UUID]
     is_grounded: bool
@@ -21,11 +21,14 @@ class GroundModeOrchestrator:
         self, 
         hybrid_retriever: HybridRetrievalService,
         llm_gateway: Callable[[str], Awaitable[str]],
-        embed_gateway: Callable[[str], Awaitable[list[float]]]
+        embed_gateway: Callable[[str], Awaitable[list[float]]],
+        memory_router: Any = None
     ):
+        from app.services.memory_router import MemoryRouterService
         self.hybrid_retriever = hybrid_retriever
         self.llm_gateway = llm_gateway
         self.embed_gateway = embed_gateway
+        self.memory_router = memory_router or MemoryRouterService()
         self.graph = self._build_graph()
 
     def _build_graph(self):
@@ -60,17 +63,25 @@ class GroundModeOrchestrator:
             query_embedding=query_embedding
         )
         
+        from app.schemas.context import MemoryItem
+        items = [MemoryItem(id=str(c.block_id), type="source", text=c.text, metadata=c.metadata) for c in chunks]
+        
+        # Ground mode has strict budget
+        bundle = self.memory_router.build_context(items, token_budget=4000)
+        
         return {
             "query_embedding": query_embedding,
-            "context_blocks": chunks,
+            "context_bundle": bundle.model_dump(),
             "retries": 0,
             "is_grounded": False,
             "answer": ""
         }
 
     async def answer_node(self, state: GroundModeState) -> dict:
+        bundle_dict = state.get("context_bundle", {})
+        items = bundle_dict.get("items", [])
         context_text = "\n\n".join(
-            f"--- Context Block {chunk.block_id} ---\n{chunk.text}" for chunk in state.get("context_blocks", [])
+            f"--- Context Block {item['id']} ---\n{item['text']}" for item in items
         )
         
         prompt = (
@@ -107,8 +118,10 @@ class GroundModeOrchestrator:
         return {"answer": answer, "evidence": evidence_uuids}
 
     async def check_hallucination_node(self, state: GroundModeState) -> dict:
+        bundle_dict = state.get("context_bundle", {})
+        items = bundle_dict.get("items", [])
         context_text = "\n\n".join(
-            f"--- Context Block ---\n{chunk.text}" for chunk in state.get("context_blocks", [])
+            f"--- Context Block ---\n{item['text']}" for item in items
         )
         
         prompt = (
@@ -144,7 +157,7 @@ class GroundModeOrchestrator:
             "workspace_id": workspace_id,
             "query": query,
             "query_embedding": [],
-            "context_blocks": [],
+            "context_bundle": {},
             "answer": "",
             "evidence": [],
             "is_grounded": False,
