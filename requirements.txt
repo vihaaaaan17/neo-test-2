@@ -26,3 +26,5 @@ tavily-python
 litellm
 google-genai
 streamlit
+pandas
+pyarrow

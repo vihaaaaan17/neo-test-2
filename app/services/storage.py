@@ -11,6 +11,9 @@ class ObjectStoreProtocol(Protocol):
         
     async def download_file(self, file_uri: str) -> bytes:
         ...
+        
+    async def generate_presigned_url(self, file_uri: str, expiration: int = 3600) -> str:
+        ...
 
 class S3ObjectStore:
     def __init__(self, s3_client):
@@ -41,6 +44,20 @@ class S3ObjectStore:
             
         response = await self.s3_client.get_object(Bucket=self.bucket, Key=object_key)
         return await response["Body"].read()
+
+    async def generate_presigned_url(self, file_uri: str, expiration: int = 3600) -> str:
+        if not file_uri.startswith("s3://"):
+            raise ValueError("Invalid S3 URI")
+            
+        path = file_uri[5:]
+        bucket_name, object_key = path.split("/", 1)
+        
+        url = await self.s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': bucket_name, 'Key': object_key},
+            ExpiresIn=expiration
+        )
+        return url
 
 def get_object_store(request: Request) -> ObjectStoreProtocol:
     """Dependency to provide shared S3ObjectStore from app state."""

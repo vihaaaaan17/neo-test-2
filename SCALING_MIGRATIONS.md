@@ -44,3 +44,11 @@ This document tracks all temporary "Phase 1-4" shortcuts made for speed or free-
 - **Migration Path**:
   - **File**: `app/orchestration/research_mode.py` and `app/repositories/graph.py`.
   - **Action**: When users need strict physical tenant isolation or federated graph capabilities across workspaces, you will need to push this curated graph into a dedicated Neo4j instance or a completely separate Aura database endpoint.
+
+## Phase 6: Production Hardening
+
+### 7. Structured Export -> Full Raw Asset Export
+- **Current State**: The export bundle packages structured JSON and Parquet data (canonical metadata, memory, extracted chunks) but explicitly omits the massive raw binaries (e.g., source PDFs) to prevent archive bloat and timeout issues.
+- **Migration Path**:
+  - **File**: `app/workers/tasks.py` (specifically `export_workspace_job`).
+  - **Action**: Introduce a multi-stage background export pipeline that can zip potentially gigabytes of raw files directly from the S3/ObjectStore bucket. This will require streaming compression or offloading the archiving process directly to AWS S3 Batch Operations or a dedicated sidecar service to avoid OOM crashes on the worker.
