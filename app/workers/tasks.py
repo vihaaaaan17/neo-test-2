@@ -450,3 +450,56 @@ async def project_output_graph_job(
     except Exception as exc:
         logger.exception("project_output_graph_job: failed to project graph for workspace %s: %s", workspace_id, exc)
         return {"status": "failed", "workspace_id": workspace_id, "error": str(exc)}
+
+# --------------------------------------------------------------------------- #
+# export_workspace_job
+# --------------------------------------------------------------------------- #
+
+async def export_workspace_job(
+    ctx: dict,
+    *,
+    workspace_id: str,
+    owner_id: str,
+) -> dict[str, Any]:
+    """
+    Background job: Executes the workspace export using WorkspaceExportService
+    and publishes the result URL to a Redis pub/sub channel.
+    """
+    import json
+    from uuid import UUID
+    from app.services.export import WorkspaceExportService
+    from app.services.storage import S3ObjectStore
+
+    workspace_uuid = UUID(workspace_id)
+    redis = ctx.get("redis")
+    channel_name = f"export:{workspace_id}"
+
+    async def publish_event(event_data: dict):
+        if redis:
+            await redis.publish(channel_name, json.dumps(event_data))
+
+    await publish_event({"status": "starting", "message": "Starting workspace export..."})
+
+    try:
+        s3_client = ctx.get("s3_client")
+        if not s3_client:
+            raise RuntimeError("s3_client not found in worker context")
+            
+        storage = S3ObjectStore(s3_client)
+
+        async with async_session_maker() as session:
+            service = WorkspaceExportService(db=session, object_store=storage)
+            signed_url = await service.export_to_zip(workspace_uuid)
+
+        await publish_event({
+            "status": "completed",
+            "message": "Export finished",
+            "url": signed_url
+        })
+        logger.info("export_workspace_job: Successfully exported workspace %s", workspace_id)
+        return {"status": "completed", "workspace_id": workspace_id, "url": signed_url}
+
+    except Exception as exc:
+        logger.exception("export_workspace_job: failed for workspace %s: %s", workspace_id, exc)
+        await publish_event({"status": "failed", "error": str(exc)})
+        return {"status": "failed", "workspace_id": workspace_id, "error": str(exc)}

@@ -12,7 +12,7 @@ from arq.connections import RedisSettings
 from app.core.config import settings
 from app.workers.tasks import (
     parse_and_chunk_job, compress_episodic_job, sync_knowledge_to_graph_job,
-    run_research_agent_job, project_output_graph_job
+    run_research_agent_job, project_output_graph_job, export_workspace_job
 )
 
 logger = logging.getLogger(__name__)
@@ -25,11 +25,23 @@ async def startup(ctx: dict) -> None:
     # For now it is None; compress_episodic_job raises a clear error if called
     # without it, which makes the missing dependency explicit rather than silent.
     ctx["llm_call"] = None
+    
+    import aioboto3
+    session = aioboto3.Session(
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        region_name=settings.AWS_REGION
+    )
+    s3_context = session.client("s3", endpoint_url=settings.S3_ENDPOINT_URL)
+    ctx["s3_client"] = await s3_context.__aenter__()
+    ctx["s3_context"] = s3_context
 
 
 async def shutdown(ctx: dict) -> None:
     """Runs once when the worker process shuts down."""
     logger.info("NeosisLM worker shutting down")
+    if "s3_context" in ctx:
+        await ctx["s3_context"].__aexit__(None, None, None)
 
 
 class WorkerSettings:
@@ -37,7 +49,8 @@ class WorkerSettings:
 
     functions = [
         parse_and_chunk_job, compress_episodic_job, sync_knowledge_to_graph_job,
-        run_research_agent_job, project_output_graph_job
+        run_research_agent_job, project_output_graph_job,
+        export_workspace_job
     ]
     on_startup = startup
     on_shutdown = shutdown
