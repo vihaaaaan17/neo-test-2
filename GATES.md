@@ -17,3 +17,10 @@
 - [x] Job invokes `WorkspaceExportService` and handles potential exceptions (EVIDENCE: `app/workers/tasks.py:488` `service = WorkspaceExportService(db=session, object_store=storage)`)
 - [x] Job publishes a message to the Redis channel `export:<workspace_id>` containing the presigned download URL (EVIDENCE: `app/workers/tasks.py:492` `await publish_event({"status": "completed", ... "url": signed_url})`)
 - [x] Worker configuration is updated to register the new job (EVIDENCE: `app/workers/settings.py:38` `export_workspace_job` added to `functions` list)
+
+# Gates for Phase 6: Ticket 3
+
+- [x] "Export Workspace Data" button added to the Streamlit UI (EVIDENCE: `streamlit_app.py:233` `if st.button("Export Workspace Data"):`)
+- [x] Clicking the button calls the API or directly enqueues `export_workspace_job` (EVIDENCE: `streamlit_app.py:245` `await arq_pool.enqueue_job("export_workspace_job"`)
+- [x] UI polls or subscribes to the Redis channel `export:<workspace_id>` to wait for completion (EVIDENCE: `streamlit_app.py:255` `async for message in pubsub.listen():`)
+- [x] A success message and clickable download link are presented to the user when the URL is received (EVIDENCE: `streamlit_app.py:266` `st.markdown(f"**[Click here to download your archive]({download_url})**")`)

@@ -88,7 +88,7 @@ def get_litellm_gateway(api_key: str):
     return llm_call
 
 # --- TABS ---
-tab1, tab2, tab3 = st.tabs(["🏗️ Workspace Setup", "🧠 Ground Mode (QA)", "🔍 Autonomous Research"])
+tab1, tab2, tab3, tab4 = st.tabs(["🏗️ Workspace Setup", "🧠 Ground Mode (QA)", "🔍 Autonomous Research", "📦 Export Data"])
 
 # TAB 1: WORKSPACE
 with tab1:
@@ -227,3 +227,59 @@ with tab3:
 
             # Run the async agent block
             asyncio.run(run_agent())
+
+# TAB 4: EXPORT DATA
+with tab4:
+    st.header("4. Export Workspace Data (Phase 6)")
+    st.markdown("This will enqueue a background job to export your workspace as a polyglot `.zip` archive. Make sure the `arq` worker is running!")
+    
+    if st.button("Export Workspace Data"):
+        if not st.session_state.workspace_id:
+            st.error("Please create a workspace first (Tab 1).")
+        else:
+            async def run_export():
+                from arq import create_pool
+                from arq.connections import RedisSettings
+                import redis.asyncio as aioredis
+                import json
+                
+                status_box = st.status("Enqueuing export job...", expanded=True)
+                
+                # Enqueue Job
+                arq_pool = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
+                await arq_pool.enqueue_job(
+                    "export_workspace_job", 
+                    workspace_id=str(st.session_state.workspace_id),
+                    owner_id=str(st.session_state.owner_id)
+                )
+                
+                # Listen to Redis Pub/Sub
+                r = aioredis.from_url(settings.REDIS_URL)
+                pubsub = r.pubsub()
+                channel = f"export:{st.session_state.workspace_id}"
+                await pubsub.subscribe(channel)
+                
+                try:
+                    status_box.update(label="Waiting for background worker...")
+                    async for message in pubsub.listen():
+                        if message["type"] == "message":
+                            data = json.loads(message["data"])
+                            status = data.get("status")
+                            
+                            if status == "starting":
+                                status_box.update(label="Worker started processing export...")
+                            elif status == "completed":
+                                status_box.update(label="Export complete!", state="complete")
+                                st.success("Workspace data exported successfully!")
+                                download_url = data.get("url")
+                                st.markdown(f"**[Click here to download your archive]({download_url})**")
+                                break
+                            elif status == "failed":
+                                status_box.update(label="Export failed", state="error")
+                                st.error(f"Error: {data.get('error')}")
+                                break
+                finally:
+                    await pubsub.unsubscribe(channel)
+                    await r.aclose()
+                    
+            asyncio.run(run_export())
