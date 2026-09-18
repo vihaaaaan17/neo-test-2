@@ -14,8 +14,13 @@ Design rules:
   startup context via WorkerSettings.on_startup.
 """
 import logging
+import os
 from uuid import UUID
 from typing import Any
+
+# Background tasks are noisy; disable global LangSmith tracing here.
+# Explicit tracing_v2_enabled blocks will override this where necessary.
+os.environ["LANGCHAIN_TRACING_V2"] = "false"
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -360,11 +365,14 @@ async def run_research_agent_job(
     }
     
     try:
-        # We use astream to yield after each node
-        async for step in orchestrator.graph.astream(initial_state):
-            # step is a dict like {'planner': {'plan': [...]}}
-            node_name = list(step.keys())[0]
-            state = step[node_name]
+        from langchain_core.tracers.context import tracing_v2_enabled
+        
+        # We use astream to yield after each node. Ensure tracing is ENABLED here.
+        with tracing_v2_enabled(project_name="NeosisLM-ResearchMode"):
+            async for step in orchestrator.graph.astream(initial_state):
+                # step is a dict like {'planner': {'plan': [...]}}
+                node_name = list(step.keys())[0]
+                state = step[node_name]
             
             if node_name == "planner":
                 ctx = state.get("context", ResearchContext())

@@ -179,5 +179,9 @@ class ResearchModeOrchestrator:
             "final_graph": None,
             "summary": None
         }
-        final_state = await self.graph.ainvoke(initial_state)
+        
+        from langchain_core.tracers.context import tracing_v2_enabled
+        with tracing_v2_enabled(project_name="NeosisLM-ResearchMode"):
+            final_state = await self.graph.ainvoke(initial_state)
+            
         return final_state
