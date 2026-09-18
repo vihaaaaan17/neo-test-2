@@ -59,12 +59,12 @@ async def project_graph_to_neo4j(graph):
     
     driver = AsyncGraphDatabase.driver(settings.NEO4J_URI, auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD))
     
-    class TempNeo4jAdapter(Neo4jAdapter):
-        def __init__(self):
-            super().__init__(settings.NEO4J_URI, settings.NEO4J_USER, settings.NEO4J_PASSWORD)
-            self._driver = driver
-            
-    temp_store = TempNeo4jAdapter()
+    temp_store = Neo4jAdapter(
+        settings.NEO4J_URI, 
+        settings.NEO4J_USER, 
+        settings.NEO4J_PASSWORD, 
+        driver=driver
+    )
     repo = GraphRepository(temp_store)
     
     try:
@@ -80,7 +80,7 @@ def get_litellm_gateway(api_key: str):
         
         # LiteLLM routing
         response = await litellm.acompletion(
-            model="gemini/gemini-1.5-pro-latest",
+            model="gemini/gemini-3.6-flash",
             messages=[{"role": "user", "content": prompt}],
             api_key=api_key
         )
@@ -167,13 +167,13 @@ with tab3:
                 search_tool = WebSearchTool()
                 orchestrator = ResearchModeOrchestrator(llm_gateway=llm_gw, search_tool=search_tool)
                 
+                from app.orchestration.research_mode import ResearchContext
                 initial_state = {
                     "workspace_id": UUID(st.session_state.workspace_id),
                     "objective": objective,
-                    "plan": [],
-                    "current_task_index": 0,
-                    "gathered_evidence": [],
-                    "final_graph": None
+                    "context": ResearchContext(),
+                    "final_graph": None,
+                    "summary": None
                 }
                 
                 status_box = st.status("Initializing LangGraph Agent...", expanded=True)
@@ -188,21 +188,26 @@ with tab3:
                         if node_name == "planner":
                             status_box.update(label="Planning phase complete")
                             st.write("**Generated Plan:**")
-                            st.json(state.get("plan", []))
+                            ctx = state.get("context", ResearchContext())
+                            st.json(ctx.plan)
                         elif node_name == "executor":
-                            idx = state.get("current_task_index", 1) - 1
-                            plan = state.get("plan", [])
+                            ctx = state.get("context", ResearchContext())
+                            idx = ctx.current_task_index - 1
+                            plan = ctx.plan
                             if idx < len(plan):
                                 status_box.update(label=f"Executed search: {plan[idx]}")
                                 st.write(f"Executed search: {plan[idx]}")
                         elif node_name == "synthesizer":
-                            status_box.update(label="Synthesis complete", state="complete")
+                            status_box.update(label="Synthesis complete", state="running")
                             st.success("Successfully generated Output KG!")
                             st.write("**Final Synthesized Graph:**")
-                            # It's an OutputGraph pydantic object or dict
                             fg = state.get("final_graph")
                             if fg:
                                 st.json(fg if isinstance(fg, dict) else fg.model_dump())
+                        elif node_name == "reporter":
+                            status_box.update(label="Research finished", state="complete")
+                            st.write("**Chatbot Summary:**")
+                            st.write(state.get("summary"))
                                 
                     # Now Project to Neo4j
                     if final_state and final_state.get("final_graph"):

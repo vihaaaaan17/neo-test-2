@@ -349,13 +349,14 @@ async def run_research_agent_job(
         search_tool=search_tool
     )
     
+    from app.orchestration.research_mode import ResearchContext
+    
     initial_state = {
         "workspace_id": UUID(workspace_id),
         "objective": objective,
-        "plan": [],
-        "current_task_index": 0,
-        "gathered_evidence": [],
-        "final_graph": None
+        "context": ResearchContext(),
+        "final_graph": None,
+        "summary": None
     }
     
     try:
@@ -366,14 +367,16 @@ async def run_research_agent_job(
             state = step[node_name]
             
             if node_name == "planner":
+                ctx = state.get("context", ResearchContext())
                 await publish_event({
                     "status": "planning", 
                     "message": "Generated research plan", 
-                    "plan": state.get("plan", [])
+                    "plan": ctx.plan
                 })
             elif node_name == "executor":
-                idx = state.get("current_task_index", 1) - 1
-                plan = state.get("plan", [])
+                ctx = state.get("context", ResearchContext())
+                idx = ctx.current_task_index - 1
+                plan = ctx.plan
                 if idx < len(plan):
                     await publish_event({
                         "status": "executing", 
@@ -383,6 +386,11 @@ async def run_research_agent_job(
                 await publish_event({
                     "status": "synthesizing", 
                     "message": "Synthesized final graph"
+                })
+            elif node_name == "reporter":
+                await publish_event({
+                    "status": "reporting", 
+                    "message": "Generated research summary"
                 })
 
         await publish_event({"status": "completed", "message": "Research complete"})

@@ -8,13 +8,19 @@ from app.schemas.graph import OutputGraph
 
 logger = logging.getLogger(__name__)
 
+from pydantic import BaseModel
+
+class ResearchContext(BaseModel):
+    plan: List[str] = []
+    current_task_index: int = 0
+    gathered_evidence: List[str] = []
+
 class ResearchState(TypedDict):
     workspace_id: UUID
     objective: str
-    plan: List[str]
-    current_task_index: int
-    gathered_evidence: List[str]
+    context: ResearchContext
     final_graph: dict | None
+    summary: str | None
 
 class ResearchModeOrchestrator:
     def __init__(
@@ -32,6 +38,7 @@ class ResearchModeOrchestrator:
         workflow.add_node("planner", self.planner_node)
         workflow.add_node("executor", self.executor_node)
         workflow.add_node("synthesizer", self.synthesizer_node)
+        workflow.add_node("reporter", self.reporter_node)
         
         workflow.set_entry_point("planner")
         workflow.add_edge("planner", "executor")
@@ -45,7 +52,8 @@ class ResearchModeOrchestrator:
             }
         )
         
-        workflow.add_edge("synthesizer", END)
+        workflow.add_edge("synthesizer", "reporter")
+        workflow.add_edge("reporter", END)
         return workflow.compile()
         
     async def planner_node(self, state: ResearchState) -> dict:
@@ -69,15 +77,18 @@ class ResearchModeOrchestrator:
             plan = [state["objective"]]
             
         return {
-            "plan": plan,
-            "current_task_index": 0,
-            "gathered_evidence": []
+            "context": ResearchContext(
+                plan=plan,
+                current_task_index=0,
+                gathered_evidence=[]
+            )
         }
         
     async def executor_node(self, state: ResearchState) -> dict:
-        idx = state.get("current_task_index", 0)
-        plan = state.get("plan", [])
-        evidence = list(state.get("gathered_evidence", []))
+        ctx = state.get("context", ResearchContext())
+        idx = ctx.current_task_index
+        plan = ctx.plan
+        evidence = list(ctx.gathered_evidence)
         
         if idx < len(plan):
             query = plan[idx]
@@ -86,24 +97,28 @@ class ResearchModeOrchestrator:
             evidence.append(f"### Query: {query}\n{search_result}")
             
         return {
-            "current_task_index": idx + 1,
-            "gathered_evidence": evidence
+            "context": ResearchContext(
+                plan=plan,
+                current_task_index=idx + 1,
+                gathered_evidence=evidence
+            )
         }
         
     def executor_router(self, state: ResearchState) -> str:
-        idx = state.get("current_task_index", 0)
-        plan = state.get("plan", [])
-        if idx < len(plan):
+        ctx = state.get("context", ResearchContext())
+        if ctx.current_task_index < len(ctx.plan):
             return "continue"
         return "finish"
         
     async def synthesizer_node(self, state: ResearchState) -> dict:
         logger.info("Synthesizing gathered evidence into OutputGraph")
-        evidence_text = "\n\n".join(state.get("gathered_evidence", []))
+        ctx = state.get("context", ResearchContext())
+        evidence_text = "\n\n".join(ctx.gathered_evidence)
         
         prompt = (
             "You are a research synthesis agent.\n"
-            "Based on the following gathered evidence, build a curated knowledge graph representing the findings.\n"
+            "Based on the following gathered evidence, build a curated, highly-compressed knowledge graph representing the findings.\n"
+            "CRITICAL: To prevent the graph from becoming too large, you MUST extract only the most important macro-level concepts and relationships. Do NOT include granular details or overly specific nodes.\n"
             "You MUST output exactly valid JSON matching the OutputGraph schema.\n"
             "The JSON must have 'nodes' (array of OutputGraphNode) and 'edges' (array of OutputGraphEdge).\n"
             "Each OutputGraphNode must have: 'id', 'label', 'properties' (dict).\n"
@@ -128,15 +143,26 @@ class ResearchModeOrchestrator:
             final_graph = {"nodes": [], "edges": []}
             
         return {"final_graph": final_graph}
+
+    async def reporter_node(self, state: ResearchState) -> dict:
+        logger.info("Generating research summary")
+        prompt = (
+            "You are a research reporting agent.\n"
+            "Based on the user's objective and the synthesized knowledge graph, write a concise, human-readable summary of the findings.\n\n"
+            f"Objective: {state['objective']}\n\n"
+            f"Knowledge Graph:\n{json.dumps(state.get('final_graph', {}))}\n\n"
+            "Summary:"
+        )
+        summary = await self.llm_gateway(prompt)
+        return {"summary": summary}
         
     async def run(self, workspace_id: UUID, objective: str) -> ResearchState:
         initial_state = {
             "workspace_id": workspace_id,
             "objective": objective,
-            "plan": [],
-            "current_task_index": 0,
-            "gathered_evidence": [],
-            "final_graph": None
+            "context": ResearchContext(),
+            "final_graph": None,
+            "summary": None
         }
         final_state = await self.graph.ainvoke(initial_state)
         return final_state

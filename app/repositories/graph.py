@@ -28,11 +28,11 @@ class GraphStore(abc.ABC):
 
 
 class Neo4jAdapter(GraphStore):
-    def __init__(self, uri: str, user: str, password: str):
+    def __init__(self, uri: str, user: str, password: str, driver: AsyncDriver | None = None):
         self._uri = uri
         self._user = user
         self._password = password
-        self._driver: AsyncDriver | None = None
+        self._driver: AsyncDriver | None = driver
 
     async def connect(self) -> None:
         if not self._driver:
