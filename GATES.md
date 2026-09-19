@@ -1,18 +1,31 @@
-- [x] Implement `httpx.AsyncClient` lifespan context pool in `app/main.py`.
-  - CHECK: Get-Content app/main.py | Select-String "httpx.AsyncClient"
-  - EVIDENCE: implemented
-- [x] Refactor `app/integrations/open_notebook/client.py` and `app/services/ground/factory.py` to inject the shared `httpx.AsyncClient`.
-  - CHECK: pytest tests/unit/test_open_notebook_client.py
-  - EVIDENCE: implemented
-- [x] Add `ground_version` integer column to `Workspace` model in `app/models/workspace.py` and schemas.
-  - CHECK: Get-Content app/models/workspace.py | Select-String "ground_version"
-  - EVIDENCE: implemented
-- [x] Add 404 -> 409 Session State Lost error mapping to `app/integrations/open_notebook/client.py` for chat interactions.
-  - CHECK: Get-Content app/integrations/open_notebook/client.py | Select-String "session_state_lost"
-  - EVIDENCE: implemented
-- [x] Add `ORPHANED_UPSTREAM` terminal deletion state logic to arq worker.
-  - CHECK: Get-Content app/worker/reconciliation.py | Select-String "ORPHANED_UPSTREAM"
-  - EVIDENCE: implemented
-- [x] Add integration test verifying `409 Conflict` on session 404.
-  - CHECK: pytest tests/integration/test_phase4_evaluation.py
-  - EVIDENCE: implemented
+# GATES: 02: Unified Research Repository
+
+- [x] Create `app/repositories/research.py` with CRUD for ResearchEvidence.
+  - CHECK: `cat app/repositories/research.py | grep create_evidence | wc -l`
+  - EXPECT: `>0`
+  - EVIDENCE: 1
+
+- [x] Implement CRUD for ResearchArtifact.
+  - CHECK: `cat app/repositories/research.py | grep create_artifact | wc -l`
+  - EXPECT: `>0`
+  - EVIDENCE: 1
+
+- [x] Implement CRUD for ResearchReport.
+  - CHECK: `cat app/repositories/research.py | grep create_report | wc -l`
+  - EXPECT: `>0`
+  - EVIDENCE: 1
+
+- [x] Implement CRUD for ResearchUsage.
+  - CHECK: `cat app/repositories/research.py | grep create_usage | wc -l`
+  - EXPECT: `>0`
+  - EVIDENCE: 1
+
+- [x] Implement CRUD for ResearchEvent.
+  - CHECK: `cat app/repositories/research.py | grep create_event | wc -l`
+  - EXPECT: `>0`
+  - EVIDENCE: 1
+
+- [x] Write integration tests enforcing cross-workspace isolation.
+  - CHECK: `pytest tests/integration/research/test_repository.py`
+  - EXPECT: `passed`
+  - EVIDENCE: 3 passed in 3.58s

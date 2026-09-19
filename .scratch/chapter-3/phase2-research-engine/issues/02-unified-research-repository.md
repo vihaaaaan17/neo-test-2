@@ -7,7 +7,7 @@ A unified repository `app/repositories/research.py` to handle persistence for al
 
 **Status:** ready-for-agent
 
-- [ ] Create `app/repositories/research.py`.
-- [ ] Implement CRUD operations for `ResearchEvidence`, `ResearchArtifact`, `ResearchReport`, `ResearchUsage`, and `ResearchEvent`.
-- [ ] Ensure every read and write operation requires and filters on `workspace_id`.
-- [ ] Write integration tests verifying database persistence and enforcing cross-workspace isolation.
+- [x] Create `app/repositories/research.py`.
+- [x] Implement CRUD operations for `ResearchEvidence`, `ResearchArtifact`, `ResearchReport`, `ResearchUsage`, and `ResearchEvent`.
+- [x] Ensure every read and write operation requires and filters on `workspace_id`.
+- [x] Write integration tests verifying database persistence and enforcing cross-workspace isolation.
