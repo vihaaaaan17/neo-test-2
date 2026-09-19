@@ -171,6 +171,34 @@ class ResearchModeOrchestrator:
         summary = await self.llm_gateway(prompt)
         return {"summary": summary}
         
+    async def astream_events(self, workspace_id: UUID, objective: str):
+        initial_state = {
+            "workspace_id": workspace_id,
+            "objective": objective,
+            "context": ResearchContext(),
+            "final_graph": None,
+            "summary": None
+        }
+        
+        from langchain_core.tracers.context import tracing_v2_enabled
+        with tracing_v2_enabled(project_name="NeosisLM-ResearchMode"):
+            async for step in self.graph.astream(initial_state):
+                node_name = list(step.keys())[0]
+                state = step[node_name]
+                if node_name == "planner":
+                    ctx = state.get("context", ResearchContext())
+                    yield {"status": "planning", "message": "Generated research plan", "plan": ctx.plan}
+                elif node_name == "executor":
+                    ctx = state.get("context", ResearchContext())
+                    idx = ctx.current_task_index - 1
+                    plan = ctx.plan
+                    if idx < len(plan):
+                        yield {"status": "executing", "message": f"Executed search: {plan[idx]}"}
+                elif node_name == "synthesizer":
+                    yield {"status": "synthesizing", "message": "Synthesized final graph", "final_graph": state.get("final_graph")}
+                elif node_name == "reporter":
+                    yield {"status": "reporting", "message": "Generated research summary", "summary": state.get("summary")}
+
     async def run(self, workspace_id: UUID, objective: str) -> ResearchState:
         initial_state = {
             "workspace_id": workspace_id,

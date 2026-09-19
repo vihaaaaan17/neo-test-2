@@ -348,62 +348,33 @@ async def run_research_agent_job(
             raise RuntimeError("llm_call not found in context")
         return await llm_fn(prompt, model="gpt-4o", provider="openai")
 
-    search_tool = WebSearchTool()
-    orchestrator = ResearchModeOrchestrator(
+    from app.services.research.factory import get_research_engine
+    
+    # We must retrieve the Workspace to get the workspace research_engine flag
+    async with async_session_maker() as session:
+        from app.models.workspace import Workspace
+        from sqlalchemy.future import select
+        result = await session.execute(
+            select(Workspace).where(Workspace.workspace_id == UUID(workspace_id))
+        )
+        workspace = result.scalars().first()
+        workspace_flag = workspace.research_engine if workspace else "legacy"
+
+    # Instantiate the appropriate engine via factory
+    orchestrator = get_research_engine(
+        workspace_flag=workspace_flag,
         llm_gateway=llm_gateway,
-        search_tool=search_tool
+        search_tool=WebSearchTool()
     )
     
-    from app.orchestration.research_mode import ResearchContext
-    
-    initial_state = {
-        "workspace_id": UUID(workspace_id),
-        "objective": objective,
-        "context": ResearchContext(),
-        "final_graph": None,
-        "summary": None
-    }
-    
     try:
-        from langchain_core.tracers.context import tracing_v2_enabled
-        
-        # We use astream to yield after each node. Ensure tracing is ENABLED here.
-        with tracing_v2_enabled(project_name="NeosisLM-ResearchMode"):
-            async for step in orchestrator.graph.astream(initial_state):
-                # step is a dict like {'planner': {'plan': [...]}}
-                node_name = list(step.keys())[0]
-                state = step[node_name]
-            
-            if node_name == "planner":
-                ctx = state.get("context", ResearchContext())
-                await publish_event({
-                    "status": "planning", 
-                    "message": "Generated research plan", 
-                    "plan": ctx.plan
-                })
-            elif node_name == "executor":
-                ctx = state.get("context", ResearchContext())
-                idx = ctx.current_task_index - 1
-                plan = ctx.plan
-                if idx < len(plan):
-                    await publish_event({
-                        "status": "executing", 
-                        "message": f"Executed search: {plan[idx]}"
-                    })
-            elif node_name == "synthesizer":
-                await publish_event({
-                    "status": "synthesizing", 
-                    "message": "Synthesized final graph"
-                })
-            elif node_name == "reporter":
-                await publish_event({
-                    "status": "reporting", 
-                    "message": "Generated research summary"
-                })
+        final_graph = None
+        async for event in orchestrator.astream_events(UUID(workspace_id), objective):
+            await publish_event(event)
+            if event.get("status") == "synthesizing" and "final_graph" in event:
+                final_graph = event["final_graph"]
 
         await publish_event({"status": "completed", "message": "Research complete"})
-        
-        final_graph = state.get("final_graph") if 'state' in locals() else None
         if final_graph and redis:
             await redis.enqueue_job(
                 "project_output_graph_job",
