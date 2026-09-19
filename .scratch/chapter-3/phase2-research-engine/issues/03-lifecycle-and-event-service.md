@@ -7,8 +7,8 @@ A service (`app/services/research/lifecycle.py`) that acts as the sole authority
 
 **Status:** ready-for-agent
 
-- [ ] Create `app/services/research/lifecycle.py`.
-- [ ] Implement strict state machine validation for `ResearchRun` (CREATED -> PLANNING -> RESEARCHING -> SYNTHESIZING -> FINALIZING -> COMPLETED/PARTIAL/FAILED/CANCELLED).
-- [ ] Implement strict state machine validation for `ResearchTask` (PENDING -> RUNNING -> COMPLETED/PARTIAL/FAILED/CANCELLED/SKIPPED).
-- [ ] Integrate with the research repository to persist transitions and automatically emit/save corresponding `ResearchEvent` records.
-- [ ] Write unit tests verifying that invalid state transitions raise clear exceptions.
+- [x] Create `app/services/research/lifecycle.py`.
+- [x] Implement strict state machine validation for `ResearchRun` (CREATED -> PLANNING -> RESEARCHING -> SYNTHESIZING -> FINALIZING -> COMPLETED/PARTIAL/FAILED/CANCELLED).
+- [x] Implement strict state machine validation for `ResearchTask` (PENDING -> RUNNING -> COMPLETED/PARTIAL/FAILED/CANCELLED/SKIPPED).
+- [x] Integrate with the research repository to persist transitions and automatically emit/save corresponding `ResearchEvent` records.
+- [x] Write unit tests verifying that invalid state transitions raise clear exceptions.

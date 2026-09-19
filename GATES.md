@@ -1,31 +1,26 @@
-# GATES: 02: Unified Research Repository
+# GATES: 03: Lifecycle & Event Service
 
-- [x] Create `app/repositories/research.py` with CRUD for ResearchEvidence.
-  - CHECK: `cat app/repositories/research.py | grep create_evidence | wc -l`
+- [x] Create `app/services/research/lifecycle.py`.
+  - CHECK: `cat app/services/research/lifecycle.py | grep ResearchLifecycleService | wc -l`
   - EXPECT: `>0`
   - EVIDENCE: 1
 
-- [x] Implement CRUD for ResearchArtifact.
-  - CHECK: `cat app/repositories/research.py | grep create_artifact | wc -l`
+- [x] Implement state validation for `ResearchRun`.
+  - CHECK: `cat app/services/research/lifecycle.py | grep "def transition_run" | wc -l`
   - EXPECT: `>0`
   - EVIDENCE: 1
 
-- [x] Implement CRUD for ResearchReport.
-  - CHECK: `cat app/repositories/research.py | grep create_report | wc -l`
+- [x] Implement state validation for `ResearchTask`.
+  - CHECK: `cat app/services/research/lifecycle.py | grep "def transition_task" | wc -l`
   - EXPECT: `>0`
   - EVIDENCE: 1
 
-- [x] Implement CRUD for ResearchUsage.
-  - CHECK: `cat app/repositories/research.py | grep create_usage | wc -l`
+- [x] Emit `ResearchEvent` automatically on transitions.
+  - CHECK: `cat app/services/research/lifecycle.py | grep create_event | wc -l`
   - EXPECT: `>0`
-  - EVIDENCE: 1
+  - EVIDENCE: 2
 
-- [x] Implement CRUD for ResearchEvent.
-  - CHECK: `cat app/repositories/research.py | grep create_event | wc -l`
-  - EXPECT: `>0`
-  - EVIDENCE: 1
-
-- [x] Write integration tests enforcing cross-workspace isolation.
-  - CHECK: `pytest tests/integration/research/test_repository.py`
+- [x] Write unit tests verifying state transitions.
+  - CHECK: `pytest tests/unit/services/research/test_lifecycle.py`
   - EXPECT: `passed`
-  - EVIDENCE: 3 passed in 3.58s
+  - EVIDENCE: 5 passed in 2.71s
