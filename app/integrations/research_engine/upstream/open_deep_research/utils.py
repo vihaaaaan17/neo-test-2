@@ -584,6 +584,10 @@ async def get_all_tools(config: RunnableConfig):
     search_tools = await get_search_tool(search_api)
     tools.extend(search_tools)
     
+    # Inject Neosis GPT-Researcher Tool Adapter
+    from app.integrations.research_engine.tools.gpt_researcher_tool import GPTResearcherTool
+    tools.append(GPTResearcherTool())
+    
     # Track existing tool names to prevent conflicts
     existing_tool_names = {
         tool.name if hasattr(tool, "name") else tool.get("name", "web_search") 

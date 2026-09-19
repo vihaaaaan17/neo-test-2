@@ -9,7 +9,8 @@ logger = logging.getLogger(__name__)
 def get_research_engine(
     workspace_flag: str,
     llm_gateway: Callable[[str], Awaitable[str]],
-    search_tool: any
+    search_tool: any,
+    redis_client: any = None
 ) -> ResearchEngineProtocol:
     """
     Factory function to route traffic to the appropriate Research Engine.
@@ -18,7 +19,7 @@ def get_research_engine(
     if settings.ENABLE_ADVANCED_RESEARCH and workspace_flag == "new":
         logger.info("Instantiating advanced OpenDeepResearchEngine")
         from app.integrations.research_engine.engine import OpenDeepResearchEngine
-        return OpenDeepResearchEngine(llm_gateway=llm_gateway, search_tool=search_tool)
+        return OpenDeepResearchEngine(llm_gateway=llm_gateway, search_tool=search_tool, redis_client=redis_client)
     else:
         logger.info("Instantiating legacy ResearchModeOrchestrator")
         from app.orchestration.research_mode import ResearchModeOrchestrator

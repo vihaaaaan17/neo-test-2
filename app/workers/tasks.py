@@ -364,7 +364,8 @@ async def run_research_agent_job(
     orchestrator = get_research_engine(
         workspace_flag=workspace_flag,
         llm_gateway=llm_gateway,
-        search_tool=WebSearchTool()
+        search_tool=WebSearchTool(),
+        redis_client=ctx.get("redis")
     )
     
     try:
