@@ -14,6 +14,7 @@ class Workspace(Base):
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     active_commit_id = Column(UUID(as_uuid=True), nullable=True)
     ground_version = Column(Integer, default=1, nullable=False)
+    research_engine = Column(String, default="legacy", nullable=False)
 
 class WorkspaceCommit(Base):
     __tablename__ = "workspace_commits"

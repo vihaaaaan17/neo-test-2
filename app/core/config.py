@@ -39,5 +39,7 @@ class Settings(BaseSettings):
     OPEN_NOTEBOOK_BASE_URL: str = "http://localhost:5055"
     OPEN_NOTEBOOK_TIMEOUT: int = 30
 
+    # Advanced Research Engine (Phase 1)
+    ENABLE_ADVANCED_RESEARCH: bool = False
 
 settings = Settings()
