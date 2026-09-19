@@ -28,3 +28,5 @@ google-genai
 streamlit
 pandas
 pyarrow
+gpt-researcher
+knowledge-storm
