@@ -501,5 +501,194 @@ async def export_workspace_job(
 
     except Exception as exc:
         logger.exception("export_workspace_job: failed for workspace %s: %s", workspace_id, exc)
-        await publish_event({"status": "failed", "error": str(exc)})
         return {"status": "failed", "workspace_id": workspace_id, "error": str(exc)}
+
+# --------------------------------------------------------------------------- #
+# Open Notebook Integration Jobs
+# --------------------------------------------------------------------------- #
+
+async def project_to_open_notebook_job(
+    ctx: dict,
+    *,
+    source_id: str,
+    snapshot_id: str,
+    workspace_id: str,
+) -> dict[str, Any]:
+    """Background job: Projects a new source snapshot to Open Notebook."""
+    from app.repositories.open_notebook import OpenNotebookRepository
+    from app.integrations.open_notebook.client import OpenNotebookClient
+    from app.services.storage import S3ObjectStore
+    import tempfile
+    import os
+    import httpx
+    from arq.worker import Retry
+
+    source_uuid = UUID(source_id)
+    snapshot_uuid = UUID(snapshot_id)
+    workspace_uuid = UUID(workspace_id)
+
+    async with async_session_maker() as session:
+        repo = OpenNotebookRepository(session)
+        source, snapshot = await _get_source_and_snapshot(session, source_uuid)
+        
+        if not source or not snapshot:
+            logger.error("project_to_open_notebook: source/snapshot not found for %s", source_id)
+            return {"status": "not_found"}
+
+        # 1. Atomic claim
+        binding = await repo.claim_projection_job(
+            source_id=source_uuid,
+            snapshot_id=snapshot_uuid,
+            checksum=snapshot.checksum_sha256
+        )
+        if not binding:
+            logger.info("project_to_open_notebook: Job already claimed/projected for %s", source_id)
+            return {"status": "skipped", "reason": "already_claimed"}
+
+        # 2. Workspace binding check/creation
+        workspace_binding = await repo.get_workspace_binding(workspace_uuid)
+        on_client = OpenNotebookClient()
+        
+        if not workspace_binding:
+            ws_title = f"Workspace {workspace_id}" # Simple fallback title
+            on_notebook_id = await on_client.create_notebook(ws_title)
+            workspace_binding = await repo.create_workspace_binding(workspace_uuid, on_notebook_id)
+
+        # 3. Download snapshot
+        s3_client = ctx.get("s3_client")
+        if not s3_client:
+            raise RuntimeError("s3_client not found in worker context")
+        storage = S3ObjectStore(s3_client)
+        file_bytes = await storage.download_file(snapshot.file_uri)
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".file") as tmp:
+            tmp.write(file_bytes)
+            tmp_path = tmp.name
+            
+        try:
+            # 4. Upload to ON
+            on_src_id = await on_client.upload_source(
+                workspace_binding.open_notebook_notebook_id, 
+                tmp_path, 
+                source.name
+            )
+            await repo.update_projection_status(
+                source_id=source_uuid,
+                snapshot_id=snapshot_uuid,
+                status="ACTIVE",
+                open_notebook_source_id=on_src_id
+            )
+            
+            # Enqueue deletion for previous active projections
+            active_bindings = await repo.get_active_projections_for_source(source_uuid)
+            redis = ctx.get("redis")
+            for b in active_bindings:
+                if b.snapshot_id != snapshot_uuid:
+                    tombstone = await repo.create_tombstone_and_delete_source_binding(b.source_id, b.snapshot_id)
+                    if tombstone and redis:
+                        await redis.enqueue_job(
+                            "process_deletion_tombstone_job",
+                            tombstone_id=str(tombstone.tombstone_id)
+                        )
+                        
+            return {"status": "completed", "source_id": source_id}
+            
+        except httpx.HTTPStatusError as e:
+            # Handle rate limiting and upstream unavailability explicitly
+            if e.response.status_code in (429, 502, 503, 504):
+                retry_after = e.response.headers.get("Retry-After")
+                if retry_after and retry_after.isdigit():
+                    delay = int(retry_after)
+                else:
+                    delay = ctx.get("job_try", 1) * 30
+                    
+                logger.warning(f"Open Notebook backpressure. Retrying in {delay}s: {str(e)}")
+                raise Retry(defer=delay)
+            else:
+                await repo.update_projection_status(
+                    source_id=source_uuid,
+                    snapshot_id=snapshot_uuid,
+                    status="FAILED",
+                    error_meta={"error": str(e)}
+                )
+                raise
+        except Exception as e:
+            await repo.update_projection_status(
+                source_id=source_uuid,
+                snapshot_id=snapshot_uuid,
+                status="FAILED",
+                error_meta={"error": str(e)}
+            )
+            raise
+        finally:
+            os.remove(tmp_path)
+
+
+async def process_deletion_tombstone_job(ctx: dict, *, tombstone_id: str) -> dict[str, Any]:
+    """Background job: Processes a DeletionTombstone against Open Notebook."""
+    from app.integrations.open_notebook.client import OpenNotebookClient
+    from app.models.open_notebook_binding import DeletionTombstone
+    from sqlalchemy import select
+    from datetime import datetime, timezone
+    
+    async with async_session_maker() as session:
+        tombstone = await session.get(DeletionTombstone, UUID(tombstone_id))
+        if not tombstone or tombstone.status != "pending":
+            return {"status": "skipped", "reason": "not_pending"}
+            
+        tombstone.attempt_count += 1
+        tombstone.last_attempt = datetime.now(timezone.utc)
+        await session.commit()
+        
+        on_client = OpenNotebookClient()
+        try:
+            if tombstone.open_notebook_id:
+                if tombstone.resource_type == "workspace":
+                    await on_client.delete_notebook(tombstone.open_notebook_id, delete_exclusive_sources=True)
+                elif tombstone.resource_type == "source":
+                    await on_client.delete_source(tombstone.open_notebook_id)
+            
+            tombstone.status = "completed"
+            await session.commit()
+            return {"status": "completed"}
+        except Exception as e:
+            if tombstone.attempt_count >= 5:
+                tombstone.status = "ORPHANED_UPSTREAM"
+                logger.error(f"Tombstone {tombstone_id} exceeded max retries. Marking ORPHANED_UPSTREAM. Error: {e}")
+                await session.commit()
+                return {"status": "orphaned_upstream"}
+            else:
+                # Leave it as pending for the reconciler, but the attempt is recorded
+                await session.commit()
+                raise e
+
+async def reconcile_deletion_tombstones_job(ctx: dict) -> dict[str, Any]:
+    """Periodic task: Sweeps for pending tombstones and enqueues processing."""
+    from app.models.open_notebook_binding import DeletionTombstone
+    from sqlalchemy import select
+    from datetime import datetime, timezone, timedelta
+    import math
+    
+    redis = ctx.get("redis")
+    if not redis:
+        return {"status": "failed", "reason": "no_redis"}
+        
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(DeletionTombstone).where(DeletionTombstone.status == "pending")
+        )
+        tombstones = result.scalars().all()
+        
+        enqueued_count = 0
+        now = datetime.now(timezone.utc)
+        for t in tombstones:
+            # Exponential backoff: 2 ^ attempt_count minutes. Wait if last_attempt was too recent.
+            if t.last_attempt and t.attempt_count > 0:
+                delay_minutes = min(math.pow(2, t.attempt_count - 1), 1440) # Max 24 hours
+                if now < t.last_attempt + timedelta(minutes=delay_minutes):
+                    continue
+                    
+            await redis.enqueue_job("process_deletion_tombstone_job", tombstone_id=str(t.tombstone_id))
+            enqueued_count += 1
+            
+        return {"status": "completed", "enqueued": enqueued_count}

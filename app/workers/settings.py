@@ -12,8 +12,11 @@ from arq.connections import RedisSettings
 from app.core.config import settings
 from app.workers.tasks import (
     parse_and_chunk_job, compress_episodic_job, sync_knowledge_to_graph_job,
-    run_research_agent_job, project_output_graph_job, export_workspace_job
+    run_research_agent_job, project_output_graph_job, export_workspace_job,
+    project_to_open_notebook_job, process_deletion_tombstone_job,
+    reconcile_deletion_tombstones_job
 )
+from arq.cron import cron
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +53,11 @@ class WorkerSettings:
     functions = [
         parse_and_chunk_job, compress_episodic_job, sync_knowledge_to_graph_job,
         run_research_agent_job, project_output_graph_job,
-        export_workspace_job
+        export_workspace_job, project_to_open_notebook_job,
+        process_deletion_tombstone_job, reconcile_deletion_tombstones_job
+    ]
+    cron_jobs = [
+        cron(reconcile_deletion_tombstones_job, minute=set(range(0, 60, 5)))
     ]
     on_startup = startup
     on_shutdown = shutdown

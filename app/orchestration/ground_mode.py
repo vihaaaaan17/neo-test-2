@@ -16,7 +16,17 @@ class GroundModeState(TypedDict):
     is_grounded: bool
     retries: int
 
+import warnings
+from typing_extensions import deprecated
+
+@deprecated("GroundModeOrchestrator is deprecated and will be removed in Phase 5. Use OpenNotebookGroundEngine instead.")
 class GroundModeOrchestrator:
+    """
+    Deprecated: Use OpenNotebookGroundEngine instead.
+    This orchestrator handles the legacy execution flow of the Ground persona.
+    It fetches knowledge from the graph and retrieves documents, 
+    then streams the reasoning and answer to the user.
+    """
     def __init__(
         self, 
         hybrid_retriever: HybridRetrievalService,
@@ -24,6 +34,24 @@ class GroundModeOrchestrator:
         embed_gateway: Callable[[str], Awaitable[list[float]]],
         memory_router: Any = None
     ):
+        logger.warning(
+            "GroundModeOrchestrator is deprecated and will be removed in Phase 5. "
+            "Please use OpenNotebookGroundEngine instead. "
+            "Ensure OPEN_NOTEBOOK_ENABLED is True in your configuration."
+        )
+        warnings.warn(
+            "GroundModeOrchestrator is deprecated and will be removed in Phase 5. "
+            "Please use OpenNotebookGroundEngine instead. "
+            "Ensure OPEN_NOTEBOOK_ENABLED is True in your configuration.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
+        from opentelemetry import metrics
+        meter = metrics.get_meter(__name__)
+        counter = meter.create_counter("legacy_ground_engine_instantiated", description="Fired when the legacy GroundModeOrchestrator is instantiated")
+        counter.add(1)
+
         from app.services.memory_router import MemoryRouterService
         self.hybrid_retriever = hybrid_retriever
         self.llm_gateway = llm_gateway

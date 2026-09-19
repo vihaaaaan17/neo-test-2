@@ -19,10 +19,10 @@ from app.api.deps.rate_limit import limiter
 from arq import ArqRedis
 import hashlib
 import json
-from typing import Callable, Awaitable
-
 from app.schemas.ground_mode import AskRequest, AskResponse
+from app.services.hybrid_retrieval import HybridRetrievalService
 from app.api.deps.llm import get_llm_gateway, get_embed_gateway
+
 from app.orchestration.ground_mode import GroundModeOrchestrator
 from app.services.hybrid_retrieval import HybridRetrievalService
 from app.services.memory_router import MemoryRouter
@@ -90,11 +90,19 @@ async def update_workspace(
 async def delete_workspace(
     workspace_id: UUID,
     current_user_id: UUID = Depends(get_current_user),
-    repo: WorkspaceRepository = Depends(get_workspace_repository)
+    repo: WorkspaceRepository = Depends(get_workspace_repository),
+    arq_redis: ArqRedis = Depends(get_arq_redis)
 ):
-    success = await repo.delete_workspace(workspace_id, current_user_id)
+    success, tombstone_id = await repo.delete_workspace(workspace_id, current_user_id)
     if not success:
         raise HTTPException(status_code=404, detail="Workspace not found")
+        
+    if tombstone_id:
+        # Enqueue background job to process the tombstone deletion
+        await arq_redis.enqueue_job(
+            "process_deletion_tombstone_job",
+            tombstone_id=str(tombstone_id)
+        )
 
 @router.post("/{workspace_id}/files", response_model=SourceResponse, status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit("10/minute")
@@ -138,6 +146,15 @@ async def upload_file_to_workspace(
         owner_id=str(current_user_id)
     )
     
+    # Enqueue background job for Open Notebook projection
+    if source.snapshots:
+        await arq_redis.enqueue_job(
+            "project_to_open_notebook_job",
+            source_id=str(source.source_id),
+            snapshot_id=str(source.snapshots[0].snapshot_id),
+            workspace_id=str(workspace_id)
+        )
+    
     return source
 
 from app.models.source import Source
@@ -160,37 +177,69 @@ async def get_source_status(
         
     return {"status": source.processing_status}
 
+@router.get("/{workspace_id}/projection-status")
+async def get_projection_status(
+    workspace_id: UUID,
+    current_user_id: UUID = Depends(get_current_user),
+    repo: WorkspaceRepository = Depends(get_workspace_repository),
+    db: AsyncSession = Depends(get_db)
+):
+    workspace = await repo.get_workspace(workspace_id, current_user_id)
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+        
+    from sqlalchemy import select, func
+    from app.models.source import Source
+    from app.models.open_notebook_binding import OpenNotebookSourceBinding
+    
+    stmt = (
+        select(OpenNotebookSourceBinding.status, func.count(OpenNotebookSourceBinding.source_id))
+        .join(Source, Source.source_id == OpenNotebookSourceBinding.source_id)
+        .where(Source.workspace_id == workspace_id)
+        .group_by(OpenNotebookSourceBinding.status)
+    )
+    
+    result = await db.execute(stmt)
+    rows = result.all()
+    
+    counts = {status: count for status, count in rows}
+    
+    return {
+        "status": counts
+    }
+
+from app.services.ground.factory import get_ground_engine, GroundEngineProtocol
+
 @router.post("/{workspace_id}/ask", response_model=AskResponse)
 async def ask_ground_mode(
     workspace_id: UUID,
     request: AskRequest,
     current_user_id: UUID = Depends(get_current_user),
     repo: WorkspaceRepository = Depends(get_workspace_repository),
+    db: AsyncSession = Depends(get_db),
     memory_router: MemoryRouter = Depends(get_memory_router),
-    hybrid_retriever: HybridRetrievalService = Depends(get_hybrid_retrieval_service),
-    llm_gateway: Callable[[str], Awaitable[str]] = Depends(get_llm_gateway),
-    embed_gateway: Callable[[str], Awaitable[list[float]]] = Depends(get_embed_gateway)
+    ground_engine: GroundEngineProtocol = Depends(get_ground_engine)
 ):
     workspace = await repo.get_workspace(workspace_id, current_user_id)
     if not workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
-        
-    orchestrator = GroundModeOrchestrator(
-        hybrid_retriever=hybrid_retriever,
-        llm_gateway=llm_gateway,
-        embed_gateway=embed_gateway
-    )
-    
-    state = await orchestrator.run(workspace_id=workspace_id, query=request.query)
+
+    # The ground engine abstracts away the feature flag check
+    state = await ground_engine.run(workspace_id=workspace_id, query=request.query, db=db)
     
     if not state.get("is_grounded", False):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, 
             detail="Unable to generate a grounded answer from the provided context."
         )
+
+    # Check for legacy engine mapping
+    evidence_uuids = []
+    if "context_docs" in state:
+        evidence_uuids = [doc["id"] for doc in state["context_docs"] if "id" in doc]
+    elif "evidence" in state:
+        evidence_uuids = state["evidence"]
         
-    evidence_uuids = state.get("evidence", [])
-    
     memory_data = KnowledgeMemoryCreate(
         knowledge_type="answer",
         content=state["answer"],
@@ -212,7 +261,150 @@ async def ask_ground_mode(
     return AskResponse(
         answer=state["answer"],
         evidence=evidence_uuids,
-        knowledge_id=memory.knowledge_id
+        knowledge_id=memory.knowledge_id,
+        provenance_status=state.get("provenance_status")
+    )
+
+from fastapi.responses import StreamingResponse
+
+@router.post("/{workspace_id}/ask/stream")
+async def ask_ground_mode_stream(
+    workspace_id: UUID,
+    request: AskRequest,
+    current_user_id: UUID = Depends(get_current_user),
+    repo: WorkspaceRepository = Depends(get_workspace_repository),
+    db: AsyncSession = Depends(get_db),
+    ground_engine: GroundEngineProtocol = Depends(get_ground_engine)
+):
+    from app.core.config import settings
+    if not settings.OPEN_NOTEBOOK_ENABLED:
+        raise HTTPException(status_code=501, detail="Streaming is only supported when Open Notebook is enabled.")
+        
+    workspace = await repo.get_workspace(workspace_id, current_user_id)
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+        
+    # Verify the workspace has an active Open Notebook binding
+    from sqlalchemy import select
+    from app.models.open_notebook_binding import OpenNotebookWorkspaceBinding
+    stmt = select(OpenNotebookWorkspaceBinding).where(
+        OpenNotebookWorkspaceBinding.workspace_id == workspace_id,
+        OpenNotebookWorkspaceBinding.status == "ACTIVE"
+    )
+    result = await db.execute(stmt)
+    ws_binding = result.scalars().first()
+    
+    if not ws_binding:
+        raise HTTPException(status_code=400, detail="Workspace does not have an active Open Notebook binding.")
+        
+    # We know it's the OpenNotebook engine since the flag is enabled
+    client = ground_engine.client
+    
+    return StreamingResponse(
+        client.ask_stream(
+            question=request.query,
+            strategy_model=ground_engine.default_strategy_model,
+            answer_model=ground_engine.default_answer_model,
+            final_answer_model=ground_engine.default_final_answer_model
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+from app.schemas.conversation import ChatRequest, ChatResponse
+from app.models.conversation import GroundConversation
+from app.models.open_notebook_binding import OpenNotebookConversationBinding, OpenNotebookWorkspaceBinding
+from app.integrations.open_notebook.client import OpenNotebookClient
+
+@router.post("/{workspace_id}/chat", response_model=ChatResponse)
+async def chat_ground_mode(
+    workspace_id: UUID,
+    request: ChatRequest,
+    current_user_id: UUID = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from sqlalchemy import select
+    
+    # Verify workspace access
+    from app.repositories.workspace import WorkspaceRepository
+    repo = WorkspaceRepository(db)
+    workspace = await repo.get_workspace(workspace_id, current_user_id)
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+        
+    # Get Open Notebook workspace binding
+    stmt = select(OpenNotebookWorkspaceBinding).where(
+        OpenNotebookWorkspaceBinding.workspace_id == workspace_id,
+        OpenNotebookWorkspaceBinding.status == "ACTIVE"
+    )
+    result = await db.execute(stmt)
+    ws_binding = result.scalars().first()
+    
+    if not ws_binding:
+        raise HTTPException(status_code=400, detail="Workspace does not have an active Open Notebook binding.")
+        
+    notebook_id = ws_binding.open_notebook_notebook_id
+    client = OpenNotebookClient(workspace_id=str(workspace_id))
+    
+    conversation_id = request.conversation_id
+    on_session_id = None
+    
+    if conversation_id:
+        # Verify conversation belongs to this workspace and user
+        conv_stmt = select(GroundConversation).where(
+            GroundConversation.conversation_id == conversation_id,
+            GroundConversation.workspace_id == workspace_id,
+            GroundConversation.owner_id == current_user_id
+        )
+        conv_result = await db.execute(conv_stmt)
+        conversation = conv_result.scalars().first()
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+            
+        # Get ON session ID
+        bind_stmt = select(OpenNotebookConversationBinding).where(
+            OpenNotebookConversationBinding.conversation_id == conversation_id
+        )
+        bind_result = await db.execute(bind_stmt)
+        on_binding = bind_result.scalars().first()
+        if not on_binding:
+            raise HTTPException(status_code=404, detail="Conversation binding not found")
+            
+        on_session_id = on_binding.open_notebook_session_id
+    else:
+        # Create new session
+        on_session_id = await client.create_chat_session(notebook_id)
+        
+        conversation = GroundConversation(
+            workspace_id=workspace_id,
+            owner_id=current_user_id
+        )
+        db.add(conversation)
+        await db.flush() # flush to get conversation_id
+        
+        conversation_id = conversation.conversation_id
+        
+        on_binding = OpenNotebookConversationBinding(
+            conversation_id=conversation_id,
+            open_notebook_session_id=on_session_id
+        )
+        db.add(on_binding)
+        await db.commit()
+        
+    # Execute Chat
+    chat_result = await client.chat_execute(
+        session_id=on_session_id,
+        notebook_id=notebook_id,
+        message=request.message
+    )
+    
+    return ChatResponse(
+        answer=chat_result["answer"],
+        conversation_id=conversation_id
     )
 
 @router.post("/{workspace_id}/commits", response_model=WorkspaceCommitResponse, status_code=status.HTTP_201_CREATED)

@@ -32,7 +32,37 @@ services:
     volumes:
       - neo4j_data:/data
 
+  surrealdb:
+    image: surrealdb/surrealdb:v2
+    command: ["start", "--log", "info", "--user", "${SURREAL_USER:-root}", "--pass", "${SURREAL_PASSWORD:-root}", "rocksdb:/mydata/mydatabase.db"]
+    user: root
+    # Note: No host port binding per Chapter 2 Phase 1 decisions. Internal only.
+    volumes:
+      - surreal_data:/mydata
+    environment:
+      - SURREAL_EXPERIMENTAL_GRAPHQL=true
+    restart: always
+
+  open_notebook:
+    image: lfnovo/open_notebook:1.14.0
+    ports:
+      - "5055:5055"  # REST API
+    environment:
+      - OPEN_NOTEBOOK_ENCRYPTION_KEY=${OPEN_NOTEBOOK_ENCRYPTION_KEY}
+      - SURREAL_URL=ws://surrealdb:8000/rpc
+      - SURREAL_USER=${SURREAL_USER:-root}
+      - SURREAL_PASSWORD=${SURREAL_PASSWORD:-root}
+      - SURREAL_NAMESPACE=open_notebook
+      - SURREAL_DATABASE=open_notebook
+    volumes:
+      - notebook_data:/app/data
+    depends_on:
+      - surrealdb
+    restart: always
+
 volumes:
   postgres_data:
   redis_data:
   neo4j_data:
+  surreal_data:
+  notebook_data:

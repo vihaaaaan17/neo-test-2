@@ -14,6 +14,7 @@ class WorkspaceResponse(BaseModel):
     owner_id: UUID
     status: str
     active_commit_id: UUID | None = None
+    ground_version: int = 1
     created_at: datetime
     updated_at: datetime
 

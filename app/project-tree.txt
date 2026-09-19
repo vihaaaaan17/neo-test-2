@@ -1,0 +1,263 @@
+Folder PATH listing for volume Study
+Volume serial number is 6636-92C5
+D:.
+|   main.py
+|   project-tree.txt
+|   
++---agents
+|   +---loops
+|   +---runtime
+|   +---synthesis
+|   +---tools
+|   \---verification
++---api
+|   +---deps
+|   |   |   arq.py
+|   |   |   auth.py
+|   |   |   llm.py
+|   |   |   rate_limit.py
+|   |   |   
+|   |   \---__pycache__
+|   |           arq.cpython-311.pyc
+|   |           auth.cpython-311.pyc
+|   |           llm.cpython-311.pyc
+|   |           rate_limit.cpython-311.pyc
+|   |           
+|   +---mode_router
+|   \---routes
+|       |   jobs.py
+|       |   workspaces.py
+|       |   
+|       \---__pycache__
+|               jobs.cpython-311.pyc
+|               workspaces.cpython-311.pyc
+|               
++---artifacts
+|   +---citations
+|   +---compilers
+|   \---registry
++---core
+|   |   config.py
+|   |   database.py
+|   |   telemetry.py
+|   |   
+|   +---config
+|   +---exceptions
+|   +---interfaces
+|   +---schemas
+|   \---__pycache__
+|           config.cpython-311.pyc
+|           database.cpython-311.pyc
+|           telemetry.cpython-311.pyc
+|           
++---data_ingestion
+|   +---chunker
+|   +---metadata
+|   +---object_store
+|   +---parser
+|   \---registry
++---graph
+|   +---internal_kg
+|   +---output_kg
+|   \---temporal
++---graphify-out
+|   |   .graphify_analysis.json
+|   |   .graphify_root
+|   |   graph.json
+|   |   manifest.json
+|   |   
+|   \---cache
+|       |   stat-index.json
+|       |   
+|       \---ast
+|           \---v0.9.53-s2
+|                   09127896701f8695c2a3c0cc3524a256d9932f94cf98b14c011de310ba5d3b44.json
+|                   09dab9c63c962bb7468e0825b097e30e3377e651297cf1833fd1f5d311710a70.json
+|                   0d99256a1f532dddfdfe0472e3ebbe2148ae8f5269e9ca9b529f75dc8a87c428.json
+|                   125b1d288bcbba59ca054524dc9a0874790a2e0f16b6e7dc9f54c1250a6d9bee.json
+|                   17633d2c6c8b6bc8d0a23b0979e715226ab3b96ca5f211050c1ef1ddf8ba2d96.json
+|                   17caa1cd8f9f9709c3550ca3aa7d00445807fe6382df516a2764fc7494962392.json
+|                   222e6ebdaeba7eec556a4f1d61613cf9daca09f80c9427440d346c0bfd19fcc0.json
+|                   2fb6a0144a0f3b179c7d676290162c11206fb93be9a7fd8be676b17e207bed7a.json
+|                   361ae979389558ef3afb6fb4179fc9afce692978da230cf837abb336d6076642.json
+|                   389eea1389077f78788ddcc84d6fddad342c6f837d68b0ac2c5b93b7156b2d45.json
+|                   3bb4cfedd6962abbaffe4088b47f6161d01cae0d91a44056108eb2ed54d32e9d.json
+|                   3d008646d464c011cbc7074395843f48a3a1421cbd727852d64db52c51858513.json
+|                   40fd0d732cd4b0e5cccfbba2edf958b9c16fe0fdd82b2e106c19f41a4b982fcc.json
+|                   42fdd9f4d21702e82c1533bcade5549f97d82b311d06285d3e6285a789f041e1.json
+|                   44788d448603400b508acac9606e35425e37542ce5bf98aff2388882bce6063a.json
+|                   457cb08cb2bd13376a33e0f4552e439570dd1cb326462c2a5ff9512d39e54642.json
+|                   51ed69a703583ca37fe132ca55aa675bd75557c0efaa9627cc5df1e17c261d1d.json
+|                   539da2d8e268a55a84624f3161873fe427558318979d8fd486adfa27db0dcc6c.json
+|                   58be7323cfaf8b4ce9f413238c7319e64d093fde621d7af9a17adee4c292f255.json
+|                   5b17e81984b137bcb5f1aa7cdf22daa0ff2cd562019f8d9d56798cf69cc43dcb.json
+|                   5f18e3b6c49a75cb05ef8aa71ce870a915ab096afa32e46cc5f06661be348405.json
+|                   6290294835a74e9ddf05bcbfa35bfa957b174d9e9426394d0ecc5c4972dd40f0.json
+|                   655aed055c7dbb411d803fe2201ecb04fe230c83bbe86302461212f767eb17d6.json
+|                   6772786172648de165cb7a538f7c5659e93add5939f2c41cb4ee5c2c1fc2f29c.json
+|                   72e3e1ad8a48097e46d0614afd639b221bfcb8c627b7cfe7ac6177697cdd4cb9.json
+|                   7b54ef2976ec186611cdabb585befdcfdbb33259644708a321efe6e21142cbfb.json
+|                   7f2deaf1cb4c14a058b0b5b6398b5acf6554da01adb63e1fcdbd7aac05d4c2bc.json
+|                   83235a140b740a822feee26dc5f1113ccc97bf079baf7b9f46710a073740435d.json
+|                   85b7007be60e2f91509db4949116175e64c06a261cc4ede589823239066330dc.json
+|                   971e1b5258056de9864a481c0921f8198be22d05acf7334fe211eb39265aab81.json
+|                   9a488db04d618f6b7fa951d3d8188d13c77dce94f1b118f9c55202c7232013aa.json
+|                   ac23f1801c2f043c72b2d8857230c69174d4dba2389ee1f5ac4b7eab983e77f3.json
+|                   b52f056c96132d466349ae9a98c1116933aaa81ca83241db1a5c765036012ea7.json
+|                   b8ea3ed99a6d2fcd7fd55bf8c62cb4341e55603b88e655b49a3c4374d35ec4d2.json
+|                   bbba21ee606a87c1ec9beab744f8d95c2520fc123ad83a37eaff9bc1a6d50a36.json
+|                   d0d634e294a2484b47fd3a760867a4f7026f4ab3d6b8ebbda921978549711e26.json
+|                   d6ef41cdf68ff32e802a0df8c651a6f261b5936afee556e56710f775d4b1f5a0.json
+|                   d6f0ca5da2f9771fe59e4e36f122510598e25753922b5fce92efec981daf6cf2.json
+|                   d82ced7e25aa7db7d41d659aef7486672d54b9a653e30e3814bd65a9e0323c8c.json
+|                   dfe9288b2525cbb3581ed52848bdc1961ec512ccc20f1b1f50ddae675406d260.json
+|                   eadf187a2b5e8db08cf17242e37088a3a9ba3e4c90930c49d195306c407f1d68.json
+|                   eaf951783f8d800142c339c81ea79c243a0193013c418e2c313533a5a64419e0.json
+|                   eb09f6e9af468890e725d11c8eaa9c629f46938793a6a6fa495688cdfb016bd9.json
+|                   f1a2bcef3f3a2982d4b76ffe02c88a89c5d51422f2654e6f829adf02daeb9c5f.json
+|                   f3c496d61aa4496ddeab5b1d05de8994f4cd6b9cbef169ede5f55cefd0abf003.json
+|                   f49a00e495a48110e6aa15d7c836a6b2499c9da72132a42f3f9268ae23a66115.json
+|                   fba83a89eb8be87dea44a2155fe0064a8d04c1a06c5989121ff085f0276a0c11.json
+|                   
++---infrastructure
+|   +---async_jobs
+|   +---cache
+|   +---database
+|   +---events
+|   \---llm_gateway
++---knowledge
+|   +---episodic_memory
+|   +---knowledge_memory
+|   +---research_memory
+|   +---source_memory
+|   +---user_memory
+|   \---working_memory
++---models
+|   |   block.py
+|   |   episodic.py
+|   |   knowledge.py
+|   |   source.py
+|   |   workspace.py
+|   |   __init__.py
+|   |   
+|   \---__pycache__
+|           block.cpython-311.pyc
+|           episodic.cpython-311.pyc
+|           knowledge.cpython-311.pyc
+|           source.cpython-311.pyc
+|           workspace.cpython-311.pyc
+|           __init__.cpython-311.pyc
+|           
++---orchestration
+|   |   ground_mode.py
+|   |   research_mode.py
+|   |   
+|   +---evidence_state
+|   +---plan_state
+|   +---research_state
+|   +---run_state
+|   +---task_state
+|   +---tool_state
+|   +---version_state
+|   +---workspace_state
+|   \---__pycache__
+|           ground_mode.cpython-311.pyc
+|           research_mode.cpython-311.pyc
+|           
++---platform
+|   +---identity
+|   \---workspace
++---quality_ops
+|   +---audit
+|   +---eval
+|   \---telemetry
++---repositories
+|   |   block.py
+|   |   episodic.py
+|   |   graph.py
+|   |   knowledge.py
+|   |   source.py
+|   |   workspace.py
+|   |   
+|   \---__pycache__
+|           block.cpython-311.pyc
+|           episodic.cpython-311.pyc
+|           graph.cpython-311.pyc
+|           knowledge.cpython-311.pyc
+|           source.cpython-311.pyc
+|           workspace.cpython-311.pyc
+|           
++---retrieval
+|   +---context
+|   +---index
+|   \---pipeline
++---schemas
+|   |   block.py
+|   |   context.py
+|   |   episodic.py
+|   |   file.py
+|   |   graph.py
+|   |   ground_mode.py
+|   |   knowledge.py
+|   |   source.py
+|   |   working_memory.py
+|   |   workspace.py
+|   |   
+|   \---__pycache__
+|           block.cpython-311.pyc
+|           context.cpython-311.pyc
+|           episodic.cpython-311.pyc
+|           file.cpython-311.pyc
+|           graph.cpython-311.pyc
+|           ground_mode.cpython-311.pyc
+|           knowledge.cpython-311.pyc
+|           source.cpython-311.pyc
+|           working_memory.cpython-311.pyc
+|           workspace.cpython-311.pyc
+|           
++---scripts
++---security
+|   +---encryption
+|   +---injection
+|   \---sandbox
++---services
+|   |   chunking.py
+|   |   episodic.py
+|   |   export.py
+|   |   hybrid_retrieval.py
+|   |   memory_router.py
+|   |   parsing.py
+|   |   quota.py
+|   |   storage.py
+|   |   web_search.py
+|   |   working_memory.py
+|   |   
+|   \---__pycache__
+|           chunking.cpython-311.pyc
+|           episodic.cpython-311.pyc
+|           export.cpython-311.pyc
+|           hybrid_retrieval.cpython-311.pyc
+|           memory_router.cpython-311.pyc
+|           parsing.cpython-311.pyc
+|           quota.cpython-311.pyc
+|           storage.cpython-311.pyc
+|           web_search.cpython-311.pyc
+|           working_memory.cpython-311.pyc
+|           
++---tests
+|   +---e2e
+|   +---integration
+|   \---unit
++---workers
+|   |   settings.py
+|   |   tasks.py
+|   |   __init__.py
+|   |   
+|   \---__pycache__
+|           settings.cpython-311.pyc
+|           tasks.cpython-311.pyc
+|           __init__.cpython-311.pyc
+|           
+\---__pycache__
+        main.cpython-311.pyc
+        

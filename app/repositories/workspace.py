@@ -34,13 +34,29 @@ class WorkspaceRepository:
         await self.session.refresh(workspace)
         return workspace
 
-    async def delete_workspace(self, workspace_id: UUID, owner_id: UUID) -> bool:
+    async def delete_workspace(self, workspace_id: UUID, owner_id: UUID) -> tuple[bool, UUID | None]:
         workspace = await self.get_workspace(workspace_id, owner_id)
         if not workspace:
-            return False
+            return False, None
         workspace.status = "archived"
+        
+        from app.models.open_notebook_binding import OpenNotebookWorkspaceBinding, DeletionTombstone
+        result = await self.session.execute(select(OpenNotebookWorkspaceBinding).where(OpenNotebookWorkspaceBinding.workspace_id == workspace_id))
+        binding = result.scalars().first()
+        tombstone_id = None
+        if binding:
+            tombstone = DeletionTombstone(
+                resource_type="workspace",
+                open_notebook_id=binding.open_notebook_notebook_id,
+                status="pending"
+            )
+            self.session.add(tombstone)
+            await self.session.flush()
+            tombstone_id = tombstone.tombstone_id
+            await self.session.delete(binding)
+            
         await self.session.commit()
-        return True
+        return True, tombstone_id
 
     async def create_commit(self, workspace_id: UUID, parent_id: UUID | None, active_knowledge_ids: list[UUID]) -> WorkspaceCommit:
         commit = WorkspaceCommit(

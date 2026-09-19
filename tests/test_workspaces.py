@@ -184,6 +184,11 @@ def test_delete_workspace():
     
     response2 = client.get(f"/api/v1/workspaces/{workspace_id}")
     assert response2.status_code == 404
+    
+    job_names = [job[0] for job in mock_arq_redis.jobs]
+    assert "delete_open_notebook_workspace_job" in job_names
+    del_job = next(job for job in mock_arq_redis.jobs if job[0] == "delete_open_notebook_workspace_job")
+    assert del_job[2]["workspace_id"] == workspace_id
 
 def test_upload_file_to_workspace():
     create_response = client.post("/api/v1/workspaces/", json={})
@@ -203,11 +208,19 @@ def test_upload_file_to_workspace():
     assert snapshot["size"] == 13
     assert snapshot["checksum_sha256"] is not None
     
-    # Check that job was enqueued
-    assert len(mock_arq_redis.jobs) > 0
-    last_job = mock_arq_redis.jobs[-1]
-    assert last_job[0] == "parse_and_chunk_job"
-    assert last_job[2]["workspace_id"] == workspace_id
+    # Check that jobs were enqueued
+    assert len(mock_arq_redis.jobs) >= 2
+    job_names = [job[0] for job in mock_arq_redis.jobs]
+    assert "parse_and_chunk_job" in job_names
+    assert "project_to_open_notebook_job" in job_names
+    
+    # Check parse_and_chunk_job args
+    parse_job = next(job for job in mock_arq_redis.jobs if job[0] == "parse_and_chunk_job")
+    assert parse_job[2]["workspace_id"] == workspace_id
+    
+    # Check project_to_open_notebook_job args
+    proj_job = next(job for job in mock_arq_redis.jobs if job[0] == "project_to_open_notebook_job")
+    assert proj_job[2]["workspace_id"] == workspace_id
     
 def test_source_status_endpoint():
     create_response = client.post("/api/v1/workspaces/", json={})

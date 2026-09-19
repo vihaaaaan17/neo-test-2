@@ -34,5 +34,10 @@ class Settings(BaseSettings):
     # NEVER enable this in production — it degrades throughput 10-20% and floods stdout.
     DEBUG_SQL: bool = False
 
+    # Open Notebook Ground Engine Integration
+    OPEN_NOTEBOOK_ENABLED: bool = True
+    OPEN_NOTEBOOK_BASE_URL: str = "http://localhost:5055"
+    OPEN_NOTEBOOK_TIMEOUT: int = 30
+
 
 settings = Settings()

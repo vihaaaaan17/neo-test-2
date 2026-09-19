@@ -9,3 +9,4 @@ class AskResponse(BaseModel):
     answer: str
     evidence: List[UUID]
     knowledge_id: UUID
+    provenance_status: str | None = None

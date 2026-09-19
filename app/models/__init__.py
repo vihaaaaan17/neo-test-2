@@ -4,5 +4,7 @@ from app.models.source import Source, SourceSnapshot
 from app.models.block import DocumentBlock
 from app.models.knowledge import KnowledgeMemory
 from app.models.episodic import EpisodicMemory
+from app.models.open_notebook_binding import OpenNotebookWorkspaceBinding, OpenNotebookSourceBinding, OpenNotebookConversationBinding, DeletionTombstone
+from app.models.conversation import GroundConversation
 
-__all__ = ["Base", "Workspace", "Source", "SourceSnapshot", "DocumentBlock", "KnowledgeMemory", "EpisodicMemory"]
+__all__ = ["Base", "Workspace", "Source", "SourceSnapshot", "DocumentBlock", "KnowledgeMemory", "EpisodicMemory", "OpenNotebookWorkspaceBinding", "OpenNotebookSourceBinding", "OpenNotebookConversationBinding", "DeletionTombstone", "GroundConversation"]

@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.core.telemetry import setup_telemetry
 from app.core.database import engine
 from app.repositories.graph import graph_store
+from app.integrations.open_notebook.health import check_open_notebook_health
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry import trace
 
@@ -24,6 +25,9 @@ setup_telemetry()
 
 # --- Rate Limiting ---
 # Limiter imported from app.api.deps.rate_limit
+
+import httpx
+from app.integrations.open_notebook.config import get_open_notebook_timeout
 
 # --- Lifespan ---
 @asynccontextmanager
@@ -40,6 +44,10 @@ async def lifespan(app: FastAPI):
     s3_context = session.client("s3", endpoint_url=settings.S3_ENDPOINT_URL)
     app.state.s3_client = await s3_context.__aenter__()
     
+    # Initialize shared HTTP client pool for Open Notebook integration
+    timeout = get_open_notebook_timeout()
+    app.state.http_client = httpx.AsyncClient(timeout=timeout)
+    
     # Connect to internal KG
     await graph_store.connect()
     
@@ -47,6 +55,7 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info("Shutting down NeosisLM API")
+    await app.state.http_client.aclose()
     await graph_store.close()
     await s3_context.__aexit__(None, None, None)
     await engine.dispose()
@@ -95,6 +104,33 @@ async def limit_upload_size(request: Request, call_next):
 
 app.add_middleware(BaseHTTPMiddleware, dispatch=limit_upload_size)
 
+import uuid
+from app.core.telemetry import neosis_run_id, neosis_task_id, neosis_request_id
+
+async def set_neosis_run_id(request: Request, call_next):
+    run_id = request.headers.get("X-Neosis-Run-ID") or str(uuid.uuid4())
+    task_id = request.headers.get("X-Neosis-Task-ID") or ""
+    request_id = request.headers.get("X-Neosis-Request-ID") or ""
+    
+    token_run = neosis_run_id.set(run_id)
+    token_task = neosis_task_id.set(task_id)
+    token_req = neosis_request_id.set(request_id)
+    
+    try:
+        response = await call_next(request)
+        response.headers["X-Neosis-Run-ID"] = run_id
+        if task_id:
+            response.headers["X-Neosis-Task-ID"] = task_id
+        if request_id:
+            response.headers["X-Neosis-Request-ID"] = request_id
+        return response
+    finally:
+        neosis_run_id.reset(token_run)
+        neosis_task_id.reset(token_task)
+        neosis_request_id.reset(token_req)
+
+app.add_middleware(BaseHTTPMiddleware, dispatch=set_neosis_run_id)
+
 
 # Instrument the FastAPI app with OpenTelemetry
 FastAPIInstrumentor.instrument_app(app)
@@ -120,6 +156,15 @@ async def health_check():
         status["status"] = "degraded"
         status["neo4j"] = "failed"
         
+    if not settings.OPEN_NOTEBOOK_ENABLED:
+        status["open_notebook"] = "disabled"
+    else:
+        if await check_open_notebook_health():
+            status["open_notebook"] = "ok"
+        else:
+            status["open_notebook"] = "failed"
+            status["status"] = "degraded"
+            
     return status
 
 from app.api.routes.workspaces import router as workspaces_router

@@ -27,6 +27,18 @@ def _postgres_is_reachable() -> bool:
         return False
 
 
+def _open_notebook_is_reachable() -> bool:
+    """Quick TCP probe to check if Open Notebook port is open."""
+    from app.core.config import settings
+    try:
+        parsed = urlparse(settings.OPEN_NOTEBOOK_BASE_URL)
+        host = parsed.hostname or "localhost"
+        port = parsed.port or 5055
+        with socket.create_connection((host, port), timeout=1):
+            return True
+    except OSError:
+        return False
+
 # --------------------------------------------------------------------------- #
 # Auto-skip marker: @pytest.mark.integration
 # --------------------------------------------------------------------------- #
@@ -39,10 +51,15 @@ def pytest_configure(config):
 
 
 def pytest_collection_modifyitems(config, items):
-    """Skip integration tests if Postgres is not reachable."""
-    if _postgres_is_reachable():
-        return  # DB is up — run everything
+    """Skip integration tests if external dependencies are not reachable."""
+    db_up = _postgres_is_reachable()
+    on_up = _open_notebook_is_reachable()
+    
     skip_no_db = pytest.mark.skip(reason="Postgres not reachable (start docker-compose)")
+    skip_no_on = pytest.mark.skip(reason="Open Notebook not reachable on port 5055 (start docker-compose)")
+    
     for item in items:
-        if "integration" in item.keywords:
+        if "integration" in item.keywords and not db_up:
             item.add_marker(skip_no_db)
+        if "open_notebook" in item.keywords and not on_up:
+            item.add_marker(skip_no_on)
