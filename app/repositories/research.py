@@ -107,6 +107,12 @@ class ResearchRepository:
         stmt = select(ResearchEvidence).where(ResearchEvidence.evidence_id == evidence_id, ResearchEvidence.run_id == run_id)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
+        
+    async def list_evidence_for_run(self, workspace_id: UUID, run_id: UUID) -> List[ResearchEvidence]:
+        await self._verify_run_workspace(run_id, workspace_id)
+        stmt = select(ResearchEvidence).where(ResearchEvidence.run_id == run_id).order_by(ResearchEvidence.retrieved_at)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
 
     # ==========================
     # ResearchArtifact

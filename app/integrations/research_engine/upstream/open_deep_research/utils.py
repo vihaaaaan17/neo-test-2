@@ -550,8 +550,9 @@ async def get_search_tool(search_api: SearchAPI):
         return [{"type": "web_search_preview"}]
         
     elif search_api == SearchAPI.TAVILY:
-        # Configure Tavily search tool with metadata
-        search_tool = tavily_search
+        # Configure Neosis-aware Tavily search tool with metadata
+        from app.integrations.research_engine.tools.neosis_search_tools import neosis_web_search
+        search_tool = neosis_web_search
         search_tool.metadata = {
             **(search_tool.metadata or {}), 
             "type": "search", 

@@ -22,6 +22,9 @@ class ResearchState(TypedDict):
     final_graph: dict | None
     summary: str | None
 
+from typing_extensions import deprecated
+
+@deprecated("This legacy research orchestrator is deprecated. Use OpenDeepResearchEngine instead.")
 class ResearchModeOrchestrator:
     def __init__(
         self,

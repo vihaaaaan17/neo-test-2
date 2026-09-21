@@ -1,0 +1,20 @@
+{"id": "test-01", "type": "factual", "objective": "What is the capital of Australia and what is its population as of the latest census?"}
+{"id": "test-02", "type": "factual", "objective": "List the last five presidents of the United States and their terms in office."}
+{"id": "test-03", "type": "multi-hop", "objective": "Who was the lead actor in the movie that won the Academy Award for Best Picture in 1994, and what was their first feature film role?"}
+{"id": "test-04", "type": "multi-source", "objective": "Summarize the key differences between the original Apollo 11 mission plan and what actually occurred during the lunar descent."}
+{"id": "test-05", "type": "academic", "objective": "What are the most widely cited causes of the Bronze Age Collapse according to recent archaeological consensus?"}
+{"id": "test-06", "type": "historical", "objective": "Trace the history of the Silk Road, focusing specifically on its economic impact on the Han Dynasty."}
+{"id": "test-07", "type": "current-information", "objective": "What are the latest developments in solid-state battery technology for electric vehicles as of this year?"}
+{"id": "test-08", "type": "conflicting-evidence", "objective": "Analyze the conflicting viewpoints on whether dietary cholesterol significantly impacts serum cholesterol levels."}
+{"id": "test-09", "type": "source-discovery", "objective": "Identify the primary industry standards organizations that define the specifications for 6G cellular networks."}
+{"id": "test-10", "type": "long-tail", "objective": "Explain the rules and historical origins of the traditional Basque sport of Pelota."}
+{"id": "test-11", "type": "temporal-bounded", "objective": "What were the major geopolitical events that occurred globally during the month of October 1962?"}
+{"id": "test-12", "type": "citation-heavy", "objective": "Provide a detailed overview of the CRISPR-Cas9 mechanism, citing key papers that established its use for gene editing."}
+{"id": "test-13", "type": "factual", "objective": "What is the speed of light in a vacuum, expressed in both meters per second and miles per hour?"}
+{"id": "test-14", "type": "multi-hop", "objective": "Which country won the FIFA World Cup in the year the Berlin Wall fell, and who was the top scorer of that tournament?"}
+{"id": "test-15", "type": "academic", "objective": "Discuss the primary limitations of large language models in symbolic reasoning tasks, based on recent literature."}
+{"id": "test-16", "type": "current-information", "objective": "What is the current status of the Artemis II mission timeline and crew assignments?"}
+{"id": "test-17", "type": "conflicting-evidence", "objective": "Summarize the debate around the effectiveness of universal basic income (UBI) based on recent pilot programs."}
+{"id": "test-18", "type": "historical", "objective": "What were the immediate and long-term consequences of the 1883 eruption of Krakatoa?"}
+{"id": "test-19", "type": "long-tail", "objective": "Detail the lifecycle and ecological niche of the axolotl in its native habitat."}
+{"id": "test-20", "type": "multi-source", "objective": "Compare the climate pledges made by the top three greenhouse gas emitting countries in the last five years."}

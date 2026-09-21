@@ -41,5 +41,6 @@ class Settings(BaseSettings):
 
     # Advanced Research Engine (Phase 1)
     ENABLE_ADVANCED_RESEARCH: bool = False
+    ACTIVE_RESEARCH_ENGINE: str | None = "open_deep_research"
 
 settings = Settings()

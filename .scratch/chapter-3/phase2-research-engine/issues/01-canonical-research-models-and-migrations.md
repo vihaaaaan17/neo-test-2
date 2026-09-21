@@ -7,9 +7,9 @@ Expand the canonical domain models in `app/models/research.py` to establish the 
 
 **Status:** ready-for-agent
 
-- [ ] Add `ResearchEvidence` model with a nullable `source_id` foreign key, retrieving details (content, fingerprint), and tagging fields.
-- [ ] Add `ResearchArtifact` model with explicit types (e.g., `memory_candidate`, `graph_candidate`) and JSONB payload.
-- [ ] Add `ResearchReport` model for finalized synthesized reports.
-- [ ] Add `ResearchUsage` model for run/task accounting (tokens, latency, cost).
-- [ ] Add `ResearchEvent` model to capture canonical audit events.
-- [ ] Generate Alembic migration applying these models safely to the database.
+- [x] Add `ResearchEvidence` model with a nullable `source_id` foreign key, retrieving details (content, fingerprint), and tagging fields.
+- [x] Add `ResearchArtifact` model with explicit types (e.g., `memory_candidate`, `graph_candidate`) and JSONB payload.
+- [x] Add `ResearchReport` model for finalized synthesized reports.
+- [x] Add `ResearchUsage` model for run/task accounting (tokens, latency, cost).
+- [x] Add `ResearchEvent` model to capture canonical audit events.
+- [x] Generate Alembic migration applying these models safely to the database.

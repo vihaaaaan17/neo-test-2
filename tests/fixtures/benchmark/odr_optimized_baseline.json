@@ -1,0 +1,222 @@
+[
+  {
+    "id": "test-01",
+    "objective": "What is the capital of Australia and what is its population as of the latest census?",
+    "type": "factual",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 665,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-02",
+    "objective": "List the last five presidents of the United States and their terms in office.",
+    "type": "factual",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 21,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-03",
+    "objective": "Who was the lead actor in the movie that won the Academy Award for Best Picture in 1994, and what was their first feature film role?",
+    "type": "multi-hop",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 17,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-04",
+    "objective": "Summarize the key differences between the original Apollo 11 mission plan and what actually occurred during the lunar descent.",
+    "type": "multi-source",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 20,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-05",
+    "objective": "What are the most widely cited causes of the Bronze Age Collapse according to recent archaeological consensus?",
+    "type": "academic",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 32,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-06",
+    "objective": "Trace the history of the Silk Road, focusing specifically on its economic impact on the Han Dynasty.",
+    "type": "historical",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 32,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-07",
+    "objective": "What are the latest developments in solid-state battery technology for electric vehicles as of this year?",
+    "type": "current-information",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 47,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-08",
+    "objective": "Analyze the conflicting viewpoints on whether dietary cholesterol significantly impacts serum cholesterol levels.",
+    "type": "conflicting-evidence",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 22,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-09",
+    "objective": "Identify the primary industry standards organizations that define the specifications for 6G cellular networks.",
+    "type": "source-discovery",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 36,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-10",
+    "objective": "Explain the rules and historical origins of the traditional Basque sport of Pelota.",
+    "type": "long-tail",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 26,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-11",
+    "objective": "What were the major geopolitical events that occurred globally during the month of October 1962?",
+    "type": "temporal-bounded",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 19,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-12",
+    "objective": "Provide a detailed overview of the CRISPR-Cas9 mechanism, citing key papers that established its use for gene editing.",
+    "type": "citation-heavy",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 20,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-13",
+    "objective": "What is the speed of light in a vacuum, expressed in both meters per second and miles per hour?",
+    "type": "factual",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 24,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-14",
+    "objective": "Which country won the FIFA World Cup in the year the Berlin Wall fell, and who was the top scorer of that tournament?",
+    "type": "multi-hop",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 25,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-15",
+    "objective": "Discuss the primary limitations of large language models in symbolic reasoning tasks, based on recent literature.",
+    "type": "academic",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 19,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-16",
+    "objective": "What is the current status of the Artemis II mission timeline and crew assignments?",
+    "type": "current-information",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 20,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-17",
+    "objective": "Summarize the debate around the effectiveness of universal basic income (UBI) based on recent pilot programs.",
+    "type": "conflicting-evidence",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 24,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-18",
+    "objective": "What were the immediate and long-term consequences of the 1883 eruption of Krakatoa?",
+    "type": "historical",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 27,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-19",
+    "objective": "Detail the lifecycle and ecological niche of the axolotl in its native habitat.",
+    "type": "long-tail",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 27,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  },
+  {
+    "id": "test-20",
+    "objective": "Compare the climate pledges made by the top three greenhouse gas emitting countries in the last five years.",
+    "type": "multi-source",
+    "status": "completed",
+    "report": "This is a synthesized mock report for the prompt: wledge Graph:\n{\"nodes\": [], \"edges\": []}\n\nSummary:. It contains several citations to mock sources [1], [2].",
+    "duration_ms": 29,
+    "cost": 0.04,
+    "events_count": 4,
+    "quality_score": 9
+  }
+]

@@ -15,9 +15,9 @@ class ResearchLifecycleService:
 
     RUN_TRANSITIONS = {
         "pending": ["planning", "failed", "cancelled"],
-        "planning": ["researching", "failed", "cancelled"],
-        "researching": ["synthesizing", "failed", "cancelled"],
-        "synthesizing": ["finalizing", "failed", "cancelled"],
+        "planning": ["researching", "failed", "cancelled", "partial"],
+        "researching": ["synthesizing", "failed", "cancelled", "partial"],
+        "synthesizing": ["finalizing", "failed", "cancelled", "partial"],
         "finalizing": ["completed", "partial", "failed", "cancelled"],
     }
 

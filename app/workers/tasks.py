@@ -317,13 +317,15 @@ async def run_research_agent_job(
     *,
     workspace_id: str,
     objective: str,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     """
-    Background job: Runs the ResearchModeOrchestrator and streams events to Redis.
+    Background job: Runs the ResearchEngine and streams events to Redis.
     """
     import json
     from uuid import UUID
-    from app.orchestration.research_mode import ResearchModeOrchestrator
+    import uuid
+    from app.integrations.research_engine.factory import ResearchEngineFactory
     from app.services.web_search import WebSearchTool
 
     job_id = ctx.get("job_id")
@@ -348,7 +350,8 @@ async def run_research_agent_job(
             raise RuntimeError("llm_call not found in context")
         return await llm_fn(prompt, model="gpt-4o", provider="openai")
 
-    from app.services.research.factory import get_research_engine
+    import time
+    start_time = time.time()
     
     # We must retrieve the Workspace to get the workspace research_engine flag
     async with async_session_maker() as session:
@@ -359,21 +362,62 @@ async def run_research_agent_job(
         )
         workspace = result.scalars().first()
         workspace_flag = workspace.research_engine if workspace else "legacy"
+        
+        # In case the API hasn't created a ResearchRun yet (backward compatibility),
+        # generate a fallback run_id so the engine has one.
+        actual_run_id = UUID(run_id) if run_id else uuid.uuid4()
+
+    logger.info(json.dumps({
+        "event": "research_run_started",
+        "workspace_id": workspace_id,
+        "run_id": str(actual_run_id),
+        "engine": workspace_flag
+    }))
 
     # Instantiate the appropriate engine via factory
-    orchestrator = get_research_engine(
-        workspace_flag=workspace_flag,
+    engine = ResearchEngineFactory.get_engine(
+        engine_name=workspace_flag,
         llm_gateway=llm_gateway,
         search_tool=WebSearchTool(),
-        redis_client=ctx.get("redis")
+        redis_client=redis
     )
     
     try:
         final_graph = None
-        async for event in orchestrator.astream_events(UUID(workspace_id), objective):
+        async for event in engine.astream_events(run_id=actual_run_id, workspace_id=UUID(workspace_id), objective=objective):
             await publish_event(event)
             if event.get("status") == "synthesizing" and "final_graph" in event:
                 final_graph = event["final_graph"]
+
+        # ---------------------------------------------------------
+        # Finalize execution, transition state, and promote candidates
+        # ---------------------------------------------------------
+        async with async_session_maker() as session:
+            from app.repositories.research import ResearchRepository
+            from app.services.research.lifecycle import ResearchLifecycleService
+            from app.services.research.service import ResearchService
+            from app.services.memory_router import MemoryRouter
+            from app.repositories.graph import GraphRepository, graph_store
+            
+            repo = ResearchRepository(session)
+            lifecycle = ResearchLifecycleService(repo)
+            
+            # Transition state to completed
+            await lifecycle.transition_run(UUID(workspace_id), actual_run_id, "completed", {"reason": "Engine finished normally"})
+            await session.commit()
+            
+            # Run final promotion
+            mem_router = MemoryRouter(
+                episodic_repo=__import__("app.repositories.episodic", fromlist=["EpisodicRepository"]).EpisodicRepository(session),
+                knowledge_repo=__import__("app.repositories.knowledge", fromlist=["KnowledgeRepository"]).KnowledgeRepository(session),
+                llm_gateway=llm_gateway
+            )
+            graph_repo = GraphRepository(graph_store)
+            research_service = ResearchService(repo, mem_router, graph_repo)
+            
+            if owner_id:
+                await research_service.promote_memory_candidates(UUID(workspace_id), actual_run_id, owner_id)
+            await research_service.promote_graph_candidates(UUID(workspace_id), actual_run_id)
 
         await publish_event({"status": "completed", "message": "Research complete"})
         if final_graph and redis:
@@ -383,9 +427,26 @@ async def run_research_agent_job(
                 graph_dict=final_graph
             )
             
-        return {"status": "completed", "workspace_id": workspace_id}
+        duration_ms = int((time.time() - start_time) * 1000)
+        logger.info(json.dumps({
+            "event": "research_run_completed",
+            "workspace_id": workspace_id,
+            "run_id": str(actual_run_id),
+            "status": "completed",
+            "duration_ms": duration_ms
+        }))
+        return {"status": "completed", "workspace_id": workspace_id, "run_id": str(actual_run_id)}
 
     except Exception as exc:
+        duration_ms = int((time.time() - start_time) * 1000)
+        logger.error(json.dumps({
+            "event": "research_run_failed",
+            "workspace_id": workspace_id,
+            "run_id": str(actual_run_id) if 'actual_run_id' in locals() else run_id,
+            "status": "failed",
+            "duration_ms": duration_ms,
+            "error": str(exc)
+        }))
         logger.exception("run_research_agent_job: failed for workspace %s: %s", workspace_id, exc)
         await publish_event({"status": "failed", "error": str(exc)})
         return {"status": "failed", "workspace_id": workspace_id, "error": str(exc)}
