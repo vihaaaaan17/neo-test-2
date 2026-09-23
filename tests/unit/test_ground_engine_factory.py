@@ -5,8 +5,6 @@ from unittest.mock import patch, MagicMock
 # Mock pgvector before any app imports to avoid ModuleNotFoundError
 sys.modules['pgvector'] = MagicMock()
 sys.modules['pgvector.sqlalchemy'] = MagicMock()
-sys.modules['langgraph'] = MagicMock()
-sys.modules['langgraph.graph'] = MagicMock()
 
 from app.services.ground.factory import get_ground_engine
 from app.integrations.open_notebook.ground_engine import OpenNotebookGroundEngine

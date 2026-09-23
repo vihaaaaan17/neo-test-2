@@ -8,7 +8,8 @@ from app.api.routes.workspaces import (
     get_workspace_repository, 
     get_object_store, 
     get_source_repository,
-    get_quota
+    get_quota,
+    get_research_repository
 )
 from app.api.deps.arq import get_arq_redis
 from app.api.deps.auth import get_current_user
@@ -113,6 +114,27 @@ class MockArqRedis:
 
 mock_arq_redis = MockArqRedis()
 app.dependency_overrides[get_arq_redis] = lambda: mock_arq_redis
+
+class MockResearchRun:
+    def __init__(self, workspace_id, owner_id, objective, engine):
+        self.run_id = uuid4()
+        self.workspace_id = workspace_id
+        self.owner_id = owner_id
+        self.objective = objective
+        self.engine = engine
+        self.status = "pending"
+
+class MockResearchRepository:
+    def __init__(self):
+        self.db = {}
+
+    async def create_run(self, workspace_id, owner_id, objective, engine, engine_revision=None):
+        run = MockResearchRun(workspace_id, owner_id, objective, engine)
+        self.db[run.run_id] = run
+        return run
+
+mock_research_repo = MockResearchRepository()
+app.dependency_overrides[get_research_repository] = lambda: mock_research_repo
 
 class MockQuotaService:
     async def check_workspace_limit(self, owner_id):
@@ -258,3 +280,35 @@ def test_upload_file_cross_tenant_isolation():
         assert response.status_code == 404
     finally:
         app.dependency_overrides[get_current_user] = mock_get_current_user
+
+def test_start_research():
+    create_response = client.post("/api/v1/workspaces/", json={})
+    workspace_id = create_response.json()["workspace_id"]
+    
+    response = client.post(
+        f"/api/v1/workspaces/{workspace_id}/research", 
+        json={"objective": "Test objective"}
+    )
+    
+    assert response.status_code == 202
+    data = response.json()
+    assert "job_id" in data
+    assert "run_id" in data
+    
+    run_id = data["run_id"]
+    
+    # Verify the run was created in the mock DB
+    from uuid import UUID
+    run = mock_research_repo.db.get(UUID(run_id))
+    assert run is not None
+    assert str(run.workspace_id) == workspace_id
+    assert run.objective == "Test objective"
+    
+    # Verify the job was enqueued with the correct run_id
+    job_names = [job[0] for job in mock_arq_redis.jobs]
+    assert "run_research_agent_job" in job_names
+    
+    research_job = [job for job in mock_arq_redis.jobs if job[0] == "run_research_agent_job"][-1]
+    assert research_job[2]["run_id"] == run_id
+    assert research_job[2]["workspace_id"] == workspace_id
+

@@ -28,11 +28,20 @@ class OpenDeepResearchEngine(ResearchEngine):
         # Compile graph lazily or here
         from app.integrations.research_engine.upstream.open_deep_research.deep_researcher import deep_researcher_builder
         from langgraph.checkpoint.memory import MemorySaver
-        
-        # In a full deployment with redis, we could use AsyncRedisSaver
-        # For Phase 3, we continue using MemorySaver for transient states
-        # but we could upgrade this later.
-        self.checkpointer = MemorySaver()
+        from app.core.config import settings
+
+        # Use AsyncPostgresSaver for production if available, MemorySaver for dev
+        if settings.ASYNC_POSTGRES_SAVER_ENABLED:
+            try:
+                from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+                # Thread ID is passed per-execution in config, never in checkpointer constructor
+                self.checkpointer = AsyncPostgresSaver.from_conn_string(settings.POSTGRES_DSN)
+            except Exception as e:
+                logger.warning(f"AsyncPostgresSaver unavailable ({e}); falling back to MemorySaver")
+                self.checkpointer = MemorySaver()
+        else:
+            self.checkpointer = MemorySaver()
+
         self.graph = deep_researcher_builder.compile(checkpointer=self.checkpointer)
 
     async def astream_events(self, run_id: UUID, workspace_id: UUID, objective: str) -> AsyncGenerator[dict[str, Any], None]:
@@ -161,28 +170,13 @@ class OpenDeepResearchEngine(ResearchEngine):
                         
         except asyncio.CancelledError:
             logger.info(f"ODR execution cancelled for run {run_id}")
-            async with async_session_maker() as session:
-                from app.services.research.lifecycle import ResearchLifecycleService
-                svc = ResearchLifecycleService(ResearchRepository(session))
-                await svc.transition_run(workspace_id, run_id, "cancelled", {"reason": "Worker cancelled task"})
-                await session.commit()
             yield {"status": "cancelled", "message": "Research execution cancelled."}
             raise
         except ResearchBudgetExceeded as e:
             logger.warning(f"Research budget exceeded for run {run_id}: {str(e)}")
-            async with async_session_maker() as session:
-                from app.services.research.lifecycle import ResearchLifecycleService
-                svc = ResearchLifecycleService(ResearchRepository(session))
-                await svc.transition_run(workspace_id, run_id, "partial", {"reason": str(e)})
-                await session.commit()
             yield {"status": "partial", "message": f"Execution halted: {str(e)}"}
         except Exception as e:
             logger.exception(f"ODR Engine encountered an error for run {run_id}: {str(e)}")
-            async with async_session_maker() as session:
-                from app.services.research.lifecycle import ResearchLifecycleService
-                svc = ResearchLifecycleService(ResearchRepository(session))
-                await svc.transition_run(workspace_id, run_id, "failed", {"error": str(e)})
-                await session.commit()
             yield {"status": "failed", "message": f"ODR execution failed: {str(e)}"}
         finally:
             self._current_task = None

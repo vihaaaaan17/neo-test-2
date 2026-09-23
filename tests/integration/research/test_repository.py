@@ -68,10 +68,23 @@ async def test_crud_operations(repo: ResearchRepository, workspaces):
     assert fetched_task is not None
     
     # Create Evidence
-    evidence = await repo.create_evidence(workspace_id=ws1.workspace_id, run_id=run.run_id, task_id=task.task_id, content="Evidence", tags=["test"])
+    evidence = await repo.create_evidence(
+        workspace_id=ws1.workspace_id,
+        run_id=run.run_id,
+        task_id=task.task_id,
+        content="Evidence",
+        tags=["test"],
+        source_resolution_status="unresolved_external",
+        provider="tavily",
+        provider_reference={"score": 0.99}
+    )
     assert evidence.evidence_id is not None
+    assert evidence.source_resolution_status == "unresolved_external"
+    assert evidence.provider == "tavily"
+    assert evidence.provider_reference["score"] == 0.99
     fetched_evidence = await repo.get_evidence(ws1.workspace_id, run.run_id, evidence.evidence_id)
     assert fetched_evidence is not None
+    assert fetched_evidence.provider == "tavily"
     
     # Create Artifact
     artifact = await repo.create_artifact(workspace_id=ws1.workspace_id, run_id=run.run_id, task_id=task.task_id, artifact_type="memory_candidate", payload={"key": "value"})

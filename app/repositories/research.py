@@ -1,7 +1,10 @@
+import json
+import uuid
 from uuid import UUID
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
+from sqlalchemy import select, func
+from arq.connections import Redis
 from sqlalchemy import exc
 
 from app.models.research import (
@@ -20,7 +23,8 @@ class ResearchRepository:
     Enforces workspace_id isolation on all reads and writes.
     """
 
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, redis_client: Optional[Redis] = None):
+        self.redis_client = redis_client
         self.session = session
 
     # ==========================
@@ -41,13 +45,15 @@ class ResearchRepository:
     # ResearchRun
     # ==========================
     async def create_run(self, workspace_id: UUID, owner_id: UUID, objective: str, engine: str, engine_revision: Optional[str] = None) -> ResearchRun:
+        attempt_id = uuid.uuid4()
         run = ResearchRun(
             workspace_id=workspace_id,
             owner_id=owner_id,
             objective=objective,
             engine=engine,
             engine_revision=engine_revision,
-            status="pending"
+            status="pending",
+            current_attempt_id=attempt_id
         )
         self.session.add(run)
         await self.session.commit()
@@ -83,7 +89,99 @@ class ResearchRepository:
     # ==========================
     # ResearchEvidence
     # ==========================
-    async def create_evidence(self, workspace_id: UUID, run_id: UUID, content: str, task_id: Optional[UUID] = None, source_id: Optional[UUID] = None, retriever: Optional[str] = None, query: Optional[str] = None, locator: Optional[str] = None, fingerprint: Optional[str] = None, tags: Optional[List[str]] = None, provenance: Optional[dict] = None) -> ResearchEvidence:
+    async def batch_create_evidence(
+        self,
+        workspace_id: UUID,
+        run_id: UUID,
+        evidence_list: List[Dict[str, Any]],
+        batch_size: int = 100
+    ) -> List[ResearchEvidence]:
+        """
+        Creates multiple evidence records in batches with fingerprint deduplication.
+        """
+        await self._verify_run_workspace(run_id, workspace_id)
+
+        # Deduplicate by fingerprint
+        unique_evidence = {}
+        for ev in evidence_list:
+            fingerprint = ev.get("fingerprint")
+            if fingerprint and fingerprint not in unique_evidence:
+                unique_evidence[fingerprint] = ev
+
+        # Check for existing evidence with the same fingerprints
+        fingerprints = list(unique_evidence.keys())
+        existing_evidence = await self._get_evidence_by_fingerprints(workspace_id, run_id, fingerprints)
+        existing_fingerprints = {ev.fingerprint for ev in existing_evidence}
+
+        # Filter out evidence that already exists
+        new_evidence = [
+            ev for fingerprint, ev in unique_evidence.items()
+            if fingerprint not in existing_fingerprints
+        ]
+
+        # Batch insert new evidence
+        inserted_evidence = []
+        for i in range(0, len(new_evidence), batch_size):
+            batch = new_evidence[i:i + batch_size]
+            created_batch = await self._bulk_insert_evidence(workspace_id, run_id, batch)
+            inserted_evidence.extend(created_batch)
+
+        return inserted_evidence
+
+    async def _get_evidence_by_fingerprints(self, workspace_id: UUID, run_id: UUID, fingerprints: List[str]) -> List[ResearchEvidence]:
+        """
+        Retrieves evidence records by their fingerprints.
+        """
+        stmt = select(ResearchEvidence).where(
+            ResearchEvidence.run_id == run_id,
+            ResearchEvidence.fingerprint.in_(fingerprints)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def _bulk_insert_evidence(self, workspace_id: UUID, run_id: UUID, evidence_list: List[Dict[str, Any]]) -> List[ResearchEvidence]:
+        """
+        Performs a bulk insert of evidence records.
+        """
+        evidence_objects = [
+            ResearchEvidence(
+                run_id=run_id,
+                task_id=ev.get("task_id"),
+                source_id=ev.get("source_id"),
+                retriever=ev.get("retriever"),
+                query=ev.get("query"),
+                content=ev.get("content"),
+                locator=ev.get("locator"),
+                fingerprint=ev.get("fingerprint"),
+                tags=ev.get("tags", []),
+                provenance=ev.get("provenance"),
+                source_resolution_status=ev.get("source_resolution_status", "unresolved_external"),
+                provider=ev.get("provider"),
+                provider_reference=ev.get("provider_reference")
+            )
+            for ev in evidence_list
+        ]
+        self.session.add_all(evidence_objects)
+        await self.session.commit()
+        return evidence_objects
+
+    async def create_evidence(
+        self,
+        workspace_id: UUID,
+        run_id: UUID,
+        content: str,
+        task_id: Optional[UUID] = None,
+        source_id: Optional[UUID] = None,
+        retriever: Optional[str] = None,
+        query: Optional[str] = None,
+        locator: Optional[str] = None,
+        fingerprint: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        provenance: Optional[dict] = None,
+        source_resolution_status: str = "unresolved_external",
+        provider: Optional[str] = None,
+        provider_reference: Optional[dict] = None
+    ) -> ResearchEvidence:
         await self._verify_run_workspace(run_id, workspace_id)
         evidence = ResearchEvidence(
             run_id=run_id,
@@ -95,7 +193,10 @@ class ResearchRepository:
             locator=locator,
             fingerprint=fingerprint,
             tags=tags or [],
-            provenance=provenance
+            provenance=provenance,
+            source_resolution_status=source_resolution_status,
+            provider=provider,
+            provider_reference=provider_reference
         )
         self.session.add(evidence)
         await self.session.commit()
@@ -166,7 +267,48 @@ class ResearchRepository:
     # ==========================
     # ResearchUsage
     # ==========================
-    async def create_usage(self, workspace_id: UUID, run_id: UUID, task_id: Optional[UUID] = None, model_calls: int = 0, input_tokens: int = 0, output_tokens: int = 0, retrieval_calls: int = 0, search_calls: int = 0, mcp_calls: int = 0, latency: float = 0.0, cost: float = 0.0, estimation_type: str = "estimated") -> ResearchUsage:
+    async def checkpoint_usage(self, workspace_id: UUID, run_id: UUID, usage_metrics: dict) -> ResearchUsage:
+        """
+        Persists usage metrics to the database as a periodic checkpoint.
+        """
+        await self._verify_run_workspace(run_id, workspace_id)
+
+        usage = ResearchUsage(
+            run_id=run_id,
+            task_id=None,
+            model_calls=usage_metrics.get('model_calls', 0),
+            input_tokens=usage_metrics.get('input_tokens', 0),
+            output_tokens=usage_metrics.get('output_tokens', 0),
+            retrieval_calls=usage_metrics.get('retrieval_calls', 0),
+            search_calls=usage_metrics.get('search_calls', 0),
+            mcp_calls=usage_metrics.get('mcp_calls', 0),
+            latency=usage_metrics.get('latency', 0.0),
+            cost=usage_metrics.get('cost', 0.0),
+            estimation_type="periodic_checkpoint"
+        )
+        self.session.add(usage)
+        await self.session.commit()
+        await self.session.refresh(usage)
+        return usage
+
+    async def create_usage(
+        self,
+        workspace_id: UUID,
+        run_id: UUID,
+        task_id: Optional[UUID] = None,
+        model_calls: int = 0,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        retrieval_calls: int = 0,
+        search_calls: int = 0,
+        mcp_calls: int = 0,
+        latency: float = 0.0,
+        cost: float = 0.0,
+        estimation_type: str = "exact"
+    ) -> ResearchUsage:
+        """
+        Records a usage entry for a research run.
+        """
         await self._verify_run_workspace(run_id, workspace_id)
         usage = ResearchUsage(
             run_id=run_id,
@@ -197,15 +339,37 @@ class ResearchRepository:
     # ==========================
     async def create_event(self, workspace_id: UUID, run_id: UUID, event_type: str, payload: Optional[dict] = None, task_id: Optional[UUID] = None) -> ResearchEvent:
         await self._verify_run_workspace(run_id, workspace_id)
+
+        # Calculate next sequence number for the run
+        result = await self.session.execute(
+            select(func.coalesce(func.max(ResearchEvent.sequence), 0)).where(ResearchEvent.run_id == run_id)
+        )
+        next_sequence = result.scalar() + 1
+
         event = ResearchEvent(
             run_id=run_id,
             task_id=task_id,
             event_type=event_type,
+            sequence=next_sequence,
             payload=payload
         )
         self.session.add(event)
         await self.session.commit()
         await self.session.refresh(event)
+
+        # Publish to Redis Pub/Sub
+        if self.redis_client:
+            channel = f"research_events:{run_id}"
+            await self.redis_client.publish(
+                channel,
+                json.dumps({
+                    "run_id": str(run_id),
+                    "event_type": event_type,
+                    "sequence": next_sequence,
+                    "payload": payload
+                })
+            )
+
         return event
 
     async def get_events_for_run(self, workspace_id: UUID, run_id: UUID) -> List[ResearchEvent]:

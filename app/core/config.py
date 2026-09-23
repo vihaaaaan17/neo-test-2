@@ -43,4 +43,21 @@ class Settings(BaseSettings):
     ENABLE_ADVANCED_RESEARCH: bool = False
     ACTIVE_RESEARCH_ENGINE: str | None = "open_deep_research"
 
+    # STORM Configuration
+    STORM_ENABLED: bool = False
+    # Checkpointer Settings
+    ASYNC_POSTGRES_SAVER_ENABLED: bool = False
+    POSTGRES_DSN: str = "postgresql+asyncpg://user:password@localhost:5432/dbname"
+
+    # Research Admission Settings
+    USER_CONCURRENCY_LIMIT: int = 1
+    WORKSPACE_CONCURRENCY_LIMIT: int = 2
+    GLOBAL_CONCURRENCY_LIMIT: int = 10
+
+    # Budget Policy Settings
+    MAX_MODEL_CALLS: int = 100
+    MAX_INPUT_TOKENS: int = 10000
+    MAX_OUTPUT_TOKENS: int = 10000
+    MAX_COST: float = 10.0
+
 settings = Settings()

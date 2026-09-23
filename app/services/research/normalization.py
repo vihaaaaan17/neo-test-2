@@ -52,3 +52,10 @@ class ResearchNormalizationService:
             
         raw = "|".join(components)
         return hashlib.sha256(raw.encode('utf-8')).hexdigest()
+
+    def normalize_evidence(self, content: str, locator: str = None, retriever: str = None, query: str = None) -> str:
+        """
+        Normalizes evidence and computes a deduplicating SHA-256 fingerprint.
+        """
+        normalized_url = self.normalize_url(locator) if locator else None
+        return self.generate_fingerprint(content=content, url=normalized_url)

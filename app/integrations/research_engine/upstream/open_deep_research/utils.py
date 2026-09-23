@@ -24,9 +24,19 @@ from langchain_core.tools import (
     ToolException,
     tool,
 )
-from langchain_mcp_adapters.client import MultiServerMCPClient
+try:
+    from langchain_mcp_adapters.client import MultiServerMCPClient
+except ImportError:
+    MultiServerMCPClient = None
 from langgraph.config import get_store
-from mcp import McpError
+try:
+    from mcp import McpError
+except ImportError:
+    try:
+        from mcp import MCPError as McpError
+    except ImportError:
+        class McpError(Exception):
+            pass
 from tavily import AsyncTavilyClient
 
 from app.integrations.research_engine.upstream.open_deep_research.configuration import Configuration, SearchAPI

@@ -1,7 +1,10 @@
 import os
 import logging
 from typing import List, Dict, Any
-from tavily import AsyncTavilyClient
+try:
+    from tavily import AsyncTavilyClient
+except ImportError:
+    AsyncTavilyClient = None  # type: ignore[assignment,misc]
 
 logger = logging.getLogger(__name__)
 

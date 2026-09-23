@@ -22,12 +22,16 @@ import json
 from app.schemas.ground_mode import AskRequest, AskResponse
 from app.services.hybrid_retrieval import HybridRetrievalService
 from app.api.deps.llm import get_llm_gateway, get_embed_gateway
+from app.repositories.research import ResearchRepository
 
 from app.orchestration.ground_mode import GroundModeOrchestrator
 from app.services.hybrid_retrieval import HybridRetrievalService
 from app.services.memory_router import MemoryRouter
 from app.repositories.knowledge import KnowledgeRepository
 from app.schemas.knowledge import KnowledgeMemoryCreate, Provenance
+from app.services.research.admission import ResearchAdmissionController
+from app.services.research.quota import ResearchQuotaService
+from app.services.research.rate_limiter import ProviderRateLimiter
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
@@ -38,7 +42,10 @@ def get_source_repository(db: AsyncSession = Depends(get_db)) -> SourceRepositor
     return SourceRepository(db)
 
 def get_quota(db: AsyncSession = Depends(get_db)) -> QuotaService:
-    return get_quota_service(db)
+    return QuotaService(db)
+
+def get_research_repository(db: AsyncSession = Depends(get_db)) -> ResearchRepository:
+    return ResearchRepository(db)
 
 def get_knowledge_repository(db: AsyncSession = Depends(get_db)) -> KnowledgeRepository:
     return KnowledgeRepository(db)
@@ -462,11 +469,26 @@ async def start_research(
     request: ResearchRequest,
     current_user_id: UUID = Depends(get_current_user),
     repo: WorkspaceRepository = Depends(get_workspace_repository),
+    research_repo: ResearchRepository = Depends(get_research_repository),
     arq_redis: ArqRedis = Depends(get_arq_redis)
 ):
     workspace = await repo.get_workspace(workspace_id, current_user_id)
     if not workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
+        
+    engine = workspace.research_engine or "legacy"
+    
+    admission_controller = ResearchAdmissionController(
+        quota_service=ResearchQuotaService(research_repo),
+        rate_limiter=ProviderRateLimiter(arq_redis),
+        repository=research_repo
+    )
+    run = await admission_controller.admit_research_run(
+        workspace_id=workspace_id,
+        owner_id=current_user_id,
+        objective=request.objective,
+        engine=engine
+    )
         
     import uuid
     job_id = str(uuid.uuid4())
@@ -475,7 +497,9 @@ async def start_research(
         "run_research_agent_job",
         workspace_id=str(workspace_id),
         objective=request.objective,
-        _job_id=job_id
+        run_id=str(run.run_id),
+        _job_id=job_id,
+        _queue_name="research-standard"
     )
     
-    return {"job_id": job_id, "status": "accepted"}
+    return {"job_id": job_id, "run_id": str(run.run_id), "status": "accepted"}

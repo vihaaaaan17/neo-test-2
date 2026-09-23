@@ -169,6 +169,15 @@ async def health_check():
 
 from app.api.routes.workspaces import router as workspaces_router
 from app.api.routes.jobs import router as jobs_router
+from app.api.routes.quota import router as quota_router
+from app.api.routes.rate_limiter import router as rate_limiter_router
+from app.api.routes.worker import router as worker_router
+from app.api.routes.metrics import router as metrics_router
+
 # Limit the workspace router routes explicitly if needed, but slowapi works automatically
 app.include_router(workspaces_router, prefix="/api/v1")
 app.include_router(jobs_router, prefix="/api/v1")
+app.include_router(quota_router, prefix="/api/v1")
+app.include_router(rate_limiter_router, prefix="/api/v1")
+app.include_router(worker_router, prefix="/api/v1")
+app.include_router(metrics_router, prefix="/api/v1")

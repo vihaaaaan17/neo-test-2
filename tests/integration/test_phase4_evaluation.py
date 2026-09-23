@@ -7,8 +7,6 @@ sys.modules['docling'] = MagicMock()
 sys.modules['docling.document_converter'] = MagicMock()
 sys.modules['litellm'] = MagicMock()
 sys.modules['neo4j'] = MagicMock()
-sys.modules['langgraph'] = MagicMock()
-sys.modules['langgraph.graph'] = MagicMock()
 
 import pytest
 import uuid

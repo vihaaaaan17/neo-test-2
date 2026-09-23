@@ -1,8 +1,10 @@
 import uuid
+from datetime import datetime
 from typing import Optional, Dict, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.research import ResearchRun, ResearchTask, ResearchEvent
 from app.repositories.research import ResearchRepository
+from app.services.research.metrics import ResearchMetricsService
 
 class InvalidTransitionError(Exception):
     pass
@@ -32,11 +34,15 @@ class ResearchLifecycleService:
         self.repository = repository
         
     async def transition_run(
-        self, 
-        workspace_id: uuid.UUID, 
-        run_id: uuid.UUID, 
-        new_status: str, 
-        payload: Optional[Dict[str, Any]] = None
+        self,
+        workspace_id: uuid.UUID,
+        run_id: uuid.UUID,
+        new_status: str,
+        payload: Optional[Dict[str, Any]] = None,
+        attempt_id: Optional[uuid.UUID] = None,
+        start_time: Optional[datetime] = None,
+        usage_metrics: Optional[Dict[str, Any]] = None,
+        failures: Optional[Dict[str, Any]] = None
     ) -> ResearchRun:
         """
         Transition a ResearchRun to a new status.
@@ -70,7 +76,21 @@ class ResearchLifecycleService:
         event_payload = {"from": current_status, "to": new_status}
         if payload:
             event_payload.update(payload)
-            
+        if attempt_id:
+            event_payload["attempt_id"] = str(attempt_id)
+
+        # Emit metrics if start_time is provided
+        if start_time:
+            metrics_service = ResearchMetricsService(self.repository)
+            await metrics_service.emit_metrics(
+                run_id=run_id,
+                workspace_id=workspace_id,
+                status=new_status,
+                start_time=start_time,
+                usage_metrics=usage_metrics,
+                failures=failures
+            )
+
         await self.repository.create_event(
             workspace_id=workspace_id,
             run_id=run_id,

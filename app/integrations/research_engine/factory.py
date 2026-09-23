@@ -3,6 +3,7 @@ from typing import Callable, Awaitable, Any
 
 from app.integrations.research_engine.engine import ResearchEngine
 from app.integrations.research_engine.legacy import LegacyResearchEngine
+from app.integrations.research_engine.exceptions import ResearchEngineSetupError
 # OpenDeepResearchEngine will be imported when implemented in Ticket 02
 
 logger = logging.getLogger(__name__)
@@ -19,10 +20,13 @@ class ResearchEngineFactory:
         search_tool: Any,
         redis_client: Any = None
     ) -> ResearchEngine:
+        import os
         from app.core.config import settings
         
-        # Override with global flag if set
-        if settings.ACTIVE_RESEARCH_ENGINE:
+        # Override with environment variable if set (e.g., operational cutover/rollback)
+        if "ACTIVE_RESEARCH_ENGINE" in os.environ:
+            engine_name = os.environ["ACTIVE_RESEARCH_ENGINE"]
+        elif not engine_name and settings.ACTIVE_RESEARCH_ENGINE:
             engine_name = settings.ACTIVE_RESEARCH_ENGINE
 
         """
@@ -44,14 +48,19 @@ class ResearchEngineFactory:
                     redis_client=redis_client
                 )
             except ImportError as e:
-                logger.error(f"Failed to import OpenDeepResearchEngine: {e}, falling back to Legacy")
-                return LegacyResearchEngine(
-                    llm_gateway=llm_gateway,
-                    search_tool=search_tool
+                logger.error(f"Failed to import OpenDeepResearchEngine: {e}")
+                raise ResearchEngineSetupError(f"Cannot load OpenDeepResearchEngine: {e}") from e
+        elif engine_name == "storm":
+            if not getattr(settings, "STORM_ENABLED", False):
+                raise ResearchEngineSetupError(
+                    "STORM engine is formally deferred to Chapter 5 and currently disabled (STORM_ENABLED=False)."
                 )
-        else:
+            raise ResearchEngineSetupError("STORM engine runtime is not yet registered.")
+        elif engine_name == "legacy":
             logger.info("Instantiating LegacyResearchEngine")
             return LegacyResearchEngine(
                 llm_gateway=llm_gateway,
                 search_tool=search_tool
             )
+        else:
+            raise ResearchEngineSetupError(f"Unknown research engine: {engine_name}")

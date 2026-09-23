@@ -37,6 +37,24 @@ class UsageTracker:
     def add_search_call(self):
         self.search_calls += 1
         self.check_budget()
+
+    def track_search_call(self):
+        self.add_search_call()
+
+    def track_error(self, error: str):
+        if not hasattr(self, "errors"):
+            self.errors = []
+        self.errors.append(error)
+
+    def get_usage_metrics(self) -> dict:
+        return {
+            "model_calls": self.model_calls,
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+            "search_calls": self.search_calls,
+            "retrieval_calls": self.retrieval_calls,
+            "mcp_calls": self.mcp_calls,
+        }
         
     def check_budget(self):
         if self.model_calls > self.max_model_calls:

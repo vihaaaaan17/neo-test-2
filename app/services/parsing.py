@@ -2,7 +2,10 @@ import tempfile
 import os
 import asyncio
 from typing import Any
-from docling.document_converter import DocumentConverter
+try:
+    from docling.document_converter import DocumentConverter
+except ImportError:
+    DocumentConverter = None
 from app.services.storage import ObjectStoreProtocol
 
 class DocumentParser:

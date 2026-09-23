@@ -12,14 +12,14 @@ from arq.connections import RedisSettings
 from app.core.config import settings
 from app.workers.tasks import (
     parse_and_chunk_job, compress_episodic_job, sync_knowledge_to_graph_job,
-    run_research_agent_job, project_output_graph_job, export_workspace_job,
-    project_to_open_notebook_job, process_deletion_tombstone_job,
-    reconcile_deletion_tombstones_job
+    run_research_agent_job, project_output_graph_job,
+    export_workspace_job, project_to_open_notebook_job,
+    process_deletion_tombstone_job, reconcile_deletion_tombstones_job
 )
 from arq.cron import cron
+from arq.worker import WorkerSettings as BaseWorkerSettings
 
 logger = logging.getLogger(__name__)
-
 
 async def startup(ctx: dict) -> None:
     """Runs once when the worker process starts. Populate shared resources."""
@@ -28,7 +28,7 @@ async def startup(ctx: dict) -> None:
     # For now it is None; compress_episodic_job raises a clear error if called
     # without it, which makes the missing dependency explicit rather than silent.
     ctx["llm_call"] = None
-    
+
     import aioboto3
     session = aioboto3.Session(
         aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
@@ -47,15 +47,53 @@ async def shutdown(ctx: dict) -> None:
         await ctx["s3_context"].__aexit__(None, None, None)
 
 
-class WorkerSettings:
-    """arq worker settings class. Discovered by: python -m arq app.workers.settings.WorkerSettings"""
+class WorkerSettings(BaseWorkerSettings):
+    """
+arq worker settings class. Discovered by: python -m arq app.workers.settings.WorkerSettings
+    """
+
+    # Define logical queues for isolation
+    QUEUES = {
+        "research-high": {
+            "functions": [run_research_agent_job],
+            "max_jobs": 5,
+            "queue_name": "research-high"
+        },
+        "research-standard": {
+            "functions": [run_research_agent_job],
+            "max_jobs": 20,
+            "queue_name": "research-standard"
+        },
+        "ground-projection": {
+            "functions": [project_output_graph_job, project_to_open_notebook_job],
+            "max_jobs": 10,
+            "queue_name": "ground-projection"
+        },
+        "source-processing": {
+            "functions": [parse_and_chunk_job, compress_episodic_job],
+            "max_jobs": 15,
+            "queue_name": "source-processing"
+        },
+        "maintenance": {
+            "functions": [reconcile_deletion_tombstones_job],
+            "max_jobs": 3,
+            "queue_name": "maintenance"
+        }
+    }
 
     functions = [
-        parse_and_chunk_job, compress_episodic_job, sync_knowledge_to_graph_job,
-        run_research_agent_job, project_output_graph_job,
-        export_workspace_job, project_to_open_notebook_job,
-        process_deletion_tombstone_job, reconcile_deletion_tombstones_job
+        run_research_agent_job,
+        parse_and_chunk_job,
+        compress_episodic_job,
+        sync_knowledge_to_graph_job,
+        project_output_graph_job,
+        export_workspace_job,
+        project_to_open_notebook_job,
+        process_deletion_tombstone_job,
+        reconcile_deletion_tombstones_job
     ]
+    queue_name = "research-standard"
+    max_jobs = 20
     cron_jobs = [
         cron(reconcile_deletion_tombstones_job, minute=set(range(0, 60, 5)))
     ]
@@ -68,3 +106,9 @@ class WorkerSettings:
     # for transient errors; arq retries handle process-level crashes.
     max_tries = 3
     job_timeout = 300  # 5 minutes max per job
+
+    def get_queue_config(self, queue_name):
+        """
+        Returns the configuration for a specific queue.
+        """
+        return self.QUEUES.get(queue_name, {})

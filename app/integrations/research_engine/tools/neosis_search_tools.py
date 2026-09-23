@@ -109,16 +109,20 @@ async def neosis_web_search(
                 await repo._verify_run_workspace(run_id, workspace_id)
                 
                 await repo.create_evidence(
+                    workspace_id=workspace_id,
                     run_id=run_id,
                     task_id=None,
-                    source_id=None, # Will be resolved later by ProvenanceService if needed
+                    source_id=None,
                     retriever="tavily_web_search",
                     query=query,
                     content=raw_content,
                     locator=url,
                     fingerprint=fingerprint,
                     tags=["search_result"],
-                    provenance={"title": title, "url": url}
+                    provenance={"title": title, "url": url},
+                    source_resolution_status="unresolved_external",
+                    provider="tavily",
+                    provider_reference={"raw_score": result.get("score")}
                 )
             except Exception as e:
                 logger.error(f"Failed to persist evidence for {url}: {e}")

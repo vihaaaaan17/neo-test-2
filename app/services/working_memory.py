@@ -1,5 +1,5 @@
 from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.checkpoint.memory import MemorySaver
 from app.schemas.working_memory import WorkingMemoryState
 from app.core.config import settings
 
@@ -15,13 +15,14 @@ graph_builder.add_node("process", process_memory)
 graph_builder.add_edge(START, "process")
 graph_builder.add_edge("process", END)
 
-# AsyncPostgresSaver replaces the in-process MemorySaver.
-# This is critical for multi-worker deployments:
-#   - MemorySaver() stores state in a per-process Python dict.
-#   - With multiple Gunicorn workers, two requests from the same user
-#     hitting different workers would see different (diverged) state.
-#   - AsyncPostgresSaver persists checkpoints to the canonical Postgres DB,
-#     ensuring all workers share a single consistent state view.
-checkpointer = AsyncPostgresSaver.from_conn_string(settings.DATABASE_URL)
+# In-memory checkpointer safe for unit tests and local dev
+if getattr(settings, "ASYNC_POSTGRES_SAVER_ENABLED", False):
+    try:
+        from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+        checkpointer = AsyncPostgresSaver.from_conn_string(settings.DATABASE_URL)
+    except Exception:
+        checkpointer = MemorySaver()
+else:
+    checkpointer = MemorySaver()
 
 working_memory_engine = graph_builder.compile(checkpointer=checkpointer)

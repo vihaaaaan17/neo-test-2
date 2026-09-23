@@ -14,6 +14,7 @@ class ResearchRun(Base):
     status = Column(String, default="pending", nullable=False)
     engine = Column(String, nullable=False)
     engine_revision = Column(String, nullable=True)
+    current_attempt_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
@@ -43,6 +44,9 @@ class ResearchEvidence(Base):
     fingerprint = Column(String, nullable=True)
     tags = Column(ARRAY(String), default=list, nullable=False)
     provenance = Column(JSONB, nullable=True)
+    source_resolution_status = Column(String, default="unresolved_external", nullable=False)
+    provider = Column(String, nullable=True)
+    provider_reference = Column(JSONB, nullable=True)
     retrieved_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
@@ -70,6 +74,8 @@ class ResearchReport(Base):
     limitations = Column(String, nullable=True)
     warnings = Column(String, nullable=True)
     version = Column(String, nullable=True)
+    provenance_version = Column(String, default="v1", nullable=False)
+    status = Column(String, default="draft", nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
@@ -98,5 +104,6 @@ class ResearchEvent(Base):
     run_id = Column(UUID(as_uuid=True), ForeignKey("research_runs.run_id", ondelete="CASCADE"), nullable=False, index=True)
     task_id = Column(UUID(as_uuid=True), ForeignKey("research_tasks.task_id", ondelete="CASCADE"), nullable=True)
     event_type = Column(String, nullable=False)
+    sequence = Column(Integer, nullable=False)
     payload = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)

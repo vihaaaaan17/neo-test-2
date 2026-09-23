@@ -333,6 +333,10 @@ async def run_research_agent_job(
         logger.error("run_research_agent_job: No job_id found in context")
         return {"status": "failed", "error": "No job_id"}
         
+    if not run_id:
+        logger.error("run_research_agent_job: Missing run_id")
+        return {"status": "failed", "error": "Missing run_id"}
+        
     redis = ctx.get("redis")
     channel_name = f"research:{job_id}"
     
@@ -353,30 +357,38 @@ async def run_research_agent_job(
     import time
     start_time = time.time()
     
-    # We must retrieve the Workspace to get the workspace research_engine flag
+    # We must retrieve the Workspace and ResearchRun
     async with async_session_maker() as session:
         from app.models.workspace import Workspace
+        from app.models.research import ResearchRun
         from sqlalchemy.future import select
-        result = await session.execute(
-            select(Workspace).where(Workspace.workspace_id == UUID(workspace_id))
-        )
-        workspace = result.scalars().first()
-        workspace_flag = workspace.research_engine if workspace else "legacy"
         
-        # In case the API hasn't created a ResearchRun yet (backward compatibility),
-        # generate a fallback run_id so the engine has one.
-        actual_run_id = UUID(run_id) if run_id else uuid.uuid4()
+        workspace = (await session.execute(
+            select(Workspace).where(Workspace.workspace_id == UUID(workspace_id))
+        )).scalars().first()
+        
+        run = (await session.execute(
+            select(ResearchRun).where(ResearchRun.run_id == UUID(run_id))
+        )).scalars().first()
+        
+        if not run:
+            await publish_event({"status": "failed", "error": "ResearchRun not found"})
+            return {"status": "failed", "error": "ResearchRun not found"}
+            
+        owner_id = run.owner_id
+        engine_flag = run.engine
+        actual_run_id = UUID(run_id)
 
     logger.info(json.dumps({
         "event": "research_run_started",
         "workspace_id": workspace_id,
         "run_id": str(actual_run_id),
-        "engine": workspace_flag
+        "engine": engine_flag
     }))
 
     # Instantiate the appropriate engine via factory
     engine = ResearchEngineFactory.get_engine(
-        engine_name=workspace_flag,
+        engine_name=engine_flag,
         llm_gateway=llm_gateway,
         search_tool=WebSearchTool(),
         redis_client=redis
@@ -384,9 +396,18 @@ async def run_research_agent_job(
     
     try:
         final_graph = None
+        final_status = "completed"
+        final_reason = "Engine finished normally"
+        
         async for event in engine.astream_events(run_id=actual_run_id, workspace_id=UUID(workspace_id), objective=objective):
             await publish_event(event)
-            if event.get("status") == "synthesizing" and "final_graph" in event:
+            status = event.get("status")
+            
+            if status in ("failed", "partial", "cancelled"):
+                final_status = status
+                final_reason = event.get("message", f"Engine returned {status}")
+                
+            if status == "synthesizing" and "final_graph" in event:
                 final_graph = event["final_graph"]
 
         # ---------------------------------------------------------
@@ -402,25 +423,26 @@ async def run_research_agent_job(
             repo = ResearchRepository(session)
             lifecycle = ResearchLifecycleService(repo)
             
-            # Transition state to completed
-            await lifecycle.transition_run(UUID(workspace_id), actual_run_id, "completed", {"reason": "Engine finished normally"})
+            # Transition state to final_status
+            await lifecycle.transition_run(UUID(workspace_id), actual_run_id, final_status, {"reason": final_reason})
             await session.commit()
             
-            # Run final promotion
-            mem_router = MemoryRouter(
-                episodic_repo=__import__("app.repositories.episodic", fromlist=["EpisodicRepository"]).EpisodicRepository(session),
-                knowledge_repo=__import__("app.repositories.knowledge", fromlist=["KnowledgeRepository"]).KnowledgeRepository(session),
-                llm_gateway=llm_gateway
-            )
-            graph_repo = GraphRepository(graph_store)
-            research_service = ResearchService(repo, mem_router, graph_repo)
-            
-            if owner_id:
-                await research_service.promote_memory_candidates(UUID(workspace_id), actual_run_id, owner_id)
-            await research_service.promote_graph_candidates(UUID(workspace_id), actual_run_id)
+            # Run final promotion only if completed
+            if final_status == "completed":
+                mem_router = MemoryRouter(
+                    episodic_repo=__import__("app.repositories.episodic", fromlist=["EpisodicRepository"]).EpisodicRepository(session),
+                    knowledge_repo=__import__("app.repositories.knowledge", fromlist=["KnowledgeRepository"]).KnowledgeRepository(session),
+                    llm_gateway=llm_gateway
+                )
+                graph_repo = GraphRepository(graph_store)
+                research_service = ResearchService(repo, mem_router, graph_repo)
+                
+                if owner_id:
+                    await research_service.promote_memory_candidates(UUID(workspace_id), actual_run_id, owner_id)
+                await research_service.promote_graph_candidates(UUID(workspace_id), actual_run_id)
 
-        await publish_event({"status": "completed", "message": "Research complete"})
-        if final_graph and redis:
+        await publish_event({"status": final_status, "message": f"Research {final_status}"})
+        if final_graph and redis and final_status == "completed":
             await redis.enqueue_job(
                 "project_output_graph_job",
                 workspace_id=workspace_id,
@@ -432,10 +454,10 @@ async def run_research_agent_job(
             "event": "research_run_completed",
             "workspace_id": workspace_id,
             "run_id": str(actual_run_id),
-            "status": "completed",
+            "status": final_status,
             "duration_ms": duration_ms
         }))
-        return {"status": "completed", "workspace_id": workspace_id, "run_id": str(actual_run_id)}
+        return {"status": final_status, "workspace_id": workspace_id, "run_id": str(actual_run_id)}
 
     except Exception as exc:
         duration_ms = int((time.time() - start_time) * 1000)
@@ -449,6 +471,19 @@ async def run_research_agent_job(
         }))
         logger.exception("run_research_agent_job: failed for workspace %s: %s", workspace_id, exc)
         await publish_event({"status": "failed", "error": str(exc)})
+        
+        # Ensure we transition to failed state if an unhandled exception occurred
+        try:
+            async with async_session_maker() as session:
+                from app.repositories.research import ResearchRepository
+                from app.services.research.lifecycle import ResearchLifecycleService
+                repo = ResearchRepository(session)
+                lifecycle = ResearchLifecycleService(repo)
+                await lifecycle.transition_run(UUID(workspace_id), actual_run_id, "failed", {"error": str(exc)})
+                await session.commit()
+        except Exception as transition_exc:
+            logger.warning(f"Could not transition run to failed (might already be terminal): {transition_exc}")
+            
         return {"status": "failed", "workspace_id": workspace_id, "error": str(exc)}
 
 # --------------------------------------------------------------------------- #

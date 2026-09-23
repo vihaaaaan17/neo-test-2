@@ -100,7 +100,8 @@ class OpenNotebookClient:
         if self.http_client:
             yield self.http_client
         else:
-            async with httpx.AsyncClient(timeout=custom_timeout or self.timeout) as client:
+            limits = httpx.Limits(max_connections=50, max_keepalive_connections=20)
+            async with httpx.AsyncClient(timeout=custom_timeout or self.timeout, limits=limits) as client:
                 yield client
         
     def _get_headers(self) -> dict[str, str]:
@@ -308,7 +309,7 @@ class OpenNotebookClient:
 
     @with_error_translation
     async def create_chat_session(self, notebook_id: str) -> str:
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with self._get_client() as client:
             response = await client.post(
                 f"{self.base_url}/api/chat/sessions",
                 json={"notebook_id": notebook_id},
@@ -325,7 +326,7 @@ class OpenNotebookClient:
         if not circuit_breaker.check_state():
             raise HTTPException(status_code=503, detail="ground_dependency_unavailable")
             
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with self._get_client(custom_timeout=120.0) as client:
             # First, build context for this notebook
             try:
                 context_res = await client.post(
