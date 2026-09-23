@@ -1,0 +1,18 @@
+# Ignore non-code, documentation, and non-app directories
+docs/
+.scratch/
+references/
+tests/
+scripts/
+NeosisLm-sheets/
+alembic/
+.agents/
+.github/
+.kilo/
+*.md
+*.txt
+*.json
+*.yaml
+*.yml
+*.csv
+*.xlsx
