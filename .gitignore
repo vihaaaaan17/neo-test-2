@@ -22,6 +22,8 @@ htmlcov/
 .agents/
 .github/
 .kilo/
-graphify-out/
-app/graphify-out/
 NeosisLm-sheets/
+
+# Ignore graphify internal cache, but track clean graph artifacts
+graphify-out/cache/
+app/graphify-out/
