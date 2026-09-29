@@ -105,8 +105,9 @@ class OpenDeepResearchEngine(ResearchEngine):
             # The config object maps to ODR's expected configuration
             config = {
                 "configurable": {
-                    "thread_id": str(run_id), # Group checkpointer by run_id
+                    "thread_id": f"{workspace_id}:{run_id}", # Group checkpointer strictly by workspace_id and run_id
                     "search_api": "tavily", # Future: abstract this based on Neosis tools
+
                     "allow_clarification": False,
                     "research_model": "gpt-4o",
                     "usage_tracker": tracker, # Inject tracker for custom tools

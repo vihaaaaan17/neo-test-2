@@ -90,6 +90,8 @@ erDiagram
         uuid workspace_id FK
         uuid owner_id
         uuid conversation_id FK
+        uuid base_commit_id FK
+        int timeline_epoch
         string objective
         string status
         string engine
@@ -175,18 +177,20 @@ stateDiagram-v2
     running --> done : Execution succeeds (Answer synthesized)
     running --> cancelled : POST /turns/{id}/cancel
     running --> failed : Execution error / unhandled exception
+    running --> aborted_by_timeline_fence : Workspace rollback advances timeline_epoch
     pending --> cancelled : User cancels before execution begins
 
     done --> [*]
     failed --> [*]
     cancelled --> [*]
+    aborted_by_timeline_fence --> [*]
 ```
 
 ### Transition Invariants & Guard Rails
 1. **Concurrency Lock:** At most one turn per conversation can be in `running` status at any time. Submitting a new turn while a turn is `running` returns `HTTP 409 Conflict`.
 2. **Idempotency:** If `client_request_id` is supplied and matches an existing turn in the same conversation, the server returns the existing turn immediately without re-executing.
 3. **Event Sequencing:** Every `ChatEvent` emitted during turn execution receives a strictly increasing, contiguous `sequence` number starting at `1`.
-4. **Terminal States:** `done`, `failed`, and `cancelled` are terminal. No further events may be appended to a turn once it enters a terminal state.
+4. **Terminal States:** `done` (`completed`), `failed`, `cancelled`, and `aborted_by_timeline_fence` are terminal. No further events may be appended to a turn once it enters a terminal state.
 
 ---
 

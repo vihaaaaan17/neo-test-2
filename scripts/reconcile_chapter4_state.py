@@ -189,6 +189,20 @@ class StateReconciliationEngine:
         bindings = list(res.scalars().all())
 
         for binding in bindings:
+            # When scoped to a workspace, verify this binding belongs to target workspace
+            if workspace_id and binding.conversation_id not in newly_created_conv_ids:
+                gc_ws_res = await self.session.execute(
+                    select(GroundConversation.workspace_id).where(GroundConversation.conversation_id == binding.conversation_id)
+                )
+                b_ws = gc_ws_res.scalar_one_or_none()
+                if b_ws is None:
+                    c_ws_res = await self.session.execute(
+                        select(Conversation.workspace_id).where(Conversation.conversation_id == binding.conversation_id)
+                    )
+                    b_ws = c_ws_res.scalar_one_or_none()
+                if b_ws is not None and b_ws != workspace_id:
+                    continue
+
             if binding.conversation_id in newly_created_conv_ids:
                 counts["open_notebook_bindings_reconciled"] += 1
                 details.append(f"Reconciled OpenNotebookConversationBinding {binding.conversation_id} to canonical Conversation")
@@ -207,6 +221,8 @@ class StateReconciliationEngine:
 
             # Check if matching GroundConversation exists to construct the missing canonical Conversation
             gc_stmt = select(GroundConversation).where(GroundConversation.conversation_id == binding.conversation_id)
+            if workspace_id:
+                gc_stmt = gc_stmt.where(GroundConversation.workspace_id == workspace_id)
             gc_res = await self.session.execute(gc_stmt)
             gc = gc_res.scalars().first()
 
@@ -232,6 +248,7 @@ class StateReconciliationEngine:
             else:
                 counts["skipped"] += 1
                 details.append(f"Binding {binding.conversation_id} has no matching GroundConversation; skipping")
+
 
     async def _quarantine_legacy_ground_memories(
         self,
@@ -297,14 +314,17 @@ class StateReconciliationEngine:
             stmt = stmt.where(ResearchRun.workspace_id == workspace_id)
         res = await self.session.execute(stmt)
         unlinked_runs = list(res.scalars().all())
-
         for run in unlinked_runs:
-            # Check if there is a ConversationTurn referencing this run_id
+            # Check if there is a ConversationTurn referencing this run_id within the same workspace
             turn_stmt = select(ConversationTurn).where(
-                ConversationTurn.research_run_id == run.run_id
+                ConversationTurn.research_run_id == run.run_id,
+                ConversationTurn.workspace_id == run.workspace_id
             )
             turn_res = await self.session.execute(turn_stmt)
             matching_turn = turn_res.scalars().first()
+
+
+
 
             if matching_turn is not None:
                 run.turn_id = matching_turn.turn_id

@@ -555,3 +555,32 @@ All legacy Chapter 3 / early Chapter 4 routes are preserved as backward-compatib
 | `POST /api/v1/workspaces/{workspace_id}/chat` | `POST /api/v1/workspaces/{workspace_id}/conversations/{conv_id}/turns` | Auto-detects ground/research and delegates to canonical turn. |
 | `POST /api/v1/workspaces/{workspace_id}/chat-ground-mode` | `POST .../turns` with `mode: "ground"` | Delegates to ground turn. |
 | `POST /api/v1/workspaces/{workspace_id}/research` | `POST .../turns` with `mode: "research"` | Creates research turn, queues background job, returns `ResearchRunResponse`. |
+
+---
+
+## 8. Candidate Promotion API (`/api/v1/workspaces/{workspace_id}/promotions`)
+
+### 8.1 Accept Promotion Candidate
+- **Method:** `POST /api/v1/workspaces/{workspace_id}/promotions/candidates/{artifact_id}/accept`
+- **Status:** `200 OK`
+- **Eligibility:** Strictly restricted to `memory_candidate` and `graph_candidate`.
+- **Payload Validation:** Candidate payloads are strictly validated against `MemoryCandidatePayload` or `GraphCandidatePayload` prior to acceptance.
+- **Timeline Epoch Fencing:** Compares candidate's baseline epoch with workspace's active `timeline_epoch`. If the epoch has advanced, aborts with HTTP 409 Conflict.
+- **Transaction Safety:** Commits the database transaction before enqueueing background graph projection jobs (`sync_knowledge_to_graph_job`, `project_output_graph_job`).
+- **Error Responses:**
+  - `400 Bad Request`: `{"detail": "invalid_candidate_type"}` if artifact type is not promotable (e.g., hypothesis, claim, finding).
+  - `409 Conflict`: `{"detail": "aborted_by_timeline_fence"}` if active workspace timeline epoch has advanced.
+  - `422 Unprocessable Entity`: `{"detail": "Invalid candidate payload"}` if payload fails Pydantic schema validation.
+
+### 8.2 Reject Promotion Candidate
+- **Method:** `POST /api/v1/workspaces/{workspace_id}/promotions/candidates/{artifact_id}/reject`
+- **Status:** `200 OK`
+- **Request Body:** `PromotionReviewRequest` (`{"notes": "optional reason"}`)
+- **Response Body:** `PromotionReviewResponse`
+
+### 8.3 List Promotion Candidates
+- **Method:** `GET /api/v1/workspaces/{workspace_id}/promotions/candidates`
+- **Status:** `200 OK`
+- **Query Parameters:** `status` (optional, e.g. `pending_review`), `limit`, `offset`
+- **Response Body:** `List[PromotionCandidateResponse]`
+

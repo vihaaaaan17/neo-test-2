@@ -82,7 +82,8 @@ export interface RollbackRequest {
 // ==========================================
 export type ConversationStatus = 'active' | 'archived';
 export type TurnMode = 'ground' | 'research';
-export type TurnStatus = 'pending' | 'running' | 'done' | 'failed' | 'cancelled';
+export type TurnStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'aborted_by_timeline_fence';
+
 
 export interface ConversationResponse {
   conversation_id: UUID;
@@ -193,6 +194,8 @@ export interface ChatEventListResponse {
 // ==========================================
 // Candidate Promotion Models
 // ==========================================
+export type CandidateType = 'memory_candidate' | 'graph_candidate';
+
 export type PromotionStatus =
   | 'pending_review'
   | 'accepted'
@@ -203,10 +206,26 @@ export type PromotionStatus =
 export interface PromotionCandidateResponse {
   artifact_id: UUID;
   run_id: UUID;
-  artifact_type: string;
+  artifact_type: CandidateType;
   promotion_status: PromotionStatus;
   payload: Record<string, unknown>;
   created_at: ISO8601Timestamp;
+}
+
+export interface ResearchRunResponse {
+  run_id: UUID;
+  workspace_id: UUID;
+  owner_id: UUID;
+  objective: string;
+  status: string;
+  engine: string;
+  engine_revision?: string | null;
+  current_attempt_id?: UUID | null;
+  conversation_id?: UUID | null;
+  turn_id?: UUID | null;
+  timeline_epoch: number;
+  created_at: ISO8601Timestamp;
+  updated_at: ISO8601Timestamp;
 }
 
 export interface PromotionReviewRequest {

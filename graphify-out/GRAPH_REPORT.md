@@ -1,16 +1,16 @@
 # Graph Report - NeosisLM  (2026-09-29)
 
 ## Corpus Check
-- 116 files · ~53,793 words
+- 116 files · ~54,060 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1265 nodes · 3224 edges · 68 communities (64 shown, 3 thin omitted)
-- Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 262 edges (avg confidence: 0.94)
+- 1265 nodes · 3229 edges · 69 communities (65 shown, 3 thin omitted)
+- Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 264 edges (avg confidence: 0.94)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `919f9012`
+- Built from commit: `e677c3f0`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -24,17 +24,17 @@
 - utils.py
 - WorkingMemoryState
 - Configuration
-- KnowledgeMemoryCreate
+- EpisodicMemory
 - state.py
 - ScratchpadRepository
 - chat/context.py
-- client.py
+- main.py
 - OpenNotebookClient
 - ChatEvent
 - deep_researcher.py
 - BaseRetriever
 - OpenDeepResearchEngine
-- verification.py
+- derivation.py
 - get_all_tools
 - ConversationRepository
 - database.py
@@ -44,7 +44,7 @@
 - ValueError
 - routes/chat.py
 - ResearchLifecycleService
-- Neo4jAdapter
+- GraphStore
 - ResearchNormalizationService
 - Source
 - WorkspaceRepository
@@ -53,11 +53,11 @@
 - GroundModeOrchestrator
 - is_token_limit_exceeded
 - create_research_run
-- chat_ground_mode
+- ask_ground_mode
 - workspaces.py
 - telemetry.py
 - settings.py
-- DerivationService
+- ProvenanceRef
 - UsageTracker
 - research/service.py
 - get_quota_status
@@ -65,30 +65,31 @@
 - core/config.py
 - integrations/__init__.py
 - ChatService
-- UUID
-- main.py
+- upload_file_to_workspace
+- Request
 - stream_job_events
 - CircuitBreaker
 - .__init__
 - GPTResearcherRetriever
 - research/budget.py
-- Any
+- MemoryRouterService
 - ResearchSourceResult
 - TurnCreate
 - Any
-- tasks.py
+- ObjectStoreProtocol
 - streamlit_app.py
-- _get_source_and_snapshot
-- get_rate_limit_status
+- tasks.py
+- ResearchEvidence
 - .retrieve
 - rate_limit.py
+- schemas/source.py
 
 ## God Nodes (most connected - your core abstractions)
 1. `ResearchRepository` - 72 edges
 2. `WorkspaceRepository` - 49 edges
 3. `ConversationRepository` - 42 edges
 4. `ChatService` - 42 edges
-5. `ResearchRun` - 34 edges
+5. `ResearchRun` - 36 edges
 6. `ConversationTurn` - 30 edges
 7. `OpenNotebookClient` - 29 edges
 8. `ResearchArtifact` - 29 edges
@@ -110,7 +111,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (68 total, 3 thin omitted)
+## Communities (69 total, 3 thin omitted)
 
 ### Community 0 - "repositories/block.py"
 Cohesion: 0.25
@@ -125,8 +126,8 @@ Cohesion: 0.12
 Nodes (22): map_canonical_sources_to_upstream(), map_citations(), AsyncSession, UUID, Map upstream Open Notebook source IDs back to canonical Neosis source_ids.…, Map canonical Neosis source_ids (UUIDs) to upstream Open Notebook source IDs…, OpenNotebookGroundEngine, Any (+14 more)
 
 ### Community 3 - "ResearchRepository"
-Cohesion: 0.13
-Nodes (15): ResearchArtifact, ResearchEvidence, ResearchReport, Any, UUID, Creates multiple evidence records in batches with fingerprint deduplication., Retrieves evidence records by their fingerprints., Performs a bulk insert of evidence records. (+7 more)
+Cohesion: 0.18
+Nodes (7): ResearchArtifact, UUID, Unified repository for all Research Fabric models. Enforces workspace_id…, Internal helper to ensure a given run_id belongs to the workspace_id. Raises an…, Persists usage metrics to the database as a periodic checkpoint., Records a usage entry for a research run., ResearchRepository
 
 ### Community 4 - "ResearchMetricsService"
 Cohesion: 0.13
@@ -141,16 +142,16 @@ Cohesion: 0.10
 Nodes (29): fetch_tokens(), get_mcp_access_token(), get_tavily_api_key(), get_tokens(), load_mcp_tools(), Any, BaseTool, InjectedToolArg (+21 more)
 
 ### Community 7 - "WorkingMemoryState"
-Cohesion: 0.12
-Nodes (17): EpisodicRepository, AsyncSession, UUID, Used by the background worker to detect duplicate compress_episodic_job calls., EpisodicMemoryCreate, EpisodicMemoryResponse, BaseModel, TypedDict (+9 more)
+Cohesion: 0.20
+Nodes (10): TypedDict, WorkingMemoryState, EpisodicMemoryService, UUID, llm_gateway: an async callable that takes a string prompt and returns a string…, Dispatch compression to the background queue., Call LLM with concurrency limits and retries., compress_episodic_job() (+2 more)
 
 ### Community 8 - "Configuration"
 Cohesion: 0.15
 Nodes (26): Config, Configuration, RunnableConfig, Create a Configuration instance from a RunnableConfig., Pydantic configuration., Main configuration class for the Deep Research agent., clarify_with_user(), compress_research() (+18 more)
 
-### Community 9 - "KnowledgeMemoryCreate"
-Cohesion: 0.43
-Nodes (5): KnowledgeMemoryCreate, KnowledgeMemoryResponse, Provenance, BaseModel, Finds all ResearchArtifacts for a given run with type='memory_candidate' and…
+### Community 9 - "EpisodicMemory"
+Cohesion: 0.22
+Nodes (9): EpisodicMemory, Base, EpisodicRepository, AsyncSession, UUID, Used by the background worker to detect duplicate compress_episodic_job calls., EpisodicMemoryCreate, EpisodicMemoryResponse (+1 more)
 
 ### Community 10 - "state.py"
 Cohesion: 0.12
@@ -161,16 +162,16 @@ Cohesion: 0.13
 Nodes (26): create_scratchpad_entry(), get_scratchpad_entry(), list_scratchpad_entries(), AsyncSession, get, patch, post, UUID (+18 more)
 
 ### Community 12 - "chat/context.py"
-Cohesion: 0.06
-Nodes (44): KnowledgeMemory, Base, KnowledgeRepository, AsyncSession, UUID, build_ground_context(), build_research_context(), _ContextCandidate (+36 more)
+Cohesion: 0.05
+Nodes (53): KnowledgeMemory, Base, KnowledgeRepository, AsyncSession, UUID, KnowledgeMemoryCreate, KnowledgeMemoryResponse, Provenance (+45 more)
 
-### Community 13 - "client.py"
-Cohesion: 0.20
-Nodes (11): CircuitState, Enum, get_open_notebook_base_url(), get_open_notebook_timeout(), is_open_notebook_enabled(), Get the default HTTP timeout for Open Notebook requests., Check if the Open Notebook Ground Engine is enabled., Get the base URL for the Open Notebook API. (+3 more)
+### Community 13 - "main.py"
+Cohesion: 0.16
+Nodes (15): CircuitState, Enum, get_open_notebook_base_url(), get_open_notebook_timeout(), is_open_notebook_enabled(), Get the default HTTP timeout for Open Notebook requests., Check if the Open Notebook Ground Engine is enabled., Get the base URL for the Open Notebook API. (+7 more)
 
 ### Community 14 - "OpenNotebookClient"
-Cohesion: 0.25
-Nodes (8): OpenNotebookClient, Any, Check health endpoint of Open Notebook. Returns the parsed JSON response.…, Streams the ask response, yielding standardized SSE events., Executes a chat message. Returns the final answer text and the updated…, Streams chat events and incremental tokens for a conversation session. Yields…, HTTP client for communicating with the Open Notebook API. Establishes the…, with_error_translation()
+Cohesion: 0.14
+Nodes (17): OpenNotebookClient, Any, Check health endpoint of Open Notebook. Returns the parsed JSON response.…, Streams the ask response, yielding standardized SSE events., Executes a chat message. Returns the final answer text and the updated…, Streams chat events and incremental tokens for a conversation session. Yields…, HTTP client for communicating with the Open Notebook API. Establishes the…, with_error_translation() (+9 more)
 
 ### Community 15 - "ChatEvent"
 Cohesion: 0.11
@@ -188,9 +189,9 @@ Nodes (8): ABC, BaseRetriever, ResearchRetrievalPolicy, Register a retriever ins
 Cohesion: 0.05
 Nodes (38): BudgetEnforcingCallbackHandler, Exception, Raised when an execution exceeds its allocated budget., Intercepts LLM results to track usage and enforce budgets., Track token usage after an LLM call completes., ResearchBudgetExceeded, Any, UUID (+30 more)
 
-### Community 19 - "verification.py"
-Cohesion: 0.16
-Nodes (16): ArithmeticVerificationError, DeterministicArithmeticVerifier, _pct_change(), Any, BaseModel, Exception, Raised when an expression violates safety rules, resource limits, or arithmetic…, Evaluates an arithmetic expression and compares the computed value against an… (+8 more)
+### Community 19 - "derivation.py"
+Cohesion: 0.10
+Nodes (23): DocumentBlock, Base, DerivationService, AsyncSession, Normalizes candidate outputs and enforces fail-closed multi-tenant provenance…, ArithmeticVerificationError, DeterministicArithmeticVerifier, _pct_change() (+15 more)
 
 ### Community 20 - "get_all_tools"
 Cohesion: 0.14
@@ -201,24 +202,24 @@ Cohesion: 0.14
 Nodes (14): Conversation, ConversationTurn, Canonical conversational container within a Neosis workspace. Mode-agnostic:…, Canonical turn record representing a single prompt-response interaction within…, ConversationRepository, Any, AsyncSession, datetime (+6 more)
 
 ### Community 22 - "database.py"
-Cohesion: 0.12
-Nodes (17): get_embed_gateway(), get_llm_gateway(), mock_embed_call(), mock_llm_call(), get_hybrid_retrieval_service(), get_db(), get_ground_engine(), get_hybrid_retrieval_service() (+9 more)
+Cohesion: 0.15
+Nodes (15): get_embed_gateway(), get_llm_gateway(), mock_embed_call(), mock_llm_call(), get_hybrid_retrieval_service(), get_db(), get_ground_engine(), get_hybrid_retrieval_service() (+7 more)
 
 ### Community 23 - "ResearchRun"
-Cohesion: 0.36
-Nodes (7): DocumentBlock, Base, Base, ResearchEvent, ResearchRun, ResearchTask, ResearchUsage
+Cohesion: 0.53
+Nodes (6): Base, ResearchEvent, ResearchReport, ResearchRun, ResearchTask, ResearchUsage
 
 ### Community 24 - "promotions.py"
 Cohesion: 0.07
 Nodes (50): accept_promotion(), get_promotion(), _get_promotion_service(), list_promotions(), AsyncSession, get, post, Redis (+42 more)
 
 ### Community 25 - "ResearchModeOrchestrator"
-Cohesion: 0.16
-Nodes (10): Any, BaseModel, deprecated, TypedDict, UUID, ResearchContext, ResearchModeOrchestrator, ResearchState (+2 more)
+Cohesion: 0.27
+Nodes (7): BaseModel, deprecated, TypedDict, UUID, ResearchContext, ResearchModeOrchestrator, ResearchState
 
 ### Community 26 - "ValueError"
-Cohesion: 0.13
-Nodes (10): EpisodicMemory, Base, AsyncSession, UUID, WorkspaceExportService, UUID, S3ObjectStore, field_validator (+2 more)
+Cohesion: 0.15
+Nodes (9): AsyncSession, UUID, WorkspaceExportService, S3ObjectStore, export_workspace_job(), Background job: Executes the workspace export using WorkspaceExportService and…, field_validator, model_validator (+1 more)
 
 ### Community 27 - "routes/chat.py"
 Cohesion: 0.16
@@ -228,33 +229,33 @@ Nodes (30): cancel_turn(), create_conversation(), get_conversation(), get_conver
 Cohesion: 0.21
 Nodes (9): InvalidTransitionError, Any, datetime, Exception, UUID, Transition a ResearchTask to a new status. Emits a ResearchEvent., Acts as the sole authority for state transitions of ResearchRun and…, Transition a ResearchRun to a new status. Emits a ResearchEvent. (+1 more)
 
-### Community 29 - "Neo4jAdapter"
-Cohesion: 0.17
-Nodes (5): GraphStore, Neo4jAdapter, Any, Abstract base class for our operational Knowledge Graph. This hides the…, AsyncDriver
+### Community 29 - "GraphStore"
+Cohesion: 0.25
+Nodes (3): GraphStore, Any, Abstract base class for our operational Knowledge Graph. This hides the…
 
 ### Community 30 - "ResearchNormalizationService"
 Cohesion: 0.15
 Nodes (12): GPTResearcherInput, BaseModel, neosis_web_search(), InjectedToolArg, RunnableConfig, tool, Fetch search results, immediately persist them to Neosis DB, and return…, Normalizes a URL by parsing it, lowercasing the scheme and netloc, and sorting… (+4 more)
 
 ### Community 31 - "Source"
-Cohesion: 0.16
+Cohesion: 0.14
 Nodes (13): Base, Source, SourceSnapshot, AsyncSession, UUID, SourceRepository, Any, AsyncSession (+5 more)
 
 ### Community 32 - "WorkspaceRepository"
-Cohesion: 0.22
-Nodes (9): get_chat_service(), ArqRedis, Base, Workspace, WorkspaceCommit, AsyncSession, UUID, Atomically rolls back the workspace to a target commit under a row lock (FOR… (+1 more)
+Cohesion: 0.25
+Nodes (7): Base, Workspace, WorkspaceCommit, AsyncSession, UUID, Atomically rolls back the workspace to a target commit under a row lock (FOR…, WorkspaceRepository
 
 ### Community 33 - "QuotaService"
-Cohesion: 0.17
-Nodes (10): get_memory_router(), get_quota(), get_quota_service(), AsyncSession, UUID, QuotaService, Check if user has exceeded their workspace limit., Check if workspace has exceeded its source count limit. (+2 more)
+Cohesion: 0.21
+Nodes (8): get_quota_service(), AsyncSession, UUID, QuotaService, Check if user has exceeded their workspace limit., Check if workspace has exceeded its source count limit., Check if workspace has exceeded its total storage limit., Check if workspace has exceeded its knowledge memory limit.
 
 ### Community 34 - "FastAPI"
-Cohesion: 0.33
-Nodes (7): get_arq_redis(), Request, Dependency to get the arq Redis pool. We lazily initialize the pool and attach…, get_current_user(), UUID, FastAPI, HTTPAuthorizationCredentials
+Cohesion: 0.21
+Nodes (12): get_arq_redis(), Request, Dependency to get the arq Redis pool. We lazily initialize the pool and attach…, get_current_user(), UUID, get_rate_limit_status(), get, Redis (+4 more)
 
 ### Community 35 - "GroundModeOrchestrator"
-Cohesion: 0.14
-Nodes (12): GroundModeOrchestrator, GroundModeState, Any, deprecated, TypedDict, UUID, Deprecated: Use OpenNotebookGroundEngine instead. This orchestrator handles the…, ContextBundle (+4 more)
+Cohesion: 0.20
+Nodes (8): GroundModeOrchestrator, GroundModeState, Any, deprecated, TypedDict, UUID, Deprecated: Use OpenNotebookGroundEngine instead. This orchestrator handles the…, MemoryItem
 
 ### Community 36 - "is_token_limit_exceeded"
 Cohesion: 0.27
@@ -264,33 +265,33 @@ Nodes (10): _check_anthropic_token_limit(), _check_gemini_token_limit(), _check_
 Cohesion: 0.24
 Nodes (11): create_research_run(), get_queue_status(), Any, AsyncSession, get, post, Redis, Response (+3 more)
 
-### Community 38 - "chat_ground_mode"
-Cohesion: 0.15
-Nodes (22): ask_ground_mode(), ask_ground_mode_stream(), chat_ground_mode(), create_workspace_commit(), get_knowledge_repository(), get_research_repository(), get_source_repository(), get_workspace_repository() (+14 more)
+### Community 38 - "ask_ground_mode"
+Cohesion: 0.19
+Nodes (11): get_chat_service(), ArqRedis, ask_ground_mode(), ask_ground_mode_stream(), AskRequest, AskResponse, BaseModel, GroundEngineProtocol (+3 more)
 
 ### Community 39 - "workspaces.py"
-Cohesion: 0.20
-Nodes (15): create_workspace(), patch, update_workspace(), FileUploadResponse, BaseModel, BaseModel, SourceResponse, SourceSnapshotResponse (+7 more)
+Cohesion: 0.13
+Nodes (33): chat_ground_mode(), create_workspace(), create_workspace_commit(), get_knowledge_repository(), get_projection_status(), get_quota(), get_research_repository(), get_source_repository() (+25 more)
 
 ### Community 40 - "telemetry.py"
 Cohesion: 0.28
 Nodes (7): Sanitizes sensitive tokens, passwords, and API keys from log strings., Logging filter that intercepts log records and redacts any credentials, bearer…, Sets up OpenTelemetry and attaches secret sanitization to the logging root., sanitize_log_message(), SecretSanitizingFilter, setup_telemetry(), LogRecord
 
 ### Community 41 - "settings.py"
-Cohesion: 0.15
-Nodes (12): get_worker_pool_status(), Any, get, Get the current status of worker pools and queues., arq WorkerSettings — defines the worker process configuration. Run the worker…, Returns the configuration for a specific queue., Runs once when the worker process starts. Populate shared resources., Runs once when the worker process shuts down. (+4 more)
+Cohesion: 0.13
+Nodes (14): get_worker_pool_status(), Any, get, Get the current status of worker pools and queues., arq WorkerSettings — defines the worker process configuration. Run the worker…, Returns the configuration for a specific queue., Runs once when the worker process starts. Populate shared resources., Runs once when the worker process shuts down. (+6 more)
 
-### Community 42 - "DerivationService"
-Cohesion: 0.24
-Nodes (7): DerivationService, Any, AsyncSession, UUID, Validates provenance references, runs deterministic verification if derivations…, Normalizes candidate outputs and enforces fail-closed multi-tenant provenance…, Strictly validates that every reference in the provenance bundle exists and…
+### Community 42 - "ProvenanceRef"
+Cohesion: 0.31
+Nodes (6): ProvenanceRef, Any, UUID, Validates provenance references, runs deterministic verification if derivations…, Builds a typed ProvenanceBundle from a list of ProvenanceRef items and optional…, Strictly validates that every reference in the provenance bundle exists and…
 
 ### Community 43 - "UsageTracker"
 Cohesion: 0.20
 Nodes (3): UsageTracker, MCPRetriever, Any
 
 ### Community 44 - "research/service.py"
-Cohesion: 0.18
-Nodes (18): GraphRepository, UUID, Projects an OutputGraph into Neo4j. Nodes get labels: OutputNode, plus their…, OutputGraph, OutputGraphEdge, OutputGraphNode, ProvenanceBundle, ProvenanceRef (+10 more)
+Cohesion: 0.27
+Nodes (12): GraphRepository, UUID, Projects an OutputGraph into Neo4j. Nodes get labels: OutputNode, plus their…, OutputGraph, OutputGraphEdge, OutputGraphNode, ProvenanceBundle, BaseModel (+4 more)
 
 ### Community 45 - "get_quota_status"
 Cohesion: 0.33
@@ -301,20 +302,20 @@ Cohesion: 0.40
 Nodes (5): get_notes_from_tool_calls(), Extract notes from tool call messages., Truncate message history by removing up to the last AI message. This is useful…, remove_up_to_last_ai_message(), MessageLikeRepresentation
 
 ### Community 47 - "core/config.py"
-Cohesion: 0.21
-Nodes (9): Settings, Shared HTTP client for Open Notebook integration., get_checkpointer(), process_memory(), Any, Validates checkpointer configuration on startup. In production, durable…, Returns the checkpointer instance appropriate for the current environment., validate_checkpointer() (+1 more)
+Cohesion: 0.18
+Nodes (11): Settings, Validates infrastructure, checkpointer, and security invariants during…, validate_production_startup(), Shared HTTP client for Open Notebook integration., get_checkpointer(), process_memory(), Any, Validates checkpointer configuration on startup. In production, durable… (+3 more)
 
 ### Community 49 - "ChatService"
 Cohesion: 0.11
 Nodes (15): OpenNotebookConversationBinding, Dual in-process and Redis Pub/Sub event broker. Provides sub/pub abstraction…, TurnEventBroker, ChatService, UUID, Unified SSE generator — supports reconnect replay via Last-Event-ID. Protocol:…, Coordinates turn submission, mode dispatching (Ground vs Research),…, Executes Ground turn in background with independent DB session. Delegates… (+7 more)
 
-### Community 50 - "UUID"
-Cohesion: 0.21
-Nodes (12): delete_workspace(), get_projection_status(), get_source_status(), get_workspace(), get_workspace_output_graph(), get, Request, UUID (+4 more)
+### Community 50 - "upload_file_to_workspace"
+Cohesion: 0.25
+Nodes (8): delete_workspace(), get_memory_router(), ArqRedis, Request, upload_file_to_workspace(), delete, limit, UploadFile
 
-### Community 52 - "main.py"
-Cohesion: 0.19
-Nodes (11): Validates infrastructure, checkpointer, and security invariants during…, validate_production_startup(), health_check(), lifespan(), limit_upload_size(), get, Request, Deep health check verifying Postgres and Neo4j connectivity. (+3 more)
+### Community 52 - "Request"
+Cohesion: 0.33
+Nodes (5): limit_upload_size(), Request, set_neosis_run_id(), UploadSizeLimitMiddleware, BaseHTTPMiddleware
 
 ### Community 53 - "stream_job_events"
 Cohesion: 0.40
@@ -328,9 +329,9 @@ Nodes (8): GPTResearcherTool, Any, BaseTool, RunnableConfig, Use the tool asynch
 Cohesion: 0.20
 Nodes (6): Any, UUID, Research-specific budget policy to enforce cost and usage limits., Check if the budget for a research run has been exceeded. Returns True if the…, Returns the current budget status., ResearchBudgetPolicy
 
-### Community 58 - "Any"
-Cohesion: 0.18
-Nodes (11): delete_open_notebook_source_job(), delete_open_notebook_workspace_job(), export_workspace_job(), process_deletion_tombstone_job(), Any, Background job: Processes a DeletionTombstone against Open Notebook., Periodic task: Sweeps for pending tombstones and enqueues processing., Compatibility job: deletes open notebook source binding if present. (+3 more)
+### Community 58 - "MemoryRouterService"
+Cohesion: 0.22
+Nodes (5): Any, ContextBundle, BaseModel, MemoryRouterService, Lightweight heuristic context builder for MemoryItem bundles. Preserved for…
 
 ### Community 59 - "ResearchSourceResult"
 Cohesion: 0.29
@@ -344,21 +345,21 @@ Nodes (5): TurnCreate, Any, Executes a Ground mode turn against Open Notebook wi
 Cohesion: 0.29
 Nodes (4): Any, Returns the current user concurrency status., Returns the current workspace concurrency status., Returns the current global concurrency status.
 
-### Community 62 - "tasks.py"
-Cohesion: 0.12
-Nodes (16): BlockRepository, AsyncSession, Validates and sanitizes structured scratchpad content. Strictly prohibits raw…, sanitize_scratchpad_content(), ChunkingService, DocumentParser, Any, Downloads a document from Object Storage and parses it using docling. Returns a… (+8 more)
+### Community 62 - "ObjectStoreProtocol"
+Cohesion: 0.15
+Nodes (9): DocumentParser, Any, Downloads a document from Object Storage and parses it using docling. Returns a…, get_object_store(), ObjectStoreProtocol, Protocol, Request, UUID (+1 more)
 
 ### Community 63 - "streamlit_app.py"
-Cohesion: 0.43
-Nodes (5): create_db_workspace(), get_litellm_gateway(), project_graph_to_neo4j(), run_agent(), run_ground_mode()
+Cohesion: 0.16
+Nodes (9): Neo4jAdapter, Executes a search query and returns the results formatted as markdown., WebSearchTool, AsyncDriver, create_db_workspace(), get_litellm_gateway(), project_graph_to_neo4j(), run_agent() (+1 more)
 
-### Community 64 - "_get_source_and_snapshot"
-Cohesion: 0.33
-Nodes (6): _get_source_and_snapshot(), project_to_open_notebook_job(), AsyncSession, UUID, Background job: Projects a new source snapshot to Open Notebook., Load the source + its first snapshot in a single query.
+### Community 64 - "tasks.py"
+Cohesion: 0.19
+Nodes (12): BlockRepository, AsyncSession, Validates and sanitizes structured scratchpad content. Strictly prohibits raw…, sanitize_scratchpad_content(), ChunkingService, _get_source_and_snapshot(), parse_and_chunk_job(), AsyncSession (+4 more)
 
-### Community 65 - "get_rate_limit_status"
-Cohesion: 0.40
-Nodes (5): get_rate_limit_status(), get, Redis, UUID, Get the current rate limit status for the user.
+### Community 65 - "ResearchEvidence"
+Cohesion: 0.36
+Nodes (5): ResearchEvidence, Any, Creates multiple evidence records in batches with fingerprint deduplication., Retrieves evidence records by their fingerprints., Performs a bulk insert of evidence records.
 
 ### Community 66 - ".retrieve"
 Cohesion: 0.40
@@ -368,17 +369,21 @@ Nodes (3): Any, Get a registered retriever by name., Execute retrieval using the
 Cohesion: 0.50
 Nodes (3): get_rate_limit_key(), Request, Rate limit by user ID if authenticated, else fallback to IP.
 
+### Community 68 - "schemas/source.py"
+Cohesion: 0.67
+Nodes (3): BaseModel, SourceResponse, SourceSnapshotResponse
+
 ## Knowledge Gaps
 - **3 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `ResearchRepository` connect `ResearchRepository` to `chat/service.py`, `ResearchMetricsService`, `ChatEvent`, `OpenDeepResearchEngine`, `ResearchRun`, `promotions.py`, `ResearchLifecycleService`, `ResearchNormalizationService`, `WorkspaceRepository`, `FastAPI`, `create_research_run`, `chat_ground_mode`, `workspaces.py`, `research/service.py`, `get_quota_status`, `.__init__`, `GPTResearcherRetriever`, `research/budget.py`, `tasks.py`?**
-  _High betweenness centrality (0.211) - this node is a cross-community bridge._
+- **Why does `ResearchRepository` connect `ResearchRepository` to `chat/service.py`, `ResearchMetricsService`, `chat/context.py`, `ChatEvent`, `OpenDeepResearchEngine`, `derivation.py`, `ResearchRun`, `promotions.py`, `ResearchLifecycleService`, `ResearchNormalizationService`, `WorkspaceRepository`, `FastAPI`, `create_research_run`, `workspaces.py`, `research/service.py`, `get_quota_status`, `.__init__`, `GPTResearcherRetriever`, `research/budget.py`, `tasks.py`, `ResearchEvidence`?**
+  _High betweenness centrality (0.209) - this node is a cross-community bridge._
 - **Why does `neosis_web_search()` connect `ResearchNormalizationService` to `ResearchRepository`, `get_all_tools`, `utils.py`?**
   _High betweenness centrality (0.109) - this node is a cross-community bridge._
-- **Why does `ConversationRepository` connect `ConversationRepository` to `WorkspaceRepository`, `chat/service.py`, `ResearchRepository`, `create_research_run`, `chat_ground_mode`, `workspaces.py`, `ScratchpadRepository`, `ChatEvent`, `ChatService`, `routes/chat.py`, `tasks.py`?**
+- **Why does `ConversationRepository` connect `ConversationRepository` to `tasks.py`, `chat/service.py`, `create_research_run`, `ask_ground_mode`, `workspaces.py`, `ScratchpadRepository`, `ChatEvent`, `ChatService`, `derivation.py`, `routes/chat.py`?**
   _High betweenness centrality (0.072) - this node is a cross-community bridge._
 - **Are the 8 inferred relationships involving `ResearchRepository` (e.g. with `ResearchArtifact` and `ResearchEvent`) actually correct?**
   _`ResearchRepository` has 8 INFERRED edges - model-reasoned connections that need verification._

@@ -5,10 +5,10 @@ Fix the Ground execution boundary and Server-Sent Events (SSE) transport fabric 
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] `resolve_ground_source_scope` and `OpenNotebookGroundEngine` reject unmapped/foreign source IDs and inject mapped upstream source IDs into Open Notebook `context_config`.
-- [ ] Ground streaming delivers incremental token chunks rather than a single completed string.
-- [ ] `OpenNotebookConversationBinding` creation uses row-level locking to prevent duplicate session generation under concurrent first turns.
-- [ ] `format_sse_event` emits `id: <sequence>` for all SSE events.
-- [ ] Unified SSE stream generator in `app/api/routes/chat.py` and `app/services/chat/service.py` accepts `Last-Event-ID`, replays historical PostgreSQL events after the cursor, transitions to live Redis pub/sub without gaps or duplicates, and terminates cleanly on done/error.
+- [x] `resolve_ground_source_scope` and `OpenNotebookGroundEngine` reject unmapped/foreign source IDs and inject mapped upstream source IDs into Open Notebook `context_config`.
+- [x] Ground streaming delivers incremental token chunks rather than a single completed string.
+- [x] `OpenNotebookConversationBinding` creation uses row-level locking to prevent duplicate session generation under concurrent first turns.
+- [x] `format_sse_event` emits `id: <sequence>` for all SSE events.
+- [x] Unified SSE stream generator in `app/api/routes/chat.py` and `app/services/chat/service.py` accepts `Last-Event-ID`, replays historical PostgreSQL events after the cursor, transitions to live Redis pub/sub without gaps or duplicates, and terminates cleanly on done/error.

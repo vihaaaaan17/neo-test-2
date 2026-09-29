@@ -5,10 +5,10 @@ Harden production runtime hygiene, synchronize handoff documentation, and delive
 
 **Blocked by:** 01: Ground + Streaming Fabric, 02: Turn + Event Concurrency, 03: Timeline + Promotion + Graph, 04: Rollback + State Integrity + Legacy
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Research metrics are populated with real runtime execution values and all timestamps use `timezone.utc`.
-- [ ] Checkpointer lifecycle and reconciliation scripts are safely scoped without leaking cross-workspace state.
-- [ ] Frozen handoff documents match the exact implementation and TypeScript contracts.
-- [ ] End-to-end tests verify Ground source containment, SSE reconnection, timeline fencing, and rollback visibility without mock shortcuts.
-- [ ] Complete test suite passes with 100% success on GitHub Actions CI.
+- [x] Research metrics are populated with real runtime execution values and all timestamps use `timezone.utc`.
+- [x] Checkpointer lifecycle and reconciliation scripts are safely scoped without leaking cross-workspace state.
+- [x] Frozen handoff documents match the exact implementation and TypeScript contracts.
+- [x] End-to-end tests verify Ground source containment, SSE reconnection, timeline fencing, and rollback visibility without mock shortcuts.
+- [x] Complete test suite passes with 100% success on GitHub Actions CI.

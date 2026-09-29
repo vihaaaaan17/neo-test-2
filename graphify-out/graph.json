@@ -303,6 +303,45 @@
       "source_location": "L8"
     },
     {
+      "id": "app_schemas_knowledge_knowledgememorycreate",
+      "label": "KnowledgeMemoryCreate",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 12,
+      "community_name": "chat/context.py",
+      "file_type": "code",
+      "norm_label": "knowledgememorycreate",
+      "source_file": "app/schemas/knowledge.py",
+      "source_location": "L11"
+    },
+    {
+      "id": "app_schemas_knowledge_knowledgememoryresponse",
+      "label": "KnowledgeMemoryResponse",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 12,
+      "community_name": "chat/context.py",
+      "file_type": "code",
+      "norm_label": "knowledgememoryresponse",
+      "source_file": "app/schemas/knowledge.py",
+      "source_location": "L22"
+    },
+    {
+      "id": "app_schemas_knowledge_provenance",
+      "label": "Provenance",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 12,
+      "community_name": "chat/context.py",
+      "file_type": "code",
+      "norm_label": "provenance",
+      "source_file": "app/schemas/knowledge.py",
+      "source_location": "L6"
+    },
+    {
       "id": "app_services_chat_context_contextcandidate",
       "label": "_ContextCandidate",
       "_callable": true,
@@ -420,13 +459,39 @@
       "source_location": "L138"
     },
     {
+      "id": "app_services_memory_router_memoryrouter",
+      "label": "MemoryRouter",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 12,
+      "community_name": "chat/context.py",
+      "file_type": "code",
+      "norm_label": "memoryrouter",
+      "source_file": "app/services/memory_router.py",
+      "source_location": "L20"
+    },
+    {
+      "id": "app_services_research_service_researchservice",
+      "label": "ResearchService",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 12,
+      "community_name": "chat/context.py",
+      "file_type": "code",
+      "norm_label": "researchservice",
+      "source_file": "app/services/research/service.py",
+      "source_location": "L13"
+    },
+    {
       "id": "app_integrations_open_notebook_client_circuitstate",
       "label": "CircuitState",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 13,
-      "community_name": "client.py",
+      "community_name": "main.py",
       "file_type": "code",
       "norm_label": "circuitstate",
       "source_file": "app/integrations/open_notebook/client.py",
@@ -693,13 +758,39 @@
       "source_location": "L10"
     },
     {
+      "id": "app_models_block_documentblock",
+      "label": "DocumentBlock",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 19,
+      "community_name": "derivation.py",
+      "file_type": "code",
+      "norm_label": "documentblock",
+      "source_file": "app/models/block.py",
+      "source_location": "L8"
+    },
+    {
+      "id": "app_services_research_derivation_derivationservice",
+      "label": "DerivationService",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 19,
+      "community_name": "derivation.py",
+      "file_type": "code",
+      "norm_label": "derivationservice",
+      "source_file": "app/services/research/derivation.py",
+      "source_location": "L20"
+    },
+    {
       "id": "app_services_research_verification_arithmeticverificationerror",
       "label": "ArithmeticVerificationError",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "code",
       "norm_label": "arithmeticverificationerror",
       "source_file": "app/services/research/verification.py",
@@ -712,7 +803,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "code",
       "norm_label": "deterministicarithmeticverifier",
       "source_file": "app/services/research/verification.py",
@@ -725,7 +816,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "code",
       "norm_label": "verificationresult",
       "source_file": "app/services/research/verification.py",
@@ -888,19 +979,6 @@
       "source_location": "L10"
     },
     {
-      "id": "app_models_block_documentblock",
-      "label": "DocumentBlock",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "ResearchRun",
-      "file_type": "code",
-      "norm_label": "documentblock",
-      "source_file": "app/models/block.py",
-      "source_location": "L8"
-    },
-    {
       "id": "app_models_research_researchevent",
       "label": "ResearchEvent",
       "_callable": true,
@@ -912,6 +990,19 @@
       "norm_label": "researchevent",
       "source_file": "app/models/research.py",
       "source_location": "L113"
+    },
+    {
+      "id": "app_models_research_researchreport",
+      "label": "ResearchReport",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "ResearchRun",
+      "file_type": "code",
+      "norm_label": "researchreport",
+      "source_file": "app/models/research.py",
+      "source_location": "L78"
     },
     {
       "id": "app_models_research_researchrun",
@@ -1213,32 +1304,6 @@
       "source_location": "L18"
     },
     {
-      "id": "app_services_web_search_websearchtool",
-      "label": "WebSearchTool",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 25,
-      "community_name": "ResearchModeOrchestrator",
-      "file_type": "code",
-      "norm_label": "websearchtool",
-      "source_file": "app/services/web_search.py",
-      "source_location": "L11"
-    },
-    {
-      "id": "app_models_episodic_episodicmemory",
-      "label": "EpisodicMemory",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 26,
-      "community_name": "ValueError",
-      "file_type": "code",
-      "norm_label": "episodicmemory",
-      "source_file": "app/models/episodic.py",
-      "source_location": "L8"
-    },
-    {
       "id": "app_services_export_workspaceexportservice",
       "label": "WorkspaceExportService",
       "_callable": true,
@@ -1414,24 +1479,11 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 29,
-      "community_name": "Neo4jAdapter",
+      "community_name": "GraphStore",
       "file_type": "code",
       "norm_label": "graphstore",
       "source_file": "app/repositories/graph.py",
       "source_location": "L11"
-    },
-    {
-      "id": "app_repositories_graph_neo4jadapter",
-      "label": "Neo4jAdapter",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 29,
-      "community_name": "Neo4jAdapter",
-      "file_type": "code",
-      "norm_label": "neo4jadapter",
-      "source_file": "app/repositories/graph.py",
-      "source_location": "L30"
     },
     {
       "id": "app_models_research_researchartifact",
@@ -1445,32 +1497,6 @@
       "norm_label": "researchartifact",
       "source_file": "app/models/research.py",
       "source_location": "L57"
-    },
-    {
-      "id": "app_models_research_researchevidence",
-      "label": "ResearchEvidence",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "ResearchRepository",
-      "file_type": "code",
-      "norm_label": "researchevidence",
-      "source_file": "app/models/research.py",
-      "source_location": "L37"
-    },
-    {
-      "id": "app_models_research_researchreport",
-      "label": "ResearchReport",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "ResearchRepository",
-      "file_type": "code",
-      "norm_label": "researchreport",
-      "source_file": "app/models/research.py",
-      "source_location": "L78"
     },
     {
       "id": "app_repositories_research_researchrepository",
@@ -1642,19 +1668,6 @@
       "source_location": "L9"
     },
     {
-      "id": "app_schemas_context_contextbundle",
-      "label": "ContextBundle",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 35,
-      "community_name": "GroundModeOrchestrator",
-      "file_type": "code",
-      "norm_label": "contextbundle",
-      "source_file": "app/schemas/context.py",
-      "source_location": "L12"
-    },
-    {
       "id": "app_schemas_context_memoryitem",
       "label": "MemoryItem",
       "_callable": true,
@@ -1666,19 +1679,6 @@
       "norm_label": "memoryitem",
       "source_file": "app/schemas/context.py",
       "source_location": "L6"
-    },
-    {
-      "id": "app_services_memory_router_memoryrouterservice",
-      "label": "MemoryRouterService",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 35,
-      "community_name": "GroundModeOrchestrator",
-      "file_type": "code",
-      "norm_label": "memoryrouterservice",
-      "source_file": "app/services/memory_router.py",
-      "source_location": "L113"
     },
     {
       "id": "app_integrations_research_engine_upstream_open_deep_research_utils_mcperror",
@@ -1694,39 +1694,13 @@
       "source_location": "L38"
     },
     {
-      "id": "app_schemas_conversation_chatrequest",
-      "label": "ChatRequest",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 38,
-      "community_name": "chat_ground_mode",
-      "file_type": "code",
-      "norm_label": "chatrequest",
-      "source_file": "app/schemas/conversation.py",
-      "source_location": "L18"
-    },
-    {
-      "id": "app_schemas_conversation_chatresponse",
-      "label": "ChatResponse",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 38,
-      "community_name": "chat_ground_mode",
-      "file_type": "code",
-      "norm_label": "chatresponse",
-      "source_file": "app/schemas/conversation.py",
-      "source_location": "L22"
-    },
-    {
       "id": "app_schemas_ground_mode_askrequest",
       "label": "AskRequest",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 38,
-      "community_name": "chat_ground_mode",
+      "community_name": "ask_ground_mode",
       "file_type": "code",
       "norm_label": "askrequest",
       "source_file": "app/schemas/ground_mode.py",
@@ -1739,7 +1713,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 38,
-      "community_name": "chat_ground_mode",
+      "community_name": "ask_ground_mode",
       "file_type": "code",
       "norm_label": "askresponse",
       "source_file": "app/schemas/ground_mode.py",
@@ -1752,11 +1726,37 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 38,
-      "community_name": "chat_ground_mode",
+      "community_name": "ask_ground_mode",
       "file_type": "code",
       "norm_label": "groundengineprotocol",
       "source_file": "app/services/ground/factory.py",
       "source_location": "L17"
+    },
+    {
+      "id": "app_schemas_conversation_chatrequest",
+      "label": "ChatRequest",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "chatrequest",
+      "source_file": "app/schemas/conversation.py",
+      "source_location": "L18"
+    },
+    {
+      "id": "app_schemas_conversation_chatresponse",
+      "label": "ChatResponse",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "chatresponse",
+      "source_file": "app/schemas/conversation.py",
+      "source_location": "L22"
     },
     {
       "id": "app_schemas_file_fileuploadresponse",
@@ -1770,32 +1770,6 @@
       "norm_label": "fileuploadresponse",
       "source_file": "app/schemas/file.py",
       "source_location": "L3"
-    },
-    {
-      "id": "app_schemas_source_sourceresponse",
-      "label": "SourceResponse",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 39,
-      "community_name": "workspaces.py",
-      "file_type": "code",
-      "norm_label": "sourceresponse",
-      "source_file": "app/schemas/source.py",
-      "source_location": "L16"
-    },
-    {
-      "id": "app_schemas_source_sourcesnapshotresponse",
-      "label": "SourceSnapshotResponse",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 39,
-      "community_name": "workspaces.py",
-      "file_type": "code",
-      "norm_label": "sourcesnapshotresponse",
-      "source_file": "app/schemas/source.py",
-      "source_location": "L5"
     },
     {
       "id": "app_schemas_workspace_researchrequest",
@@ -1886,7 +1860,7 @@
       "file_type": "code",
       "norm_label": "researchmetricsservice",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L11"
+      "source_location": "L16"
     },
     {
       "id": "app_core_telemetry_secretsanitizingfilter",
@@ -1915,17 +1889,17 @@
       "source_location": "L55"
     },
     {
-      "id": "app_services_research_derivation_derivationservice",
-      "label": "DerivationService",
+      "id": "app_schemas_graph_provenanceref",
+      "label": "ProvenanceRef",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 42,
-      "community_name": "DerivationService",
+      "community_name": "ProvenanceRef",
       "file_type": "code",
-      "norm_label": "derivationservice",
-      "source_file": "app/services/research/derivation.py",
-      "source_location": "L20"
+      "norm_label": "provenanceref",
+      "source_file": "app/schemas/graph.py",
+      "source_location": "L15"
     },
     {
       "id": "app_integrations_research_engine_budget_usagetracker",
@@ -2019,45 +1993,6 @@
       "source_location": "L20"
     },
     {
-      "id": "app_schemas_graph_provenanceref",
-      "label": "ProvenanceRef",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 44,
-      "community_name": "research/service.py",
-      "file_type": "code",
-      "norm_label": "provenanceref",
-      "source_file": "app/schemas/graph.py",
-      "source_location": "L15"
-    },
-    {
-      "id": "app_services_memory_router_memoryrouter",
-      "label": "MemoryRouter",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 44,
-      "community_name": "research/service.py",
-      "file_type": "code",
-      "norm_label": "memoryrouter",
-      "source_file": "app/services/memory_router.py",
-      "source_location": "L20"
-    },
-    {
-      "id": "app_services_research_service_researchservice",
-      "label": "ResearchService",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 44,
-      "community_name": "research/service.py",
-      "file_type": "code",
-      "norm_label": "researchservice",
-      "source_file": "app/services/research/service.py",
-      "source_location": "L13"
-    },
-    {
       "id": "app_core_config_settings",
       "label": "Settings",
       "_callable": true,
@@ -2116,7 +2051,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 52,
-      "community_name": "main.py",
+      "community_name": "Request",
       "file_type": "code",
       "norm_label": "uploadsizelimitmiddleware",
       "source_file": "app/main.py",
@@ -2175,6 +2110,32 @@
       "source_location": "L10"
     },
     {
+      "id": "app_schemas_context_contextbundle",
+      "label": "ContextBundle",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 58,
+      "community_name": "MemoryRouterService",
+      "file_type": "code",
+      "norm_label": "contextbundle",
+      "source_file": "app/schemas/context.py",
+      "source_location": "L12"
+    },
+    {
+      "id": "app_services_memory_router_memoryrouterservice",
+      "label": "MemoryRouterService",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 58,
+      "community_name": "MemoryRouterService",
+      "file_type": "code",
+      "norm_label": "memoryrouterservice",
+      "source_file": "app/services/memory_router.py",
+      "source_location": "L113"
+    },
+    {
       "id": "app_services_research_retrievers_academic_academicretriever",
       "label": "AcademicRetriever",
       "_callable": true,
@@ -2214,39 +2175,13 @@
       "source_location": "L76"
     },
     {
-      "id": "app_repositories_block_blockrepository",
-      "label": "BlockRepository",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 62,
-      "community_name": "tasks.py",
-      "file_type": "code",
-      "norm_label": "blockrepository",
-      "source_file": "app/repositories/block.py",
-      "source_location": "L6"
-    },
-    {
-      "id": "app_services_chunking_chunkingservice",
-      "label": "ChunkingService",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 62,
-      "community_name": "tasks.py",
-      "file_type": "code",
-      "norm_label": "chunkingservice",
-      "source_file": "app/services/chunking.py",
-      "source_location": "L4"
-    },
-    {
       "id": "app_services_parsing_documentparser",
       "label": "DocumentParser",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 62,
-      "community_name": "tasks.py",
+      "community_name": "ObjectStoreProtocol",
       "file_type": "code",
       "norm_label": "documentparser",
       "source_file": "app/services/parsing.py",
@@ -2259,50 +2194,102 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 62,
-      "community_name": "tasks.py",
+      "community_name": "ObjectStoreProtocol",
       "file_type": "code",
       "norm_label": "objectstoreprotocol",
       "source_file": "app/services/storage.py",
       "source_location": "L8"
     },
     {
-      "id": "app_repositories_episodic_episodicrepository",
-      "label": "EpisodicRepository",
+      "id": "app_repositories_graph_neo4jadapter",
+      "label": "Neo4jAdapter",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
-      "community": 7,
-      "community_name": "WorkingMemoryState",
+      "community": 63,
+      "community_name": "streamlit_app.py",
       "file_type": "code",
-      "norm_label": "episodicrepository",
-      "source_file": "app/repositories/episodic.py",
-      "source_location": "L7"
+      "norm_label": "neo4jadapter",
+      "source_file": "app/repositories/graph.py",
+      "source_location": "L30"
     },
     {
-      "id": "app_schemas_episodic_episodicmemorycreate",
-      "label": "EpisodicMemoryCreate",
+      "id": "app_services_web_search_websearchtool",
+      "label": "WebSearchTool",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
-      "community": 7,
-      "community_name": "WorkingMemoryState",
+      "community": 63,
+      "community_name": "streamlit_app.py",
       "file_type": "code",
-      "norm_label": "episodicmemorycreate",
-      "source_file": "app/schemas/episodic.py",
+      "norm_label": "websearchtool",
+      "source_file": "app/services/web_search.py",
+      "source_location": "L11"
+    },
+    {
+      "id": "app_repositories_block_blockrepository",
+      "label": "BlockRepository",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 64,
+      "community_name": "tasks.py",
+      "file_type": "code",
+      "norm_label": "blockrepository",
+      "source_file": "app/repositories/block.py",
       "source_location": "L6"
     },
     {
-      "id": "app_schemas_episodic_episodicmemoryresponse",
-      "label": "EpisodicMemoryResponse",
+      "id": "app_services_chunking_chunkingservice",
+      "label": "ChunkingService",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
-      "community": 7,
-      "community_name": "WorkingMemoryState",
+      "community": 64,
+      "community_name": "tasks.py",
       "file_type": "code",
-      "norm_label": "episodicmemoryresponse",
-      "source_file": "app/schemas/episodic.py",
+      "norm_label": "chunkingservice",
+      "source_file": "app/services/chunking.py",
+      "source_location": "L4"
+    },
+    {
+      "id": "app_models_research_researchevidence",
+      "label": "ResearchEvidence",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 65,
+      "community_name": "ResearchEvidence",
+      "file_type": "code",
+      "norm_label": "researchevidence",
+      "source_file": "app/models/research.py",
+      "source_location": "L37"
+    },
+    {
+      "id": "app_schemas_source_sourceresponse",
+      "label": "SourceResponse",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 68,
+      "community_name": "schemas/source.py",
+      "file_type": "code",
+      "norm_label": "sourceresponse",
+      "source_file": "app/schemas/source.py",
       "source_location": "L16"
+    },
+    {
+      "id": "app_schemas_source_sourcesnapshotresponse",
+      "label": "SourceSnapshotResponse",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 68,
+      "community_name": "schemas/source.py",
+      "file_type": "code",
+      "norm_label": "sourcesnapshotresponse",
+      "source_file": "app/schemas/source.py",
+      "source_location": "L5"
     },
     {
       "id": "app_schemas_working_memory_workingmemorystate",
@@ -2357,43 +2344,56 @@
       "source_location": "L38"
     },
     {
-      "id": "app_schemas_knowledge_knowledgememorycreate",
-      "label": "KnowledgeMemoryCreate",
+      "id": "app_models_episodic_episodicmemory",
+      "label": "EpisodicMemory",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "KnowledgeMemoryCreate",
+      "community_name": "EpisodicMemory",
       "file_type": "code",
-      "norm_label": "knowledgememorycreate",
-      "source_file": "app/schemas/knowledge.py",
-      "source_location": "L11"
+      "norm_label": "episodicmemory",
+      "source_file": "app/models/episodic.py",
+      "source_location": "L8"
     },
     {
-      "id": "app_schemas_knowledge_knowledgememoryresponse",
-      "label": "KnowledgeMemoryResponse",
+      "id": "app_repositories_episodic_episodicrepository",
+      "label": "EpisodicRepository",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "KnowledgeMemoryCreate",
+      "community_name": "EpisodicMemory",
       "file_type": "code",
-      "norm_label": "knowledgememoryresponse",
-      "source_file": "app/schemas/knowledge.py",
-      "source_location": "L22"
+      "norm_label": "episodicrepository",
+      "source_file": "app/repositories/episodic.py",
+      "source_location": "L7"
     },
     {
-      "id": "app_schemas_knowledge_provenance",
-      "label": "Provenance",
+      "id": "app_schemas_episodic_episodicmemorycreate",
+      "label": "EpisodicMemoryCreate",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "KnowledgeMemoryCreate",
+      "community_name": "EpisodicMemory",
       "file_type": "code",
-      "norm_label": "provenance",
-      "source_file": "app/schemas/knowledge.py",
+      "norm_label": "episodicmemorycreate",
+      "source_file": "app/schemas/episodic.py",
       "source_location": "L6"
+    },
+    {
+      "id": "app_schemas_episodic_episodicmemoryresponse",
+      "label": "EpisodicMemoryResponse",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "EpisodicMemory",
+      "file_type": "code",
+      "norm_label": "episodicmemoryresponse",
+      "source_file": "app/schemas/episodic.py",
+      "source_location": "L16"
     },
     {
       "id": "app_repositories_block_blockrepository_bulk_create_blocks",
@@ -2960,6 +2960,30 @@
       "source_location": "L36"
     },
     {
+      "id": "app_services_research_service_researchservice_init",
+      "label": ".__init__()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 12,
+      "community_name": "chat/context.py",
+      "file_type": "code",
+      "norm_label": ".__init__()",
+      "source_file": "app/services/research/service.py",
+      "source_location": "L19"
+    },
+    {
+      "id": "app_services_research_service_researchservice_promote_memory_candidates",
+      "label": ".promote_memory_candidates()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 12,
+      "community_name": "chat/context.py",
+      "file_type": "code",
+      "norm_label": ".promote_memory_candidates()",
+      "source_file": "app/services/research/service.py",
+      "source_location": "L29"
+    },
+    {
       "id": "app_workers_tasks_sync_knowledge_to_graph_job",
       "label": "sync_knowledge_to_graph_job()",
       "_callable": true,
@@ -2977,7 +3001,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 13,
-      "community_name": "client.py",
+      "community_name": "main.py",
       "file_type": "code",
       "norm_label": ".__init__()",
       "source_file": "app/integrations/open_notebook/client.py",
@@ -2989,7 +3013,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 13,
-      "community_name": "client.py",
+      "community_name": "main.py",
       "file_type": "code",
       "norm_label": "get_open_notebook_base_url()",
       "source_file": "app/integrations/open_notebook/config.py",
@@ -3001,7 +3025,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 13,
-      "community_name": "client.py",
+      "community_name": "main.py",
       "file_type": "code",
       "norm_label": "get_open_notebook_timeout()",
       "source_file": "app/integrations/open_notebook/config.py",
@@ -3013,7 +3037,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 13,
-      "community_name": "client.py",
+      "community_name": "main.py",
       "file_type": "code",
       "norm_label": "is_open_notebook_enabled()",
       "source_file": "app/integrations/open_notebook/config.py",
@@ -3025,11 +3049,35 @@
       "_callable": true,
       "_origin": "ast",
       "community": 13,
-      "community_name": "client.py",
+      "community_name": "main.py",
       "file_type": "code",
       "norm_label": "check_open_notebook_health()",
       "source_file": "app/integrations/open_notebook/health.py",
       "source_location": "L7"
+    },
+    {
+      "id": "app_main_health_check",
+      "label": "health_check()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "main.py",
+      "file_type": "code",
+      "norm_label": "health_check()",
+      "source_file": "app/main.py",
+      "source_location": "L150"
+    },
+    {
+      "id": "app_main_lifespan",
+      "label": "lifespan()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "main.py",
+      "file_type": "code",
+      "norm_label": "lifespan()",
+      "source_file": "app/main.py",
+      "source_location": "L34"
     },
     {
       "id": "app_integrations_open_notebook_client_opennotebookclient_ask_simple",
@@ -3210,6 +3258,54 @@
       "norm_label": "with_error_translation()",
       "source_file": "app/integrations/open_notebook/client.py",
       "source_location": "L55"
+    },
+    {
+      "id": "app_workers_tasks_delete_open_notebook_source_job",
+      "label": "delete_open_notebook_source_job()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "OpenNotebookClient",
+      "file_type": "code",
+      "norm_label": "delete_open_notebook_source_job()",
+      "source_file": "app/workers/tasks.py",
+      "source_location": "L1208"
+    },
+    {
+      "id": "app_workers_tasks_delete_open_notebook_workspace_job",
+      "label": "delete_open_notebook_workspace_job()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "OpenNotebookClient",
+      "file_type": "code",
+      "norm_label": "delete_open_notebook_workspace_job()",
+      "source_file": "app/workers/tasks.py",
+      "source_location": "L1221"
+    },
+    {
+      "id": "app_workers_tasks_process_deletion_tombstone_job",
+      "label": "process_deletion_tombstone_job()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "OpenNotebookClient",
+      "file_type": "code",
+      "norm_label": "process_deletion_tombstone_job()",
+      "source_file": "app/workers/tasks.py",
+      "source_location": "L1138"
+    },
+    {
+      "id": "app_workers_tasks_project_to_open_notebook_job",
+      "label": "project_to_open_notebook_job()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "OpenNotebookClient",
+      "file_type": "code",
+      "norm_label": "project_to_open_notebook_job()",
+      "source_file": "app/workers/tasks.py",
+      "source_location": "L1021"
     },
     {
       "id": "app_services_chat_events_chateventrepository_append_event",
@@ -3533,7 +3629,7 @@
       "file_type": "code",
       "norm_label": ".cancel()",
       "source_file": "app/integrations/research_engine/open_deep_research/engine.py",
-      "source_location": "L500"
+      "source_location": "L501"
     },
     {
       "id": "app_integrations_research_engine_open_deep_research_engine_opendeepresearchengine_format_research_context",
@@ -3545,7 +3641,7 @@
       "file_type": "code",
       "norm_label": "._format_research_context()",
       "source_file": "app/integrations/research_engine/open_deep_research/engine.py",
-      "source_location": "L369"
+      "source_location": "L370"
     },
     {
       "id": "app_integrations_research_engine_open_deep_research_engine_opendeepresearchengine_init",
@@ -3560,12 +3656,24 @@
       "source_location": "L17"
     },
     {
+      "id": "app_services_research_derivation_derivationservice_init",
+      "label": ".__init__()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 19,
+      "community_name": "derivation.py",
+      "file_type": "code",
+      "norm_label": ".__init__()",
+      "source_file": "app/services/research/derivation.py",
+      "source_location": "L25"
+    },
+    {
       "id": "app_services_research_verification_deterministicarithmeticverifier_eval_node",
       "label": "._eval_node()",
       "_callable": true,
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "code",
       "norm_label": "._eval_node()",
       "source_file": "app/services/research/verification.py",
@@ -3577,7 +3685,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "code",
       "norm_label": ".evaluate()",
       "source_file": "app/services/research/verification.py",
@@ -3589,7 +3697,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "code",
       "norm_label": ".__init__()",
       "source_file": "app/services/research/verification.py",
@@ -3601,7 +3709,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "code",
       "norm_label": "_pct_change()",
       "source_file": "app/services/research/verification.py",
@@ -3613,7 +3721,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "code",
       "norm_label": "_safe_round()",
       "source_file": "app/services/research/verification.py",
@@ -3625,7 +3733,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "code",
       "norm_label": "verify_calculation()",
       "source_file": "app/services/research/verification.py",
@@ -3637,11 +3745,23 @@
       "_callable": true,
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "code",
       "norm_label": "verify_claim()",
       "source_file": "app/services/research/verification.py",
       "source_location": "L269"
+    },
+    {
+      "id": "app_workers_tasks_run_research_agent_job",
+      "label": "run_research_agent_job()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 19,
+      "community_name": "derivation.py",
+      "file_type": "code",
+      "norm_label": "run_research_agent_job()",
+      "source_file": "app/workers/tasks.py",
+      "source_location": "L344"
     },
     {
       "id": "app_integrations_open_notebook_citation_mapper_map_canonical_sources_to_upstream",
@@ -4208,18 +4328,6 @@
       "source_location": "L14"
     },
     {
-      "id": "app_services_ground_factory_groundengineprotocol_run",
-      "label": ".run()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 22,
-      "community_name": "database.py",
-      "file_type": "code",
-      "norm_label": ".run()",
-      "source_file": "app/services/ground/factory.py",
-      "source_location": "L18"
-    },
-    {
       "id": "app_services_hybrid_retrieval_hybridretrievalservice_init",
       "label": ".__init__()",
       "_callable": true,
@@ -4460,18 +4568,6 @@
       "source_location": "L185"
     },
     {
-      "id": "app_orchestration_research_mode_researchmodeorchestrator_build_graph",
-      "label": "._build_graph()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 25,
-      "community_name": "ResearchModeOrchestrator",
-      "file_type": "code",
-      "norm_label": "._build_graph()",
-      "source_file": "app/orchestration/research_mode.py",
-      "source_location": "L49"
-    },
-    {
       "id": "app_orchestration_research_mode_researchmodeorchestrator_executor_node",
       "label": ".executor_node()",
       "_callable": true,
@@ -4494,18 +4590,6 @@
       "norm_label": ".executor_router()",
       "source_file": "app/orchestration/research_mode.py",
       "source_location": "L121"
-    },
-    {
-      "id": "app_orchestration_research_mode_researchmodeorchestrator_init",
-      "label": ".__init__()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 25,
-      "community_name": "ResearchModeOrchestrator",
-      "file_type": "code",
-      "norm_label": ".__init__()",
-      "source_file": "app/orchestration/research_mode.py",
-      "source_location": "L30"
     },
     {
       "id": "app_orchestration_research_mode_researchmodeorchestrator_planner_node",
@@ -4554,30 +4638,6 @@
       "norm_label": ".synthesizer_node()",
       "source_file": "app/orchestration/research_mode.py",
       "source_location": "L127"
-    },
-    {
-      "id": "app_services_web_search_websearchtool_init",
-      "label": ".__init__()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 25,
-      "community_name": "ResearchModeOrchestrator",
-      "file_type": "code",
-      "norm_label": ".__init__()",
-      "source_file": "app/services/web_search.py",
-      "source_location": "L12"
-    },
-    {
-      "id": "app_services_web_search_websearchtool_search",
-      "label": ".search()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 25,
-      "community_name": "ResearchModeOrchestrator",
-      "file_type": "code",
-      "norm_label": ".search()",
-      "source_file": "app/services/web_search.py",
-      "source_location": "L20"
     },
     {
       "id": "app_schemas_chat_turncreate_validate_message",
@@ -4640,18 +4700,6 @@
       "source_location": "L16"
     },
     {
-      "id": "app_services_storage_objectstoreprotocol_upload_file",
-      "label": ".upload_file()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 26,
-      "community_name": "ValueError",
-      "file_type": "code",
-      "norm_label": ".upload_file()",
-      "source_file": "app/services/storage.py",
-      "source_location": "L9"
-    },
-    {
       "id": "app_services_storage_s3objectstore_download_file",
       "label": ".download_file()",
       "_callable": true,
@@ -4688,16 +4736,16 @@
       "source_location": "L19"
     },
     {
-      "id": "app_services_storage_s3objectstore_upload_file",
-      "label": ".upload_file()",
+      "id": "app_workers_tasks_export_workspace_job",
+      "label": "export_workspace_job()",
       "_callable": true,
       "_origin": "ast",
       "community": 26,
       "community_name": "ValueError",
       "file_type": "code",
-      "norm_label": ".upload_file()",
-      "source_file": "app/services/storage.py",
-      "source_location": "L23"
+      "norm_label": "export_workspace_job()",
+      "source_file": "app/workers/tasks.py",
+      "source_location": "L968"
     },
     {
       "id": "app_api_routes_chat_cancel_turn",
@@ -4885,7 +4933,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 29,
-      "community_name": "Neo4jAdapter",
+      "community_name": "GraphStore",
       "file_type": "code",
       "norm_label": ".__init__()",
       "source_file": "app/repositories/graph.py",
@@ -4897,7 +4945,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 29,
-      "community_name": "Neo4jAdapter",
+      "community_name": "GraphStore",
       "file_type": "code",
       "norm_label": ".close()",
       "source_file": "app/repositories/graph.py",
@@ -4909,7 +4957,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 29,
-      "community_name": "Neo4jAdapter",
+      "community_name": "GraphStore",
       "file_type": "code",
       "norm_label": ".connect()",
       "source_file": "app/repositories/graph.py",
@@ -4921,35 +4969,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 29,
-      "community_name": "Neo4jAdapter",
+      "community_name": "GraphStore",
       "file_type": "code",
       "norm_label": ".execute_query()",
       "source_file": "app/repositories/graph.py",
       "source_location": "L26"
-    },
-    {
-      "id": "app_repositories_graph_neo4jadapter_close",
-      "label": ".close()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 29,
-      "community_name": "Neo4jAdapter",
-      "file_type": "code",
-      "norm_label": ".close()",
-      "source_file": "app/repositories/graph.py",
-      "source_location": "L44"
-    },
-    {
-      "id": "app_repositories_graph_neo4jadapter_connect",
-      "label": ".connect()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 29,
-      "community_name": "Neo4jAdapter",
-      "file_type": "code",
-      "norm_label": ".connect()",
-      "source_file": "app/repositories/graph.py",
-      "source_location": "L37"
     },
     {
       "id": "app_repositories_graph_neo4jadapter_execute_query",
@@ -4957,47 +4981,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 29,
-      "community_name": "Neo4jAdapter",
+      "community_name": "GraphStore",
       "file_type": "code",
       "norm_label": ".execute_query()",
       "source_file": "app/repositories/graph.py",
       "source_location": "L50"
-    },
-    {
-      "id": "app_repositories_graph_neo4jadapter_init",
-      "label": ".__init__()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 29,
-      "community_name": "Neo4jAdapter",
-      "file_type": "code",
-      "norm_label": ".__init__()",
-      "source_file": "app/repositories/graph.py",
-      "source_location": "L31"
-    },
-    {
-      "id": "app_repositories_research_researchrepository_batch_create_evidence",
-      "label": ".batch_create_evidence()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "ResearchRepository",
-      "file_type": "code",
-      "norm_label": ".batch_create_evidence()",
-      "source_file": "app/repositories/research.py",
-      "source_location": "L119"
-    },
-    {
-      "id": "app_repositories_research_researchrepository_bulk_insert_evidence",
-      "label": "._bulk_insert_evidence()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "ResearchRepository",
-      "file_type": "code",
-      "norm_label": "._bulk_insert_evidence()",
-      "source_file": "app/repositories/research.py",
-      "source_location": "L169"
     },
     {
       "id": "app_repositories_research_researchrepository_checkpoint_usage",
@@ -5144,18 +5132,6 @@
       "source_location": "L233"
     },
     {
-      "id": "app_repositories_research_researchrepository_get_evidence_by_fingerprints",
-      "label": "._get_evidence_by_fingerprints()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "ResearchRepository",
-      "file_type": "code",
-      "norm_label": "._get_evidence_by_fingerprints()",
-      "source_file": "app/repositories/research.py",
-      "source_location": "L158"
-    },
-    {
       "id": "app_repositories_research_researchrepository_get_report",
       "label": ".get_report()",
       "_callable": true,
@@ -5276,18 +5252,6 @@
       "source_location": "L34"
     },
     {
-      "id": "app_workers_tasks_run_research_agent_job",
-      "label": "run_research_agent_job()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "ResearchRepository",
-      "file_type": "code",
-      "norm_label": "run_research_agent_job()",
-      "source_file": "app/workers/tasks.py",
-      "source_location": "L344"
-    },
-    {
       "id": "app_integrations_research_engine_tools_neosis_search_tools_neosis_web_search",
       "label": "neosis_web_search()",
       "_callable": true,
@@ -5394,18 +5358,6 @@
       "norm_label": ".resolve_source()",
       "source_file": "app/services/research/provenance.py",
       "source_location": "L16"
-    },
-    {
-      "id": "app_api_routes_chat_get_chat_service",
-      "label": "get_chat_service()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 32,
-      "community_name": "WorkspaceRepository",
-      "file_type": "code",
-      "norm_label": "get_chat_service()",
-      "source_file": "app/api/routes/chat.py",
-      "source_location": "L41"
     },
     {
       "id": "app_repositories_workspace_workspacerepository_create_commit",
@@ -5540,30 +5492,6 @@
       "source_location": "L224"
     },
     {
-      "id": "app_api_routes_workspaces_get_memory_router",
-      "label": "get_memory_router()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 33,
-      "community_name": "QuotaService",
-      "file_type": "code",
-      "norm_label": "get_memory_router()",
-      "source_file": "app/api/routes/workspaces.py",
-      "source_location": "L58"
-    },
-    {
-      "id": "app_api_routes_workspaces_get_quota",
-      "label": "get_quota()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 33,
-      "community_name": "QuotaService",
-      "file_type": "code",
-      "norm_label": "get_quota()",
-      "source_file": "app/api/routes/workspaces.py",
-      "source_location": "L49"
-    },
-    {
       "id": "app_services_quota_get_quota_service",
       "label": "get_quota_service()",
       "_callable": true,
@@ -5660,6 +5588,18 @@
       "source_location": "L9"
     },
     {
+      "id": "app_api_routes_rate_limiter_get_rate_limit_status",
+      "label": "get_rate_limit_status()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 34,
+      "community_name": "FastAPI",
+      "file_type": "code",
+      "norm_label": "get_rate_limit_status()",
+      "source_file": "app/api/routes/rate_limiter.py",
+      "source_location": "L12"
+    },
+    {
       "id": "app_orchestration_ground_mode_groundmodeorchestrator_answer_node",
       "label": ".answer_node()",
       "_callable": true,
@@ -5744,42 +5684,6 @@
       "source_location": "L183"
     },
     {
-      "id": "app_schemas_context_contextbundle_get_context_text",
-      "label": ".get_context_text()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 35,
-      "community_name": "GroundModeOrchestrator",
-      "file_type": "code",
-      "norm_label": ".get_context_text()",
-      "source_file": "app/schemas/context.py",
-      "source_location": "L18"
-    },
-    {
-      "id": "app_services_memory_router_memoryrouterservice_build_context",
-      "label": ".build_context()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 35,
-      "community_name": "GroundModeOrchestrator",
-      "file_type": "code",
-      "norm_label": ".build_context()",
-      "source_file": "app/services/memory_router.py",
-      "source_location": "L124"
-    },
-    {
-      "id": "app_services_memory_router_memoryrouterservice_estimate_tokens",
-      "label": ".estimate_tokens()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 35,
-      "community_name": "GroundModeOrchestrator",
-      "file_type": "code",
-      "norm_label": ".estimate_tokens()",
-      "source_file": "app/services/memory_router.py",
-      "source_location": "L120"
-    },
-    {
       "id": "app_integrations_research_engine_upstream_open_deep_research_utils_check_anthropic_token_limit",
       "label": "_check_anthropic_token_limit()",
       "_callable": true,
@@ -5852,12 +5756,24 @@
       "source_location": "L83"
     },
     {
+      "id": "app_api_routes_chat_get_chat_service",
+      "label": "get_chat_service()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 38,
+      "community_name": "ask_ground_mode",
+      "file_type": "code",
+      "norm_label": "get_chat_service()",
+      "source_file": "app/api/routes/chat.py",
+      "source_location": "L41"
+    },
+    {
       "id": "app_api_routes_workspaces_ask_ground_mode",
       "label": "ask_ground_mode()",
       "_callable": true,
       "_origin": "ast",
       "community": 38,
-      "community_name": "chat_ground_mode",
+      "community_name": "ask_ground_mode",
       "file_type": "code",
       "norm_label": "ask_ground_mode()",
       "source_file": "app/api/routes/workspaces.py",
@@ -5869,107 +5785,35 @@
       "_callable": true,
       "_origin": "ast",
       "community": 38,
-      "community_name": "chat_ground_mode",
+      "community_name": "ask_ground_mode",
       "file_type": "code",
       "norm_label": "ask_ground_mode_stream()",
       "source_file": "app/api/routes/workspaces.py",
       "source_location": "L319"
     },
     {
+      "id": "app_services_ground_factory_groundengineprotocol_run",
+      "label": ".run()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 38,
+      "community_name": "ask_ground_mode",
+      "file_type": "code",
+      "norm_label": ".run()",
+      "source_file": "app/services/ground/factory.py",
+      "source_location": "L18"
+    },
+    {
       "id": "app_api_routes_workspaces_chat_ground_mode",
       "label": "chat_ground_mode()",
       "_callable": true,
       "_origin": "ast",
-      "community": 38,
-      "community_name": "chat_ground_mode",
+      "community": 39,
+      "community_name": "workspaces.py",
       "file_type": "code",
       "norm_label": "chat_ground_mode()",
       "source_file": "app/api/routes/workspaces.py",
       "source_location": "L378"
-    },
-    {
-      "id": "app_api_routes_workspaces_create_workspace_commit",
-      "label": "create_workspace_commit()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 38,
-      "community_name": "chat_ground_mode",
-      "file_type": "code",
-      "norm_label": "create_workspace_commit()",
-      "source_file": "app/api/routes/workspaces.py",
-      "source_location": "L474"
-    },
-    {
-      "id": "app_api_routes_workspaces_get_knowledge_repository",
-      "label": "get_knowledge_repository()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 38,
-      "community_name": "chat_ground_mode",
-      "file_type": "code",
-      "norm_label": "get_knowledge_repository()",
-      "source_file": "app/api/routes/workspaces.py",
-      "source_location": "L55"
-    },
-    {
-      "id": "app_api_routes_workspaces_get_research_repository",
-      "label": "get_research_repository()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 38,
-      "community_name": "chat_ground_mode",
-      "file_type": "code",
-      "norm_label": "get_research_repository()",
-      "source_file": "app/api/routes/workspaces.py",
-      "source_location": "L52"
-    },
-    {
-      "id": "app_api_routes_workspaces_get_source_repository",
-      "label": "get_source_repository()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 38,
-      "community_name": "chat_ground_mode",
-      "file_type": "code",
-      "norm_label": "get_source_repository()",
-      "source_file": "app/api/routes/workspaces.py",
-      "source_location": "L46"
-    },
-    {
-      "id": "app_api_routes_workspaces_get_workspace_repository",
-      "label": "get_workspace_repository()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 38,
-      "community_name": "chat_ground_mode",
-      "file_type": "code",
-      "norm_label": "get_workspace_repository()",
-      "source_file": "app/api/routes/workspaces.py",
-      "source_location": "L43"
-    },
-    {
-      "id": "app_api_routes_workspaces_rollback_workspace",
-      "label": "rollback_workspace()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 38,
-      "community_name": "chat_ground_mode",
-      "file_type": "code",
-      "norm_label": "rollback_workspace()",
-      "source_file": "app/api/routes/workspaces.py",
-      "source_location": "L554"
-    },
-    {
-      "id": "app_api_routes_workspaces_start_research",
-      "label": "start_research()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 38,
-      "community_name": "chat_ground_mode",
-      "file_type": "code",
-      "norm_label": "start_research()",
-      "source_file": "app/api/routes/workspaces.py",
-      "source_location": "L595"
     },
     {
       "id": "app_api_routes_workspaces_create_workspace",
@@ -5982,6 +5826,150 @@
       "norm_label": "create_workspace()",
       "source_file": "app/api/routes/workspaces.py",
       "source_location": "L69"
+    },
+    {
+      "id": "app_api_routes_workspaces_create_workspace_commit",
+      "label": "create_workspace_commit()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "create_workspace_commit()",
+      "source_file": "app/api/routes/workspaces.py",
+      "source_location": "L474"
+    },
+    {
+      "id": "app_api_routes_workspaces_get_knowledge_repository",
+      "label": "get_knowledge_repository()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "get_knowledge_repository()",
+      "source_file": "app/api/routes/workspaces.py",
+      "source_location": "L55"
+    },
+    {
+      "id": "app_api_routes_workspaces_get_projection_status",
+      "label": "get_projection_status()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "get_projection_status()",
+      "source_file": "app/api/routes/workspaces.py",
+      "source_location": "L206"
+    },
+    {
+      "id": "app_api_routes_workspaces_get_quota",
+      "label": "get_quota()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "get_quota()",
+      "source_file": "app/api/routes/workspaces.py",
+      "source_location": "L49"
+    },
+    {
+      "id": "app_api_routes_workspaces_get_research_repository",
+      "label": "get_research_repository()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "get_research_repository()",
+      "source_file": "app/api/routes/workspaces.py",
+      "source_location": "L52"
+    },
+    {
+      "id": "app_api_routes_workspaces_get_source_repository",
+      "label": "get_source_repository()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "get_source_repository()",
+      "source_file": "app/api/routes/workspaces.py",
+      "source_location": "L46"
+    },
+    {
+      "id": "app_api_routes_workspaces_get_source_status",
+      "label": "get_source_status()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "get_source_status()",
+      "source_file": "app/api/routes/workspaces.py",
+      "source_location": "L188"
+    },
+    {
+      "id": "app_api_routes_workspaces_get_workspace",
+      "label": "get_workspace()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "get_workspace()",
+      "source_file": "app/api/routes/workspaces.py",
+      "source_location": "L79"
+    },
+    {
+      "id": "app_api_routes_workspaces_get_workspace_output_graph",
+      "label": "get_workspace_output_graph()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "get_workspace_output_graph()",
+      "source_file": "app/api/routes/workspaces.py",
+      "source_location": "L102"
+    },
+    {
+      "id": "app_api_routes_workspaces_get_workspace_repository",
+      "label": "get_workspace_repository()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "get_workspace_repository()",
+      "source_file": "app/api/routes/workspaces.py",
+      "source_location": "L43"
+    },
+    {
+      "id": "app_api_routes_workspaces_rollback_workspace",
+      "label": "rollback_workspace()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "rollback_workspace()",
+      "source_file": "app/api/routes/workspaces.py",
+      "source_location": "L554"
+    },
+    {
+      "id": "app_api_routes_workspaces_start_research",
+      "label": "start_research()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "start_research()",
+      "source_file": "app/api/routes/workspaces.py",
+      "source_location": "L595"
     },
     {
       "id": "app_api_routes_workspaces_update_workspace",
@@ -6017,7 +6005,7 @@
       "file_type": "code",
       "norm_label": ".emit_metrics()",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L20"
+      "source_location": "L26"
     },
     {
       "id": "app_services_research_metrics_researchmetricsservice_get_observability_dashboard_data",
@@ -6029,7 +6017,7 @@
       "file_type": "code",
       "norm_label": ".get_observability_dashboard_data()",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L86"
+      "source_location": "L152"
     },
     {
       "id": "app_services_research_metrics_researchmetricsservice_init",
@@ -6041,7 +6029,7 @@
       "file_type": "code",
       "norm_label": ".__init__()",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L17"
+      "source_location": "L23"
     },
     {
       "id": "app_services_research_metrics_researchmetricsservice_track_cost",
@@ -6053,7 +6041,7 @@
       "file_type": "code",
       "norm_label": ".track_cost()",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L62"
+      "source_location": "L119"
     },
     {
       "id": "app_services_research_metrics_researchmetricsservice_track_failures",
@@ -6065,7 +6053,7 @@
       "file_type": "code",
       "norm_label": ".track_failures()",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L69"
+      "source_location": "L135"
     },
     {
       "id": "app_services_research_metrics_researchmetricsservice_track_time_to_first_event",
@@ -6077,7 +6065,7 @@
       "file_type": "code",
       "norm_label": ".track_time_to_first_event()",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L55"
+      "source_location": "L102"
     },
     {
       "id": "app_core_telemetry_sanitize_log_message",
@@ -6164,16 +6152,28 @@
       "source_location": "L115"
     },
     {
-      "id": "app_services_research_derivation_derivationservice_init",
-      "label": ".__init__()",
+      "id": "app_workers_tasks_reconcile_deletion_tombstones_job",
+      "label": "reconcile_deletion_tombstones_job()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 41,
+      "community_name": "settings.py",
+      "file_type": "code",
+      "norm_label": "reconcile_deletion_tombstones_job()",
+      "source_file": "app/workers/tasks.py",
+      "source_location": "L1176"
+    },
+    {
+      "id": "app_services_research_derivation_derivationservice_build_provenance_bundle",
+      "label": ".build_provenance_bundle()",
       "_callable": true,
       "_origin": "ast",
       "community": 42,
-      "community_name": "DerivationService",
+      "community_name": "ProvenanceRef",
       "file_type": "code",
-      "norm_label": ".__init__()",
+      "norm_label": ".build_provenance_bundle()",
       "source_file": "app/services/research/derivation.py",
-      "source_location": "L25"
+      "source_location": "L28"
     },
     {
       "id": "app_services_research_derivation_derivationservice_normalize_derivation",
@@ -6181,7 +6181,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 42,
-      "community_name": "DerivationService",
+      "community_name": "ProvenanceRef",
       "file_type": "code",
       "norm_label": ".normalize_derivation()",
       "source_file": "app/services/research/derivation.py",
@@ -6193,7 +6193,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 42,
-      "community_name": "DerivationService",
+      "community_name": "ProvenanceRef",
       "file_type": "code",
       "norm_label": ".validate_provenance_lineage()",
       "source_file": "app/services/research/derivation.py",
@@ -6356,30 +6356,6 @@
       "source_location": "L72"
     },
     {
-      "id": "app_services_research_derivation_derivationservice_build_provenance_bundle",
-      "label": ".build_provenance_bundle()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 44,
-      "community_name": "research/service.py",
-      "file_type": "code",
-      "norm_label": ".build_provenance_bundle()",
-      "source_file": "app/services/research/derivation.py",
-      "source_location": "L28"
-    },
-    {
-      "id": "app_services_research_service_researchservice_init",
-      "label": ".__init__()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 44,
-      "community_name": "research/service.py",
-      "file_type": "code",
-      "norm_label": ".__init__()",
-      "source_file": "app/services/research/service.py",
-      "source_location": "L19"
-    },
-    {
       "id": "app_services_research_service_researchservice_promote_graph_candidates",
       "label": ".promote_graph_candidates()",
       "_callable": true,
@@ -6438,6 +6414,18 @@
       "norm_label": "remove_up_to_last_ai_message()",
       "source_file": "app/integrations/research_engine/upstream/open_deep_research/utils.py",
       "source_location": "L863"
+    },
+    {
+      "id": "app_core_startup_validate_production_startup",
+      "label": "validate_production_startup()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 47,
+      "community_name": "core/config.py",
+      "file_type": "code",
+      "norm_label": "validate_production_startup()",
+      "source_file": "app/core/startup.py",
+      "source_location": "L11"
     },
     {
       "id": "app_services_working_memory_get_checkpointer",
@@ -6685,59 +6673,23 @@
       "_callable": true,
       "_origin": "ast",
       "community": 50,
-      "community_name": "UUID",
+      "community_name": "upload_file_to_workspace",
       "file_type": "code",
       "norm_label": "delete_workspace()",
       "source_file": "app/api/routes/workspaces.py",
       "source_location": "L115"
     },
     {
-      "id": "app_api_routes_workspaces_get_projection_status",
-      "label": "get_projection_status()",
+      "id": "app_api_routes_workspaces_get_memory_router",
+      "label": "get_memory_router()",
       "_callable": true,
       "_origin": "ast",
       "community": 50,
-      "community_name": "UUID",
+      "community_name": "upload_file_to_workspace",
       "file_type": "code",
-      "norm_label": "get_projection_status()",
+      "norm_label": "get_memory_router()",
       "source_file": "app/api/routes/workspaces.py",
-      "source_location": "L206"
-    },
-    {
-      "id": "app_api_routes_workspaces_get_source_status",
-      "label": "get_source_status()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 50,
-      "community_name": "UUID",
-      "file_type": "code",
-      "norm_label": "get_source_status()",
-      "source_file": "app/api/routes/workspaces.py",
-      "source_location": "L188"
-    },
-    {
-      "id": "app_api_routes_workspaces_get_workspace",
-      "label": "get_workspace()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 50,
-      "community_name": "UUID",
-      "file_type": "code",
-      "norm_label": "get_workspace()",
-      "source_file": "app/api/routes/workspaces.py",
-      "source_location": "L79"
-    },
-    {
-      "id": "app_api_routes_workspaces_get_workspace_output_graph",
-      "label": "get_workspace_output_graph()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 50,
-      "community_name": "UUID",
-      "file_type": "code",
-      "norm_label": "get_workspace_output_graph()",
-      "source_file": "app/api/routes/workspaces.py",
-      "source_location": "L102"
+      "source_location": "L58"
     },
     {
       "id": "app_api_routes_workspaces_upload_file_to_workspace",
@@ -6745,47 +6697,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 50,
-      "community_name": "UUID",
+      "community_name": "upload_file_to_workspace",
       "file_type": "code",
       "norm_label": "upload_file_to_workspace()",
       "source_file": "app/api/routes/workspaces.py",
       "source_location": "L134"
-    },
-    {
-      "id": "app_core_startup_validate_production_startup",
-      "label": "validate_production_startup()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 52,
-      "community_name": "main.py",
-      "file_type": "code",
-      "norm_label": "validate_production_startup()",
-      "source_file": "app/core/startup.py",
-      "source_location": "L11"
-    },
-    {
-      "id": "app_main_health_check",
-      "label": "health_check()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 52,
-      "community_name": "main.py",
-      "file_type": "code",
-      "norm_label": "health_check()",
-      "source_file": "app/main.py",
-      "source_location": "L150"
-    },
-    {
-      "id": "app_main_lifespan",
-      "label": "lifespan()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 52,
-      "community_name": "main.py",
-      "file_type": "code",
-      "norm_label": "lifespan()",
-      "source_file": "app/main.py",
-      "source_location": "L34"
     },
     {
       "id": "app_main_limit_upload_size",
@@ -6793,7 +6709,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 52,
-      "community_name": "main.py",
+      "community_name": "Request",
       "file_type": "code",
       "norm_label": "limit_upload_size()",
       "source_file": "app/main.py",
@@ -6805,7 +6721,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 52,
-      "community_name": "main.py",
+      "community_name": "Request",
       "file_type": "code",
       "norm_label": "set_neosis_run_id()",
       "source_file": "app/main.py",
@@ -6817,7 +6733,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 52,
-      "community_name": "main.py",
+      "community_name": "Request",
       "file_type": "code",
       "norm_label": ".dispatch()",
       "source_file": "app/main.py",
@@ -6992,64 +6908,64 @@
       "source_location": "L15"
     },
     {
-      "id": "app_workers_tasks_delete_open_notebook_source_job",
-      "label": "delete_open_notebook_source_job()",
+      "id": "app_orchestration_research_mode_researchmodeorchestrator_build_graph",
+      "label": "._build_graph()",
       "_callable": true,
       "_origin": "ast",
       "community": 58,
-      "community_name": "Any",
+      "community_name": "MemoryRouterService",
       "file_type": "code",
-      "norm_label": "delete_open_notebook_source_job()",
-      "source_file": "app/workers/tasks.py",
-      "source_location": "L1208"
+      "norm_label": "._build_graph()",
+      "source_file": "app/orchestration/research_mode.py",
+      "source_location": "L49"
     },
     {
-      "id": "app_workers_tasks_delete_open_notebook_workspace_job",
-      "label": "delete_open_notebook_workspace_job()",
+      "id": "app_orchestration_research_mode_researchmodeorchestrator_init",
+      "label": ".__init__()",
       "_callable": true,
       "_origin": "ast",
       "community": 58,
-      "community_name": "Any",
+      "community_name": "MemoryRouterService",
       "file_type": "code",
-      "norm_label": "delete_open_notebook_workspace_job()",
-      "source_file": "app/workers/tasks.py",
-      "source_location": "L1221"
+      "norm_label": ".__init__()",
+      "source_file": "app/orchestration/research_mode.py",
+      "source_location": "L30"
     },
     {
-      "id": "app_workers_tasks_export_workspace_job",
-      "label": "export_workspace_job()",
+      "id": "app_schemas_context_contextbundle_get_context_text",
+      "label": ".get_context_text()",
       "_callable": true,
       "_origin": "ast",
       "community": 58,
-      "community_name": "Any",
+      "community_name": "MemoryRouterService",
       "file_type": "code",
-      "norm_label": "export_workspace_job()",
-      "source_file": "app/workers/tasks.py",
-      "source_location": "L968"
+      "norm_label": ".get_context_text()",
+      "source_file": "app/schemas/context.py",
+      "source_location": "L18"
     },
     {
-      "id": "app_workers_tasks_process_deletion_tombstone_job",
-      "label": "process_deletion_tombstone_job()",
+      "id": "app_services_memory_router_memoryrouterservice_build_context",
+      "label": ".build_context()",
       "_callable": true,
       "_origin": "ast",
       "community": 58,
-      "community_name": "Any",
+      "community_name": "MemoryRouterService",
       "file_type": "code",
-      "norm_label": "process_deletion_tombstone_job()",
-      "source_file": "app/workers/tasks.py",
-      "source_location": "L1138"
+      "norm_label": ".build_context()",
+      "source_file": "app/services/memory_router.py",
+      "source_location": "L124"
     },
     {
-      "id": "app_workers_tasks_reconcile_deletion_tombstones_job",
-      "label": "reconcile_deletion_tombstones_job()",
+      "id": "app_services_memory_router_memoryrouterservice_estimate_tokens",
+      "label": ".estimate_tokens()",
       "_callable": true,
       "_origin": "ast",
       "community": 58,
-      "community_name": "Any",
+      "community_name": "MemoryRouterService",
       "file_type": "code",
-      "norm_label": "reconcile_deletion_tombstones_job()",
-      "source_file": "app/workers/tasks.py",
-      "source_location": "L1176"
+      "norm_label": ".estimate_tokens()",
+      "source_file": "app/services/memory_router.py",
+      "source_location": "L120"
     },
     {
       "id": "app_services_research_retrievers_academic_academicretriever_parse_arxiv_atom",
@@ -7292,36 +7208,12 @@
       "source_location": "L118"
     },
     {
-      "id": "app_repositories_block_blockrepository_init",
-      "label": ".__init__()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 62,
-      "community_name": "tasks.py",
-      "file_type": "code",
-      "norm_label": ".__init__()",
-      "source_file": "app/repositories/block.py",
-      "source_location": "L7"
-    },
-    {
-      "id": "app_services_chat_context_sanitize_scratchpad_content",
-      "label": "sanitize_scratchpad_content()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 62,
-      "community_name": "tasks.py",
-      "file_type": "code",
-      "norm_label": "sanitize_scratchpad_content()",
-      "source_file": "app/services/chat/context.py",
-      "source_location": "L199"
-    },
-    {
       "id": "app_services_parsing_documentparser_init",
       "label": ".__init__()",
       "_callable": true,
       "_origin": "ast",
       "community": 62,
-      "community_name": "tasks.py",
+      "community_name": "ObjectStoreProtocol",
       "file_type": "code",
       "norm_label": ".__init__()",
       "source_file": "app/services/parsing.py",
@@ -7333,7 +7225,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 62,
-      "community_name": "tasks.py",
+      "community_name": "ObjectStoreProtocol",
       "file_type": "code",
       "norm_label": ".parse_document()",
       "source_file": "app/services/parsing.py",
@@ -7345,7 +7237,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 62,
-      "community_name": "tasks.py",
+      "community_name": "ObjectStoreProtocol",
       "file_type": "code",
       "norm_label": "._run_docling()",
       "source_file": "app/services/parsing.py",
@@ -7357,7 +7249,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 62,
-      "community_name": "tasks.py",
+      "community_name": "ObjectStoreProtocol",
       "file_type": "code",
       "norm_label": "get_object_store()",
       "source_file": "app/services/storage.py",
@@ -7369,7 +7261,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 62,
-      "community_name": "tasks.py",
+      "community_name": "ObjectStoreProtocol",
       "file_type": "code",
       "norm_label": ".download_file()",
       "source_file": "app/services/storage.py",
@@ -7381,23 +7273,95 @@
       "_callable": true,
       "_origin": "ast",
       "community": 62,
-      "community_name": "tasks.py",
+      "community_name": "ObjectStoreProtocol",
       "file_type": "code",
       "norm_label": ".generate_presigned_url()",
       "source_file": "app/services/storage.py",
       "source_location": "L15"
     },
     {
-      "id": "app_workers_tasks_parse_and_chunk_job",
-      "label": "parse_and_chunk_job()",
+      "id": "app_services_storage_objectstoreprotocol_upload_file",
+      "label": ".upload_file()",
       "_callable": true,
       "_origin": "ast",
       "community": 62,
-      "community_name": "tasks.py",
+      "community_name": "ObjectStoreProtocol",
       "file_type": "code",
-      "norm_label": "parse_and_chunk_job()",
-      "source_file": "app/workers/tasks.py",
-      "source_location": "L86"
+      "norm_label": ".upload_file()",
+      "source_file": "app/services/storage.py",
+      "source_location": "L9"
+    },
+    {
+      "id": "app_services_storage_s3objectstore_upload_file",
+      "label": ".upload_file()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 62,
+      "community_name": "ObjectStoreProtocol",
+      "file_type": "code",
+      "norm_label": ".upload_file()",
+      "source_file": "app/services/storage.py",
+      "source_location": "L23"
+    },
+    {
+      "id": "app_repositories_graph_neo4jadapter_close",
+      "label": ".close()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 63,
+      "community_name": "streamlit_app.py",
+      "file_type": "code",
+      "norm_label": ".close()",
+      "source_file": "app/repositories/graph.py",
+      "source_location": "L44"
+    },
+    {
+      "id": "app_repositories_graph_neo4jadapter_connect",
+      "label": ".connect()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 63,
+      "community_name": "streamlit_app.py",
+      "file_type": "code",
+      "norm_label": ".connect()",
+      "source_file": "app/repositories/graph.py",
+      "source_location": "L37"
+    },
+    {
+      "id": "app_repositories_graph_neo4jadapter_init",
+      "label": ".__init__()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 63,
+      "community_name": "streamlit_app.py",
+      "file_type": "code",
+      "norm_label": ".__init__()",
+      "source_file": "app/repositories/graph.py",
+      "source_location": "L31"
+    },
+    {
+      "id": "app_services_web_search_websearchtool_init",
+      "label": ".__init__()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 63,
+      "community_name": "streamlit_app.py",
+      "file_type": "code",
+      "norm_label": ".__init__()",
+      "source_file": "app/services/web_search.py",
+      "source_location": "L12"
+    },
+    {
+      "id": "app_services_web_search_websearchtool_search",
+      "label": ".search()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 63,
+      "community_name": "streamlit_app.py",
+      "file_type": "code",
+      "norm_label": ".search()",
+      "source_file": "app/services/web_search.py",
+      "source_location": "L20"
     },
     {
       "id": "streamlit_app_create_db_workspace",
@@ -7472,40 +7436,88 @@
       "source_location": "L120"
     },
     {
+      "id": "app_repositories_block_blockrepository_init",
+      "label": ".__init__()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 64,
+      "community_name": "tasks.py",
+      "file_type": "code",
+      "norm_label": ".__init__()",
+      "source_file": "app/repositories/block.py",
+      "source_location": "L7"
+    },
+    {
+      "id": "app_services_chat_context_sanitize_scratchpad_content",
+      "label": "sanitize_scratchpad_content()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 64,
+      "community_name": "tasks.py",
+      "file_type": "code",
+      "norm_label": "sanitize_scratchpad_content()",
+      "source_file": "app/services/chat/context.py",
+      "source_location": "L199"
+    },
+    {
       "id": "app_workers_tasks_get_source_and_snapshot",
       "label": "_get_source_and_snapshot()",
       "_callable": true,
       "_origin": "ast",
       "community": 64,
-      "community_name": "_get_source_and_snapshot",
+      "community_name": "tasks.py",
       "file_type": "code",
       "norm_label": "_get_source_and_snapshot()",
       "source_file": "app/workers/tasks.py",
       "source_location": "L63"
     },
     {
-      "id": "app_workers_tasks_project_to_open_notebook_job",
-      "label": "project_to_open_notebook_job()",
+      "id": "app_workers_tasks_parse_and_chunk_job",
+      "label": "parse_and_chunk_job()",
       "_callable": true,
       "_origin": "ast",
       "community": 64,
-      "community_name": "_get_source_and_snapshot",
+      "community_name": "tasks.py",
       "file_type": "code",
-      "norm_label": "project_to_open_notebook_job()",
+      "norm_label": "parse_and_chunk_job()",
       "source_file": "app/workers/tasks.py",
-      "source_location": "L1021"
+      "source_location": "L86"
     },
     {
-      "id": "app_api_routes_rate_limiter_get_rate_limit_status",
-      "label": "get_rate_limit_status()",
+      "id": "app_repositories_research_researchrepository_batch_create_evidence",
+      "label": ".batch_create_evidence()",
       "_callable": true,
       "_origin": "ast",
       "community": 65,
-      "community_name": "get_rate_limit_status",
+      "community_name": "ResearchEvidence",
       "file_type": "code",
-      "norm_label": "get_rate_limit_status()",
-      "source_file": "app/api/routes/rate_limiter.py",
-      "source_location": "L12"
+      "norm_label": ".batch_create_evidence()",
+      "source_file": "app/repositories/research.py",
+      "source_location": "L119"
+    },
+    {
+      "id": "app_repositories_research_researchrepository_bulk_insert_evidence",
+      "label": "._bulk_insert_evidence()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 65,
+      "community_name": "ResearchEvidence",
+      "file_type": "code",
+      "norm_label": "._bulk_insert_evidence()",
+      "source_file": "app/repositories/research.py",
+      "source_location": "L169"
+    },
+    {
+      "id": "app_repositories_research_researchrepository_get_evidence_by_fingerprints",
+      "label": "._get_evidence_by_fingerprints()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 65,
+      "community_name": "ResearchEvidence",
+      "file_type": "code",
+      "norm_label": "._get_evidence_by_fingerprints()",
+      "source_file": "app/repositories/research.py",
+      "source_location": "L158"
     },
     {
       "id": "app_services_research_retrievers_registry_retrieverregistry_get",
@@ -7542,42 +7554,6 @@
       "norm_label": "get_rate_limit_key()",
       "source_file": "app/api/deps/rate_limit.py",
       "source_location": "L5"
-    },
-    {
-      "id": "app_repositories_episodic_episodicrepository_create_episode",
-      "label": ".create_episode()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "WorkingMemoryState",
-      "file_type": "code",
-      "norm_label": ".create_episode()",
-      "source_file": "app/repositories/episodic.py",
-      "source_location": "L11"
-    },
-    {
-      "id": "app_repositories_episodic_episodicrepository_get_episode_by_run_id",
-      "label": ".get_episode_by_run_id()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "WorkingMemoryState",
-      "file_type": "code",
-      "norm_label": ".get_episode_by_run_id()",
-      "source_file": "app/repositories/episodic.py",
-      "source_location": "L29"
-    },
-    {
-      "id": "app_repositories_episodic_episodicrepository_init",
-      "label": ".__init__()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "WorkingMemoryState",
-      "file_type": "code",
-      "norm_label": ".__init__()",
-      "source_file": "app/repositories/episodic.py",
-      "source_location": "L8"
     },
     {
       "id": "app_services_episodic_episodicmemoryservice_call_llm_with_backpressure",
@@ -7760,16 +7736,40 @@
       "source_location": "L887"
     },
     {
-      "id": "app_services_research_service_researchservice_promote_memory_candidates",
-      "label": ".promote_memory_candidates()",
+      "id": "app_repositories_episodic_episodicrepository_create_episode",
+      "label": ".create_episode()",
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "KnowledgeMemoryCreate",
+      "community_name": "EpisodicMemory",
       "file_type": "code",
-      "norm_label": ".promote_memory_candidates()",
-      "source_file": "app/services/research/service.py",
+      "norm_label": ".create_episode()",
+      "source_file": "app/repositories/episodic.py",
+      "source_location": "L11"
+    },
+    {
+      "id": "app_repositories_episodic_episodicrepository_get_episode_by_run_id",
+      "label": ".get_episode_by_run_id()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "EpisodicMemory",
+      "file_type": "code",
+      "norm_label": ".get_episode_by_run_id()",
+      "source_file": "app/repositories/episodic.py",
       "source_location": "L29"
+    },
+    {
+      "id": "app_repositories_episodic_episodicrepository_init",
+      "label": ".__init__()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "EpisodicMemory",
+      "file_type": "code",
+      "norm_label": ".__init__()",
+      "source_file": "app/repositories/episodic.py",
+      "source_location": "L8"
     },
     {
       "id": "app_repositories_block",
@@ -8465,6 +8465,28 @@
       "source_location": ""
     },
     {
+      "id": "app_schemas_knowledge",
+      "label": "schemas/knowledge.py",
+      "_origin": "ast",
+      "community": 12,
+      "community_name": "chat/context.py",
+      "file_type": "code",
+      "norm_label": "schemas/knowledge.py",
+      "source_file": "app/schemas/knowledge.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "app_schemas_knowledge_py_basemodel",
+      "label": "BaseModel",
+      "_origin": "ast",
+      "community": 12,
+      "community_name": "chat/context.py",
+      "file_type": "code",
+      "norm_label": "basemodel",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
       "id": "app_services_chat_context",
       "label": "chat/context.py",
       "_origin": "ast",
@@ -8707,6 +8729,17 @@
       "source_location": "L139"
     },
     {
+      "id": "app_services_memory_router_rationale_21",
+      "label": "Central memory and context router. Cleanly separates write routing, policy\u2026",
+      "_origin": "ast",
+      "community": 12,
+      "community_name": "chat/context.py",
+      "file_type": "rationale",
+      "norm_label": "central memory and context router. cleanly separates write routing, policy...",
+      "source_file": "app/services/memory_router.py",
+      "source_location": "L21"
+    },
+    {
       "id": "app_services_memory_router_rationale_42",
       "label": "Intercepts memory pushes, enforcing policy boundaries before persisting. Ground\u2026",
       "_origin": "ast",
@@ -8740,6 +8773,28 @@
       "source_location": "L98"
     },
     {
+      "id": "app_services_research_service_rationale_14",
+      "label": "Central coordinator for Research Engine Phase 2. Implements explicit promotion\u2026",
+      "_origin": "ast",
+      "community": 12,
+      "community_name": "chat/context.py",
+      "file_type": "rationale",
+      "norm_label": "central coordinator for research engine phase 2. implements explicit promotion...",
+      "source_file": "app/services/research/service.py",
+      "source_location": "L14"
+    },
+    {
+      "id": "app_services_research_service_rationale_30",
+      "label": "Finds all ResearchArtifacts for a given run with type='memory_candidate' and\u2026",
+      "_origin": "ast",
+      "community": 12,
+      "community_name": "chat/context.py",
+      "file_type": "rationale",
+      "norm_label": "finds all researchartifacts for a given run with type='memory_candidate' and...",
+      "source_file": "app/services/research/service.py",
+      "source_location": "L30"
+    },
+    {
       "id": "app_workers_tasks_rationale_267",
       "label": "Background job: synchronizes a KnowledgeMemory row from Postgres to the Neo4j\u2026",
       "_origin": "ast",
@@ -8755,7 +8810,7 @@
       "label": "client.py",
       "_origin": "ast",
       "community": 13,
-      "community_name": "client.py",
+      "community_name": "main.py",
       "file_type": "code",
       "norm_label": "client.py",
       "source_file": "app/integrations/open_notebook/client.py",
@@ -8766,7 +8821,7 @@
       "label": "Enum",
       "_origin": "ast",
       "community": 13,
-      "community_name": "client.py",
+      "community_name": "main.py",
       "file_type": "code",
       "norm_label": "enum",
       "source_file": "",
@@ -8777,7 +8832,7 @@
       "label": "open_notebook/config.py",
       "_origin": "ast",
       "community": 13,
-      "community_name": "client.py",
+      "community_name": "main.py",
       "file_type": "code",
       "norm_label": "open_notebook/config.py",
       "source_file": "app/integrations/open_notebook/config.py",
@@ -8788,18 +8843,40 @@
       "label": "health.py",
       "_origin": "ast",
       "community": 13,
-      "community_name": "client.py",
+      "community_name": "main.py",
       "file_type": "code",
       "norm_label": "health.py",
       "source_file": "app/integrations/open_notebook/health.py",
       "source_location": "L1"
     },
     {
+      "id": "app_main",
+      "label": "main.py",
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "main.py",
+      "file_type": "code",
+      "norm_label": "main.py",
+      "source_file": "app/main.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "app_main_py_get",
+      "label": "get",
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "main.py",
+      "file_type": "code",
+      "norm_label": "get",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
       "id": "asyncclient",
       "label": "AsyncClient",
       "_origin": "ast",
       "community": 13,
-      "community_name": "client.py",
+      "community_name": "main.py",
       "file_type": "code",
       "norm_label": "asyncclient",
       "source_file": "",
@@ -8810,7 +8887,7 @@
       "label": "Get the default HTTP timeout for Open Notebook requests.",
       "_origin": "ast",
       "community": 13,
-      "community_name": "client.py",
+      "community_name": "main.py",
       "file_type": "rationale",
       "norm_label": "get the default http timeout for open notebook requests.",
       "source_file": "app/integrations/open_notebook/config.py",
@@ -8821,7 +8898,7 @@
       "label": "Check if the Open Notebook Ground Engine is enabled.",
       "_origin": "ast",
       "community": 13,
-      "community_name": "client.py",
+      "community_name": "main.py",
       "file_type": "rationale",
       "norm_label": "check if the open notebook ground engine is enabled.",
       "source_file": "app/integrations/open_notebook/config.py",
@@ -8832,7 +8909,7 @@
       "label": "Get the base URL for the Open Notebook API.",
       "_origin": "ast",
       "community": 13,
-      "community_name": "client.py",
+      "community_name": "main.py",
       "file_type": "rationale",
       "norm_label": "get the base url for the open notebook api.",
       "source_file": "app/integrations/open_notebook/config.py",
@@ -8843,14 +8920,36 @@
       "label": "Check if the Open Notebook Ground Engine is reachable and healthy. Returns:\u2026",
       "_origin": "ast",
       "community": 13,
-      "community_name": "client.py",
+      "community_name": "main.py",
       "file_type": "rationale",
       "norm_label": "check if the open notebook ground engine is reachable and healthy. returns:...",
       "source_file": "app/integrations/open_notebook/health.py",
       "source_location": "L8"
     },
     {
+      "id": "app_main_rationale_151",
+      "label": "Deep health check verifying Postgres and Neo4j connectivity.",
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "main.py",
+      "file_type": "rationale",
+      "norm_label": "deep health check verifying postgres and neo4j connectivity.",
+      "source_file": "app/main.py",
+      "source_location": "L151"
+    },
+    {
       "id": "app_integrations_open_notebook_client_py_any",
+      "label": "Any",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "OpenNotebookClient",
+      "file_type": "code",
+      "norm_label": "any",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "app_workers_tasks_py_any",
       "label": "Any",
       "_origin": "ast",
       "community": 14,
@@ -8914,6 +9013,50 @@
       "norm_label": "http client for communicating with the open notebook api. establishes the...",
       "source_file": "app/integrations/open_notebook/client.py",
       "source_location": "L87"
+    },
+    {
+      "id": "app_workers_tasks_rationale_1028",
+      "label": "Background job: Projects a new source snapshot to Open Notebook.",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "OpenNotebookClient",
+      "file_type": "rationale",
+      "norm_label": "background job: projects a new source snapshot to open notebook.",
+      "source_file": "app/workers/tasks.py",
+      "source_location": "L1028"
+    },
+    {
+      "id": "app_workers_tasks_rationale_1139",
+      "label": "Background job: Processes a DeletionTombstone against Open Notebook.",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "OpenNotebookClient",
+      "file_type": "rationale",
+      "norm_label": "background job: processes a deletiontombstone against open notebook.",
+      "source_file": "app/workers/tasks.py",
+      "source_location": "L1139"
+    },
+    {
+      "id": "app_workers_tasks_rationale_1209",
+      "label": "Compatibility job: deletes open notebook source binding if present.",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "OpenNotebookClient",
+      "file_type": "rationale",
+      "norm_label": "compatibility job: deletes open notebook source binding if present.",
+      "source_file": "app/workers/tasks.py",
+      "source_location": "L1209"
+    },
+    {
+      "id": "app_workers_tasks_rationale_1222",
+      "label": "Compatibility job: deletes open notebook workspace binding if present.",
+      "_origin": "ast",
+      "community": 14,
+      "community_name": "OpenNotebookClient",
+      "file_type": "rationale",
+      "norm_label": "compatibility job: deletes open notebook workspace binding if present.",
+      "source_file": "app/workers/tasks.py",
+      "source_location": "L1222"
     },
     {
       "id": "app_models_conversation",
@@ -9664,7 +9807,7 @@
       "source_location": "L11"
     },
     {
-      "id": "app_integrations_research_engine_open_deep_research_engine_rationale_370",
+      "id": "app_integrations_research_engine_open_deep_research_engine_rationale_371",
       "label": "Formats a canonical ResearchContext snapshot (as produced by\u2026",
       "_origin": "ast",
       "community": 18,
@@ -9672,7 +9815,7 @@
       "file_type": "rationale",
       "norm_label": "formats a canonical researchcontext snapshot (as produced by...",
       "source_file": "app/integrations/research_engine/open_deep_research/engine.py",
-      "source_location": "L370"
+      "source_location": "L371"
     },
     {
       "id": "app_integrations_research_engine_open_deep_research_engine_rationale_42",
@@ -9686,7 +9829,7 @@
       "source_location": "L42"
     },
     {
-      "id": "app_integrations_research_engine_open_deep_research_engine_rationale_501",
+      "id": "app_integrations_research_engine_open_deep_research_engine_rationale_502",
       "label": "Trigger cooperative cancellation of the running execution.",
       "_origin": "ast",
       "community": 18,
@@ -9694,14 +9837,58 @@
       "file_type": "rationale",
       "norm_label": "trigger cooperative cancellation of the running execution.",
       "source_file": "app/integrations/research_engine/open_deep_research/engine.py",
-      "source_location": "L501"
+      "source_location": "L502"
+    },
+    {
+      "id": "app_models_block",
+      "label": "models/block.py",
+      "_origin": "ast",
+      "community": 19,
+      "community_name": "derivation.py",
+      "file_type": "code",
+      "norm_label": "models/block.py",
+      "source_file": "app/models/block.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "app_models_block_py_base",
+      "label": "Base",
+      "_origin": "ast",
+      "community": 19,
+      "community_name": "derivation.py",
+      "file_type": "code",
+      "norm_label": "base",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "app_services_research_derivation",
+      "label": "derivation.py",
+      "_origin": "ast",
+      "community": 19,
+      "community_name": "derivation.py",
+      "file_type": "code",
+      "norm_label": "derivation.py",
+      "source_file": "app/services/research/derivation.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "app_services_research_derivation_py_asyncsession",
+      "label": "AsyncSession",
+      "_origin": "ast",
+      "community": 19,
+      "community_name": "derivation.py",
+      "file_type": "code",
+      "norm_label": "asyncsession",
+      "source_file": "",
+      "source_location": ""
     },
     {
       "id": "app_services_research_verification",
       "label": "verification.py",
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "code",
       "norm_label": "verification.py",
       "source_file": "app/services/research/verification.py",
@@ -9712,7 +9899,7 @@
       "label": "Any",
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "code",
       "norm_label": "any",
       "source_file": "",
@@ -9723,7 +9910,7 @@
       "label": "BaseModel",
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "code",
       "norm_label": "basemodel",
       "source_file": "",
@@ -9734,7 +9921,7 @@
       "label": "Exception",
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "code",
       "norm_label": "exception",
       "source_file": "",
@@ -9745,18 +9932,29 @@
       "label": "AST",
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "code",
       "norm_label": "ast",
       "source_file": "",
       "source_location": ""
     },
     {
+      "id": "app_services_research_derivation_rationale_21",
+      "label": "Normalizes candidate outputs and enforces fail-closed multi-tenant provenance\u2026",
+      "_origin": "ast",
+      "community": 19,
+      "community_name": "derivation.py",
+      "file_type": "rationale",
+      "norm_label": "normalizes candidate outputs and enforces fail-closed multi-tenant provenance...",
+      "source_file": "app/services/research/derivation.py",
+      "source_location": "L21"
+    },
+    {
       "id": "app_services_research_verification_rationale_17",
       "label": "Raised when an expression violates safety rules, resource limits, or arithmetic\u2026",
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "rationale",
       "norm_label": "raised when an expression violates safety rules, resource limits, or arithmetic...",
       "source_file": "app/services/research/verification.py",
@@ -9767,7 +9965,7 @@
       "label": "Evaluates an arithmetic expression and compares the computed value against an\u2026",
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "rationale",
       "norm_label": "evaluates an arithmetic expression and compares the computed value against an...",
       "source_file": "app/services/research/verification.py",
@@ -9778,7 +9976,7 @@
       "label": "Inspects candidate payload for derivation metadata and runs deterministic\u2026",
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "rationale",
       "norm_label": "inspects candidate payload for derivation metadata and runs deterministic...",
       "source_file": "app/services/research/verification.py",
@@ -9789,7 +9987,7 @@
       "label": "Calculates percentage change from a to b: ((b - a) / a) * 100.",
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "rationale",
       "norm_label": "calculates percentage change from a to b: ((b - a) / a) * 100.",
       "source_file": "app/services/research/verification.py",
@@ -9800,11 +9998,22 @@
       "label": "Sandboxed AST-based deterministic arithmetic evaluator. Enforces strict\u2026",
       "_origin": "ast",
       "community": 19,
-      "community_name": "verification.py",
+      "community_name": "derivation.py",
       "file_type": "rationale",
       "norm_label": "sandboxed ast-based deterministic arithmetic evaluator. enforces strict...",
       "source_file": "app/services/research/verification.py",
       "source_location": "L44"
+    },
+    {
+      "id": "app_workers_tasks_rationale_352",
+      "label": "Background job: Runs the ResearchEngine and streams events to Redis.",
+      "_origin": "ast",
+      "community": 19,
+      "community_name": "derivation.py",
+      "file_type": "rationale",
+      "norm_label": "background job: runs the researchengine and streams events to redis.",
+      "source_file": "app/workers/tasks.py",
+      "source_location": "L352"
     },
     {
       "id": "app_integrations_open_notebook_citation_mapper",
@@ -10291,17 +10500,6 @@
       "source_location": "L1"
     },
     {
-      "id": "app_models_workspace",
-      "label": "models/workspace.py",
-      "_origin": "ast",
-      "community": 22,
-      "community_name": "database.py",
-      "file_type": "code",
-      "norm_label": "models/workspace.py",
-      "source_file": "app/models/workspace.py",
-      "source_location": "L1"
-    },
-    {
       "id": "app_services_ground_factory",
       "label": "ground/factory.py",
       "_origin": "ast",
@@ -10313,17 +10511,6 @@
       "source_location": "L1"
     },
     {
-      "id": "app_services_ground_factory_py_any",
-      "label": "Any",
-      "_origin": "ast",
-      "community": 22,
-      "community_name": "database.py",
-      "file_type": "code",
-      "norm_label": "any",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
       "id": "app_services_ground_factory_py_request",
       "label": "Request",
       "_origin": "ast",
@@ -10331,17 +10518,6 @@
       "community_name": "database.py",
       "file_type": "code",
       "norm_label": "request",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "app_services_ground_factory_py_uuid",
-      "label": "UUID",
-      "_origin": "ast",
-      "community": 22,
-      "community_name": "database.py",
-      "file_type": "code",
-      "norm_label": "uuid",
       "source_file": "",
       "source_location": ""
     },
@@ -10401,28 +10577,6 @@
       "source_location": "L29"
     },
     {
-      "id": "app_models_block",
-      "label": "models/block.py",
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "ResearchRun",
-      "file_type": "code",
-      "norm_label": "models/block.py",
-      "source_file": "app/models/block.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "app_models_block_py_base",
-      "label": "Base",
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "ResearchRun",
-      "file_type": "code",
-      "norm_label": "base",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
       "id": "app_models_init",
       "label": "models/__init__.py",
       "_origin": "ast",
@@ -10431,17 +10585,6 @@
       "file_type": "code",
       "norm_label": "models/__init__.py",
       "source_file": "app/models/__init__.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "app_models_knowledge",
-      "label": "models/knowledge.py",
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "ResearchRun",
-      "file_type": "code",
-      "norm_label": "models/knowledge.py",
-      "source_file": "app/models/knowledge.py",
       "source_location": "L1"
     },
     {
@@ -10478,17 +10621,6 @@
       "source_location": "L1"
     },
     {
-      "id": "app_services_research_derivation",
-      "label": "derivation.py",
-      "_origin": "ast",
-      "community": 23,
-      "community_name": "ResearchRun",
-      "file_type": "code",
-      "norm_label": "derivation.py",
-      "source_file": "app/services/research/derivation.py",
-      "source_location": "L1"
-    },
-    {
       "id": "app_services_research_lifecycle",
       "label": "lifecycle.py",
       "_origin": "ast",
@@ -10497,6 +10629,17 @@
       "file_type": "code",
       "norm_label": "lifecycle.py",
       "source_file": "app/services/research/lifecycle.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "app_services_research_metrics",
+      "label": "research/metrics.py",
+      "_origin": "ast",
+      "community": 23,
+      "community_name": "ResearchRun",
+      "file_type": "code",
+      "norm_label": "research/metrics.py",
+      "source_file": "app/services/research/metrics.py",
       "source_location": "L1"
     },
     {
@@ -10841,17 +10984,6 @@
       "source_location": "L1"
     },
     {
-      "id": "app_orchestration_research_mode_py_any",
-      "label": "Any",
-      "_origin": "ast",
-      "community": 25,
-      "community_name": "ResearchModeOrchestrator",
-      "file_type": "code",
-      "norm_label": "any",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
       "id": "app_orchestration_research_mode_py_basemodel",
       "label": "BaseModel",
       "_origin": "ast",
@@ -10896,61 +11028,6 @@
       "source_location": ""
     },
     {
-      "id": "app_services_web_search",
-      "label": "web_search.py",
-      "_origin": "ast",
-      "community": 25,
-      "community_name": "ResearchModeOrchestrator",
-      "file_type": "code",
-      "norm_label": "web_search.py",
-      "source_file": "app/services/web_search.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "app_services_web_search_rationale_21",
-      "label": "Executes a search query and returns the results formatted as markdown.",
-      "_origin": "ast",
-      "community": 25,
-      "community_name": "ResearchModeOrchestrator",
-      "file_type": "rationale",
-      "norm_label": "executes a search query and returns the results formatted as markdown.",
-      "source_file": "app/services/web_search.py",
-      "source_location": "L21"
-    },
-    {
-      "id": "app_models_episodic",
-      "label": "models/episodic.py",
-      "_origin": "ast",
-      "community": 26,
-      "community_name": "ValueError",
-      "file_type": "code",
-      "norm_label": "models/episodic.py",
-      "source_file": "app/models/episodic.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "app_models_episodic_py_base",
-      "label": "Base",
-      "_origin": "ast",
-      "community": 26,
-      "community_name": "ValueError",
-      "file_type": "code",
-      "norm_label": "base",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "app_services_export",
-      "label": "export.py",
-      "_origin": "ast",
-      "community": 26,
-      "community_name": "ValueError",
-      "file_type": "code",
-      "norm_label": "export.py",
-      "source_file": "app/services/export.py",
-      "source_location": "L1"
-    },
-    {
       "id": "app_services_export_py_asyncsession",
       "label": "AsyncSession",
       "_origin": "ast",
@@ -10963,17 +11040,6 @@
     },
     {
       "id": "app_services_export_py_uuid",
-      "label": "UUID",
-      "_origin": "ast",
-      "community": 26,
-      "community_name": "ValueError",
-      "file_type": "code",
-      "norm_label": "uuid",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "app_services_storage_py_uuid",
       "label": "UUID",
       "_origin": "ast",
       "community": 26,
@@ -11015,6 +11081,17 @@
       "norm_label": "valueerror",
       "source_file": "",
       "source_location": ""
+    },
+    {
+      "id": "app_workers_tasks_rationale_974",
+      "label": "Background job: Executes the workspace export using WorkspaceExportService and\u2026",
+      "_origin": "ast",
+      "community": 26,
+      "community_name": "ValueError",
+      "file_type": "rationale",
+      "norm_label": "background job: executes the workspace export using workspaceexportservice and...",
+      "source_file": "app/workers/tasks.py",
+      "source_location": "L974"
     },
     {
       "id": "app_api_routes_chat",
@@ -11230,20 +11307,9 @@
       "label": "Any",
       "_origin": "ast",
       "community": 29,
-      "community_name": "Neo4jAdapter",
+      "community_name": "GraphStore",
       "file_type": "code",
       "norm_label": "any",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "asyncdriver",
-      "label": "AsyncDriver",
-      "_origin": "ast",
-      "community": 29,
-      "community_name": "Neo4jAdapter",
-      "file_type": "code",
-      "norm_label": "asyncdriver",
       "source_file": "",
       "source_location": ""
     },
@@ -11252,22 +11318,11 @@
       "label": "Abstract base class for our operational Knowledge Graph. This hides the\u2026",
       "_origin": "ast",
       "community": 29,
-      "community_name": "Neo4jAdapter",
+      "community_name": "GraphStore",
       "file_type": "rationale",
       "norm_label": "abstract base class for our operational knowledge graph. this hides the...",
       "source_file": "app/repositories/graph.py",
       "source_location": "L12"
-    },
-    {
-      "id": "app_repositories_research_py_any",
-      "label": "Any",
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "ResearchRepository",
-      "file_type": "code",
-      "norm_label": "any",
-      "source_file": "",
-      "source_location": ""
     },
     {
       "id": "app_repositories_research_py_uuid",
@@ -11279,39 +11334,6 @@
       "norm_label": "uuid",
       "source_file": "",
       "source_location": ""
-    },
-    {
-      "id": "app_repositories_research_rationale_126",
-      "label": "Creates multiple evidence records in batches with fingerprint deduplication.",
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "ResearchRepository",
-      "file_type": "rationale",
-      "norm_label": "creates multiple evidence records in batches with fingerprint deduplication.",
-      "source_file": "app/repositories/research.py",
-      "source_location": "L126"
-    },
-    {
-      "id": "app_repositories_research_rationale_159",
-      "label": "Retrieves evidence records by their fingerprints.",
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "ResearchRepository",
-      "file_type": "rationale",
-      "norm_label": "retrieves evidence records by their fingerprints.",
-      "source_file": "app/repositories/research.py",
-      "source_location": "L159"
-    },
-    {
-      "id": "app_repositories_research_rationale_170",
-      "label": "Performs a bulk insert of evidence records.",
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "ResearchRepository",
-      "file_type": "rationale",
-      "norm_label": "performs a bulk insert of evidence records.",
-      "source_file": "app/repositories/research.py",
-      "source_location": "L170"
     },
     {
       "id": "app_repositories_research_rationale_22",
@@ -11356,17 +11378,6 @@
       "norm_label": "records a usage entry for a research run.",
       "source_file": "app/repositories/research.py",
       "source_location": "L436"
-    },
-    {
-      "id": "app_workers_tasks_rationale_352",
-      "label": "Background job: Runs the ResearchEngine and streams events to Redis.",
-      "_origin": "ast",
-      "community": 3,
-      "community_name": "ResearchRepository",
-      "file_type": "rationale",
-      "norm_label": "background job: runs the researchengine and streams events to redis.",
-      "source_file": "app/workers/tasks.py",
-      "source_location": "L352"
     },
     {
       "id": "app_integrations_research_engine_tools_gpt_researcher_tool",
@@ -11512,6 +11523,17 @@
       "source_location": "L6"
     },
     {
+      "id": "app_models_knowledge",
+      "label": "models/knowledge.py",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "Source",
+      "file_type": "code",
+      "norm_label": "models/knowledge.py",
+      "source_file": "app/models/knowledge.py",
+      "source_location": "L1"
+    },
+    {
       "id": "app_models_source",
       "label": "models/source.py",
       "_origin": "ast",
@@ -11532,6 +11554,17 @@
       "norm_label": "base",
       "source_file": "",
       "source_location": ""
+    },
+    {
+      "id": "app_models_workspace",
+      "label": "models/workspace.py",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "Source",
+      "file_type": "code",
+      "norm_label": "models/workspace.py",
+      "source_file": "app/models/workspace.py",
+      "source_location": "L1"
     },
     {
       "id": "app_repositories_source",
@@ -11565,6 +11598,17 @@
       "norm_label": "uuid",
       "source_file": "",
       "source_location": ""
+    },
+    {
+      "id": "app_services_export",
+      "label": "export.py",
+      "_origin": "ast",
+      "community": 31,
+      "community_name": "Source",
+      "file_type": "code",
+      "norm_label": "export.py",
+      "source_file": "app/services/export.py",
+      "source_location": "L1"
     },
     {
       "id": "app_services_quota",
@@ -11653,17 +11697,6 @@
       "norm_label": "manages the mapping of external citations/evidence to canonical workspace...",
       "source_file": "app/services/research/provenance.py",
       "source_location": "L9"
-    },
-    {
-      "id": "app_api_routes_chat_py_arqredis",
-      "label": "ArqRedis",
-      "_origin": "ast",
-      "community": 32,
-      "community_name": "WorkspaceRepository",
-      "file_type": "code",
-      "norm_label": "arqredis",
-      "source_file": "",
-      "source_location": ""
     },
     {
       "id": "app_models_workspace_py_base",
@@ -11853,6 +11886,39 @@
       "source_location": "L1"
     },
     {
+      "id": "app_api_routes_rate_limiter_py_get",
+      "label": "get",
+      "_origin": "ast",
+      "community": 34,
+      "community_name": "FastAPI",
+      "file_type": "code",
+      "norm_label": "get",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "app_api_routes_rate_limiter_py_redis",
+      "label": "Redis",
+      "_origin": "ast",
+      "community": 34,
+      "community_name": "FastAPI",
+      "file_type": "code",
+      "norm_label": "redis",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "app_api_routes_rate_limiter_py_uuid",
+      "label": "UUID",
+      "_origin": "ast",
+      "community": 34,
+      "community_name": "FastAPI",
+      "file_type": "code",
+      "norm_label": "uuid",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
       "id": "fastapi",
       "label": "FastAPI",
       "_origin": "ast",
@@ -11884,6 +11950,17 @@
       "norm_label": "dependency to get the arq redis pool. we lazily initialize the pool and attach...",
       "source_file": "app/api/deps/arq.py",
       "source_location": "L10"
+    },
+    {
+      "id": "app_api_routes_rate_limiter_rationale_16",
+      "label": "Get the current rate limit status for the user.",
+      "_origin": "ast",
+      "community": 34,
+      "community_name": "FastAPI",
+      "file_type": "rationale",
+      "norm_label": "get the current rate limit status for the user.",
+      "source_file": "app/api/routes/rate_limiter.py",
+      "source_location": "L16"
     },
     {
       "id": "app_orchestration_ground_mode",
@@ -11941,28 +12018,6 @@
       "source_location": ""
     },
     {
-      "id": "app_schemas_context",
-      "label": "schemas/context.py",
-      "_origin": "ast",
-      "community": 35,
-      "community_name": "GroundModeOrchestrator",
-      "file_type": "code",
-      "norm_label": "schemas/context.py",
-      "source_file": "app/schemas/context.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "app_schemas_context_py_basemodel",
-      "label": "BaseModel",
-      "_origin": "ast",
-      "community": 35,
-      "community_name": "GroundModeOrchestrator",
-      "file_type": "code",
-      "norm_label": "basemodel",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
       "id": "app_orchestration_ground_mode_rationale_24",
       "label": "Deprecated: Use OpenNotebookGroundEngine instead. This orchestrator handles the\u2026",
       "_origin": "ast",
@@ -11972,17 +12027,6 @@
       "norm_label": "deprecated: use opennotebookgroundengine instead. this orchestrator handles the...",
       "source_file": "app/orchestration/ground_mode.py",
       "source_location": "L24"
-    },
-    {
-      "id": "app_services_memory_router_rationale_114",
-      "label": "Lightweight heuristic context builder for MemoryItem bundles. Preserved for\u2026",
-      "_origin": "ast",
-      "community": 35,
-      "community_name": "GroundModeOrchestrator",
-      "file_type": "rationale",
-      "norm_label": "lightweight heuristic context builder for memoryitem bundles. preserved for...",
-      "source_file": "app/services/memory_router.py",
-      "source_location": "L114"
     },
     {
       "id": "app_integrations_research_engine_upstream_open_deep_research_utils_py_exception",
@@ -12139,57 +12183,13 @@
       "source_location": "L89"
     },
     {
-      "id": "app_api_routes_workspaces_py_arqredis",
+      "id": "app_api_routes_chat_py_arqredis",
       "label": "ArqRedis",
       "_origin": "ast",
       "community": 38,
-      "community_name": "chat_ground_mode",
+      "community_name": "ask_ground_mode",
       "file_type": "code",
       "norm_label": "arqredis",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "app_api_routes_workspaces_py_asyncsession",
-      "label": "AsyncSession",
-      "_origin": "ast",
-      "community": 38,
-      "community_name": "chat_ground_mode",
-      "file_type": "code",
-      "norm_label": "asyncsession",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "app_api_routes_workspaces_py_post",
-      "label": "post",
-      "_origin": "ast",
-      "community": 38,
-      "community_name": "chat_ground_mode",
-      "file_type": "code",
-      "norm_label": "post",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "app_api_routes_workspaces_py_response",
-      "label": "Response",
-      "_origin": "ast",
-      "community": 38,
-      "community_name": "chat_ground_mode",
-      "file_type": "code",
-      "norm_label": "response",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "app_schemas_conversation_py_basemodel",
-      "label": "BaseModel",
-      "_origin": "ast",
-      "community": 38,
-      "community_name": "chat_ground_mode",
-      "file_type": "code",
-      "norm_label": "basemodel",
       "source_file": "",
       "source_location": ""
     },
@@ -12198,7 +12198,7 @@
       "label": "schemas/ground_mode.py",
       "_origin": "ast",
       "community": 38,
-      "community_name": "chat_ground_mode",
+      "community_name": "ask_ground_mode",
       "file_type": "code",
       "norm_label": "schemas/ground_mode.py",
       "source_file": "app/schemas/ground_mode.py",
@@ -12209,9 +12209,20 @@
       "label": "BaseModel",
       "_origin": "ast",
       "community": 38,
-      "community_name": "chat_ground_mode",
+      "community_name": "ask_ground_mode",
       "file_type": "code",
       "norm_label": "basemodel",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "app_services_ground_factory_py_any",
+      "label": "Any",
+      "_origin": "ast",
+      "community": 38,
+      "community_name": "ask_ground_mode",
+      "file_type": "code",
+      "norm_label": "any",
       "source_file": "",
       "source_location": ""
     },
@@ -12220,9 +12231,20 @@
       "label": "Protocol",
       "_origin": "ast",
       "community": 38,
-      "community_name": "chat_ground_mode",
+      "community_name": "ask_ground_mode",
       "file_type": "code",
       "norm_label": "protocol",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "app_services_ground_factory_py_uuid",
+      "label": "UUID",
+      "_origin": "ast",
+      "community": 38,
+      "community_name": "ask_ground_mode",
+      "file_type": "code",
+      "norm_label": "uuid",
       "source_file": "",
       "source_location": ""
     },
@@ -12238,6 +12260,28 @@
       "source_location": "L1"
     },
     {
+      "id": "app_api_routes_workspaces_py_asyncsession",
+      "label": "AsyncSession",
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "asyncsession",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "app_api_routes_workspaces_py_get",
+      "label": "get",
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "get",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
       "id": "app_api_routes_workspaces_py_patch",
       "label": "patch",
       "_origin": "ast",
@@ -12245,6 +12289,39 @@
       "community_name": "workspaces.py",
       "file_type": "code",
       "norm_label": "patch",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "app_api_routes_workspaces_py_post",
+      "label": "post",
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "post",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "app_api_routes_workspaces_py_response",
+      "label": "Response",
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "response",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "app_api_routes_workspaces_py_uuid",
+      "label": "UUID",
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "uuid",
       "source_file": "",
       "source_location": ""
     },
@@ -12260,6 +12337,17 @@
       "source_location": "L1"
     },
     {
+      "id": "app_schemas_conversation_py_basemodel",
+      "label": "BaseModel",
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "workspaces.py",
+      "file_type": "code",
+      "norm_label": "basemodel",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
       "id": "app_schemas_file",
       "label": "file.py",
       "_origin": "ast",
@@ -12272,28 +12360,6 @@
     },
     {
       "id": "app_schemas_file_py_basemodel",
-      "label": "BaseModel",
-      "_origin": "ast",
-      "community": 39,
-      "community_name": "workspaces.py",
-      "file_type": "code",
-      "norm_label": "basemodel",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "app_schemas_source",
-      "label": "schemas/source.py",
-      "_origin": "ast",
-      "community": 39,
-      "community_name": "workspaces.py",
-      "file_type": "code",
-      "norm_label": "schemas/source.py",
-      "source_file": "app/schemas/source.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "app_schemas_source_py_basemodel",
       "label": "BaseModel",
       "_origin": "ast",
       "community": 39,
@@ -12370,17 +12436,6 @@
       "source_location": ""
     },
     {
-      "id": "app_services_research_metrics",
-      "label": "research/metrics.py",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "ResearchMetricsService",
-      "file_type": "code",
-      "norm_label": "research/metrics.py",
-      "source_file": "app/services/research/metrics.py",
-      "source_location": "L1"
-    },
-    {
       "id": "app_services_research_metrics_py_any",
       "label": "Any",
       "_origin": "ast",
@@ -12425,29 +12480,7 @@
       "source_location": "L18"
     },
     {
-      "id": "app_services_research_metrics_rationale_12",
-      "label": "Service to emit structured metrics for research observability. Tracks wait\u2026",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "ResearchMetricsService",
-      "file_type": "rationale",
-      "norm_label": "service to emit structured metrics for research observability. tracks wait...",
-      "source_file": "app/services/research/metrics.py",
-      "source_location": "L12"
-    },
-    {
-      "id": "app_services_research_metrics_rationale_21",
-      "label": "Emits structured metrics for a research run.",
-      "_origin": "ast",
-      "community": 4,
-      "community_name": "ResearchMetricsService",
-      "file_type": "rationale",
-      "norm_label": "emits structured metrics for a research run.",
-      "source_file": "app/services/research/metrics.py",
-      "source_location": "L21"
-    },
-    {
-      "id": "app_services_research_metrics_rationale_56",
+      "id": "app_services_research_metrics_rationale_103",
       "label": "Tracks the time-to-first-event (TTFE) for a research run.",
       "_origin": "ast",
       "community": 4,
@@ -12455,10 +12488,10 @@
       "file_type": "rationale",
       "norm_label": "tracks the time-to-first-event (ttfe) for a research run.",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L56"
+      "source_location": "L103"
     },
     {
-      "id": "app_services_research_metrics_rationale_63",
+      "id": "app_services_research_metrics_rationale_120",
       "label": "Tracks the cost of a research run.",
       "_origin": "ast",
       "community": 4,
@@ -12466,10 +12499,10 @@
       "file_type": "rationale",
       "norm_label": "tracks the cost of a research run.",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L63"
+      "source_location": "L120"
     },
     {
-      "id": "app_services_research_metrics_rationale_70",
+      "id": "app_services_research_metrics_rationale_136",
       "label": "Tracks failures for a research run.",
       "_origin": "ast",
       "community": 4,
@@ -12477,18 +12510,40 @@
       "file_type": "rationale",
       "norm_label": "tracks failures for a research run.",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L70"
+      "source_location": "L136"
     },
     {
-      "id": "app_services_research_metrics_rationale_87",
-      "label": "Retrieves observability dashboard data for a workspace.",
+      "id": "app_services_research_metrics_rationale_153",
+      "label": "Retrieves real observability dashboard data for a workspace.",
       "_origin": "ast",
       "community": 4,
       "community_name": "ResearchMetricsService",
       "file_type": "rationale",
-      "norm_label": "retrieves observability dashboard data for a workspace.",
+      "norm_label": "retrieves real observability dashboard data for a workspace.",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L87"
+      "source_location": "L153"
+    },
+    {
+      "id": "app_services_research_metrics_rationale_17",
+      "label": "Service to emit structured metrics for research observability. Tracks wait\u2026",
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "ResearchMetricsService",
+      "file_type": "rationale",
+      "norm_label": "service to emit structured metrics for research observability. tracks wait...",
+      "source_file": "app/services/research/metrics.py",
+      "source_location": "L17"
+    },
+    {
+      "id": "app_services_research_metrics_rationale_36",
+      "label": "Emits structured metrics with real runtime execution values.",
+      "_origin": "ast",
+      "community": 4,
+      "community_name": "ResearchMetricsService",
+      "file_type": "rationale",
+      "norm_label": "emits structured metrics with real runtime execution values.",
+      "source_file": "app/services/research/metrics.py",
+      "source_location": "L36"
     },
     {
       "id": "app_core_telemetry",
@@ -12656,24 +12711,24 @@
       "source_location": "L56"
     },
     {
+      "id": "app_workers_tasks_rationale_1177",
+      "label": "Periodic task: Sweeps for pending tombstones and enqueues processing.",
+      "_origin": "ast",
+      "community": 41,
+      "community_name": "settings.py",
+      "file_type": "rationale",
+      "norm_label": "periodic task: sweeps for pending tombstones and enqueues processing.",
+      "source_file": "app/workers/tasks.py",
+      "source_location": "L1177"
+    },
+    {
       "id": "app_services_research_derivation_py_any",
       "label": "Any",
       "_origin": "ast",
       "community": 42,
-      "community_name": "DerivationService",
+      "community_name": "ProvenanceRef",
       "file_type": "code",
       "norm_label": "any",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "app_services_research_derivation_py_asyncsession",
-      "label": "AsyncSession",
-      "_origin": "ast",
-      "community": 42,
-      "community_name": "DerivationService",
-      "file_type": "code",
-      "norm_label": "asyncsession",
       "source_file": "",
       "source_location": ""
     },
@@ -12682,7 +12737,7 @@
       "label": "UUID",
       "_origin": "ast",
       "community": 42,
-      "community_name": "DerivationService",
+      "community_name": "ProvenanceRef",
       "file_type": "code",
       "norm_label": "uuid",
       "source_file": "",
@@ -12693,29 +12748,29 @@
       "label": "Validates provenance references, runs deterministic verification if derivations\u2026",
       "_origin": "ast",
       "community": 42,
-      "community_name": "DerivationService",
+      "community_name": "ProvenanceRef",
       "file_type": "rationale",
       "norm_label": "validates provenance references, runs deterministic verification if derivations...",
       "source_file": "app/services/research/derivation.py",
       "source_location": "L167"
     },
     {
-      "id": "app_services_research_derivation_rationale_21",
-      "label": "Normalizes candidate outputs and enforces fail-closed multi-tenant provenance\u2026",
+      "id": "app_services_research_derivation_rationale_34",
+      "label": "Builds a typed ProvenanceBundle from a list of ProvenanceRef items and optional\u2026",
       "_origin": "ast",
       "community": 42,
-      "community_name": "DerivationService",
+      "community_name": "ProvenanceRef",
       "file_type": "rationale",
-      "norm_label": "normalizes candidate outputs and enforces fail-closed multi-tenant provenance...",
+      "norm_label": "builds a typed provenancebundle from a list of provenanceref items and optional...",
       "source_file": "app/services/research/derivation.py",
-      "source_location": "L21"
+      "source_location": "L34"
     },
     {
       "id": "app_services_research_derivation_rationale_53",
       "label": "Strictly validates that every reference in the provenance bundle exists and\u2026",
       "_origin": "ast",
       "community": 42,
-      "community_name": "DerivationService",
+      "community_name": "ProvenanceRef",
       "file_type": "rationale",
       "norm_label": "strictly validates that every reference in the provenance bundle exists and...",
       "source_file": "app/services/research/derivation.py",
@@ -12808,39 +12863,6 @@
       "norm_label": "projects an outputgraph into neo4j. nodes get labels: outputnode, plus their...",
       "source_file": "app/repositories/graph.py",
       "source_location": "L78"
-    },
-    {
-      "id": "app_services_memory_router_rationale_21",
-      "label": "Central memory and context router. Cleanly separates write routing, policy\u2026",
-      "_origin": "ast",
-      "community": 44,
-      "community_name": "research/service.py",
-      "file_type": "rationale",
-      "norm_label": "central memory and context router. cleanly separates write routing, policy...",
-      "source_file": "app/services/memory_router.py",
-      "source_location": "L21"
-    },
-    {
-      "id": "app_services_research_derivation_rationale_34",
-      "label": "Builds a typed ProvenanceBundle from a list of ProvenanceRef items and optional\u2026",
-      "_origin": "ast",
-      "community": 44,
-      "community_name": "research/service.py",
-      "file_type": "rationale",
-      "norm_label": "builds a typed provenancebundle from a list of provenanceref items and optional...",
-      "source_file": "app/services/research/derivation.py",
-      "source_location": "L34"
-    },
-    {
-      "id": "app_services_research_service_rationale_14",
-      "label": "Central coordinator for Research Engine Phase 2. Implements explicit promotion\u2026",
-      "_origin": "ast",
-      "community": 44,
-      "community_name": "research/service.py",
-      "file_type": "rationale",
-      "norm_label": "central coordinator for research engine phase 2. implements explicit promotion...",
-      "source_file": "app/services/research/service.py",
-      "source_location": "L14"
     },
     {
       "id": "app_services_research_service_rationale_76",
@@ -13017,6 +13039,17 @@
       "norm_label": "basesettings",
       "source_file": "",
       "source_location": ""
+    },
+    {
+      "id": "app_core_startup_rationale_12",
+      "label": "Validates infrastructure, checkpointer, and security invariants during\u2026",
+      "_origin": "ast",
+      "community": 47,
+      "community_name": "core/config.py",
+      "file_type": "rationale",
+      "norm_label": "validates infrastructure, checkpointer, and security invariants during...",
+      "source_file": "app/core/startup.py",
+      "source_location": "L12"
     },
     {
       "id": "app_integrations_open_notebook_init_rationale_1",
@@ -13305,13 +13338,13 @@
       "source_location": "L97"
     },
     {
-      "id": "app_api_routes_workspaces_py_get",
-      "label": "get",
+      "id": "app_api_routes_workspaces_py_arqredis",
+      "label": "ArqRedis",
       "_origin": "ast",
       "community": 50,
-      "community_name": "UUID",
+      "community_name": "upload_file_to_workspace",
       "file_type": "code",
-      "norm_label": "get",
+      "norm_label": "arqredis",
       "source_file": "",
       "source_location": ""
     },
@@ -13320,20 +13353,9 @@
       "label": "Request",
       "_origin": "ast",
       "community": 50,
-      "community_name": "UUID",
+      "community_name": "upload_file_to_workspace",
       "file_type": "code",
       "norm_label": "request",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "app_api_routes_workspaces_py_uuid",
-      "label": "UUID",
-      "_origin": "ast",
-      "community": 50,
-      "community_name": "UUID",
-      "file_type": "code",
-      "norm_label": "uuid",
       "source_file": "",
       "source_location": ""
     },
@@ -13342,7 +13364,7 @@
       "label": "delete",
       "_origin": "ast",
       "community": 50,
-      "community_name": "UUID",
+      "community_name": "upload_file_to_workspace",
       "file_type": "code",
       "norm_label": "delete",
       "source_file": "",
@@ -13353,7 +13375,7 @@
       "label": "limit",
       "_origin": "ast",
       "community": 50,
-      "community_name": "UUID",
+      "community_name": "upload_file_to_workspace",
       "file_type": "code",
       "norm_label": "limit",
       "source_file": "",
@@ -13364,7 +13386,7 @@
       "label": "UploadFile",
       "_origin": "ast",
       "community": 50,
-      "community_name": "UUID",
+      "community_name": "upload_file_to_workspace",
       "file_type": "code",
       "norm_label": "uploadfile",
       "source_file": "",
@@ -13382,33 +13404,11 @@
       "source_location": "L1"
     },
     {
-      "id": "app_main",
-      "label": "main.py",
-      "_origin": "ast",
-      "community": 52,
-      "community_name": "main.py",
-      "file_type": "code",
-      "norm_label": "main.py",
-      "source_file": "app/main.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "app_main_py_get",
-      "label": "get",
-      "_origin": "ast",
-      "community": 52,
-      "community_name": "main.py",
-      "file_type": "code",
-      "norm_label": "get",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
       "id": "app_main_py_request",
       "label": "Request",
       "_origin": "ast",
       "community": 52,
-      "community_name": "main.py",
+      "community_name": "Request",
       "file_type": "code",
       "norm_label": "request",
       "source_file": "",
@@ -13419,33 +13419,11 @@
       "label": "BaseHTTPMiddleware",
       "_origin": "ast",
       "community": 52,
-      "community_name": "main.py",
+      "community_name": "Request",
       "file_type": "code",
       "norm_label": "basehttpmiddleware",
       "source_file": "",
       "source_location": ""
-    },
-    {
-      "id": "app_core_startup_rationale_12",
-      "label": "Validates infrastructure, checkpointer, and security invariants during\u2026",
-      "_origin": "ast",
-      "community": 52,
-      "community_name": "main.py",
-      "file_type": "rationale",
-      "norm_label": "validates infrastructure, checkpointer, and security invariants during...",
-      "source_file": "app/core/startup.py",
-      "source_location": "L12"
-    },
-    {
-      "id": "app_main_rationale_151",
-      "label": "Deep health check verifying Postgres and Neo4j connectivity.",
-      "_origin": "ast",
-      "community": 52,
-      "community_name": "main.py",
-      "file_type": "rationale",
-      "norm_label": "deep health check verifying postgres and neo4j connectivity.",
-      "source_file": "app/main.py",
-      "source_location": "L151"
     },
     {
       "id": "app_api_routes_jobs_py_arqredis",
@@ -13657,70 +13635,48 @@
       "source_location": "L46"
     },
     {
-      "id": "app_workers_tasks_py_any",
+      "id": "app_orchestration_research_mode_py_any",
       "label": "Any",
       "_origin": "ast",
       "community": 58,
-      "community_name": "Any",
+      "community_name": "MemoryRouterService",
       "file_type": "code",
       "norm_label": "any",
       "source_file": "",
       "source_location": ""
     },
     {
-      "id": "app_workers_tasks_rationale_1139",
-      "label": "Background job: Processes a DeletionTombstone against Open Notebook.",
+      "id": "app_schemas_context",
+      "label": "schemas/context.py",
       "_origin": "ast",
       "community": 58,
-      "community_name": "Any",
-      "file_type": "rationale",
-      "norm_label": "background job: processes a deletiontombstone against open notebook.",
-      "source_file": "app/workers/tasks.py",
-      "source_location": "L1139"
+      "community_name": "MemoryRouterService",
+      "file_type": "code",
+      "norm_label": "schemas/context.py",
+      "source_file": "app/schemas/context.py",
+      "source_location": "L1"
     },
     {
-      "id": "app_workers_tasks_rationale_1177",
-      "label": "Periodic task: Sweeps for pending tombstones and enqueues processing.",
+      "id": "app_schemas_context_py_basemodel",
+      "label": "BaseModel",
       "_origin": "ast",
       "community": 58,
-      "community_name": "Any",
-      "file_type": "rationale",
-      "norm_label": "periodic task: sweeps for pending tombstones and enqueues processing.",
-      "source_file": "app/workers/tasks.py",
-      "source_location": "L1177"
+      "community_name": "MemoryRouterService",
+      "file_type": "code",
+      "norm_label": "basemodel",
+      "source_file": "",
+      "source_location": ""
     },
     {
-      "id": "app_workers_tasks_rationale_1209",
-      "label": "Compatibility job: deletes open notebook source binding if present.",
+      "id": "app_services_memory_router_rationale_114",
+      "label": "Lightweight heuristic context builder for MemoryItem bundles. Preserved for\u2026",
       "_origin": "ast",
       "community": 58,
-      "community_name": "Any",
+      "community_name": "MemoryRouterService",
       "file_type": "rationale",
-      "norm_label": "compatibility job: deletes open notebook source binding if present.",
-      "source_file": "app/workers/tasks.py",
-      "source_location": "L1209"
-    },
-    {
-      "id": "app_workers_tasks_rationale_1222",
-      "label": "Compatibility job: deletes open notebook workspace binding if present.",
-      "_origin": "ast",
-      "community": 58,
-      "community_name": "Any",
-      "file_type": "rationale",
-      "norm_label": "compatibility job: deletes open notebook workspace binding if present.",
-      "source_file": "app/workers/tasks.py",
-      "source_location": "L1222"
-    },
-    {
-      "id": "app_workers_tasks_rationale_974",
-      "label": "Background job: Executes the workspace export using WorkspaceExportService and\u2026",
-      "_origin": "ast",
-      "community": 58,
-      "community_name": "Any",
-      "file_type": "rationale",
-      "norm_label": "background job: executes the workspace export using workspaceexportservice and...",
-      "source_file": "app/workers/tasks.py",
-      "source_location": "L974"
+      "norm_label": "lightweight heuristic context builder for memoryitem bundles. preserved for...",
+      "source_file": "app/services/memory_router.py",
+      "source_location": "L114"
     },
     {
       "id": "app_services_research_retrievers_academic",
@@ -14075,22 +14031,11 @@
       "source_location": "L128"
     },
     {
-      "id": "app_repositories_block_py_asyncsession",
-      "label": "AsyncSession",
-      "_origin": "ast",
-      "community": 62,
-      "community_name": "tasks.py",
-      "file_type": "code",
-      "norm_label": "asyncsession",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
       "id": "app_services_parsing",
       "label": "parsing.py",
       "_origin": "ast",
       "community": 62,
-      "community_name": "tasks.py",
+      "community_name": "ObjectStoreProtocol",
       "file_type": "code",
       "norm_label": "parsing.py",
       "source_file": "app/services/parsing.py",
@@ -14101,7 +14046,7 @@
       "label": "Any",
       "_origin": "ast",
       "community": 62,
-      "community_name": "tasks.py",
+      "community_name": "ObjectStoreProtocol",
       "file_type": "code",
       "norm_label": "any",
       "source_file": "",
@@ -14112,7 +14057,7 @@
       "label": "storage.py",
       "_origin": "ast",
       "community": 62,
-      "community_name": "tasks.py",
+      "community_name": "ObjectStoreProtocol",
       "file_type": "code",
       "norm_label": "storage.py",
       "source_file": "app/services/storage.py",
@@ -14123,7 +14068,7 @@
       "label": "Protocol",
       "_origin": "ast",
       "community": 62,
-      "community_name": "tasks.py",
+      "community_name": "ObjectStoreProtocol",
       "file_type": "code",
       "norm_label": "protocol",
       "source_file": "",
@@ -14134,40 +14079,29 @@
       "label": "Request",
       "_origin": "ast",
       "community": 62,
-      "community_name": "tasks.py",
+      "community_name": "ObjectStoreProtocol",
       "file_type": "code",
       "norm_label": "request",
       "source_file": "",
       "source_location": ""
     },
     {
-      "id": "app_workers_tasks",
-      "label": "tasks.py",
+      "id": "app_services_storage_py_uuid",
+      "label": "UUID",
       "_origin": "ast",
       "community": 62,
-      "community_name": "tasks.py",
+      "community_name": "ObjectStoreProtocol",
       "file_type": "code",
-      "norm_label": "tasks.py",
-      "source_file": "app/workers/tasks.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "app_services_chat_context_rationale_200",
-      "label": "Validates and sanitizes structured scratchpad content. Strictly prohibits raw\u2026",
-      "_origin": "ast",
-      "community": 62,
-      "community_name": "tasks.py",
-      "file_type": "rationale",
-      "norm_label": "validates and sanitizes structured scratchpad content. strictly prohibits raw...",
-      "source_file": "app/services/chat/context.py",
-      "source_location": "L200"
+      "norm_label": "uuid",
+      "source_file": "",
+      "source_location": ""
     },
     {
       "id": "app_services_parsing_rationale_16",
       "label": "Downloads a document from Object Storage and parses it using docling. Returns a\u2026",
       "_origin": "ast",
       "community": 62,
-      "community_name": "tasks.py",
+      "community_name": "ObjectStoreProtocol",
       "file_type": "rationale",
       "norm_label": "downloads a document from object storage and parses it using docling. returns a...",
       "source_file": "app/services/parsing.py",
@@ -14178,33 +14112,33 @@
       "label": "Dependency to provide shared S3ObjectStore from app state.",
       "_origin": "ast",
       "community": 62,
-      "community_name": "tasks.py",
+      "community_name": "ObjectStoreProtocol",
       "file_type": "rationale",
       "norm_label": "dependency to provide shared s3objectstore from app state.",
       "source_file": "app/services/storage.py",
       "source_location": "L63"
     },
     {
-      "id": "app_workers_tasks_rationale_1",
-      "label": "Background job functions executed by the arq worker. Design rules: - Every job\u2026",
+      "id": "app_services_web_search",
+      "label": "web_search.py",
       "_origin": "ast",
-      "community": 62,
-      "community_name": "tasks.py",
-      "file_type": "rationale",
-      "norm_label": "background job functions executed by the arq worker. design rules: - every job...",
-      "source_file": "app/workers/tasks.py",
+      "community": 63,
+      "community_name": "streamlit_app.py",
+      "file_type": "code",
+      "norm_label": "web_search.py",
+      "source_file": "app/services/web_search.py",
       "source_location": "L1"
     },
     {
-      "id": "app_workers_tasks_rationale_93",
-      "label": "Background job: download from S3, parse with Docling, chunk, bulk-insert\u2026",
+      "id": "asyncdriver",
+      "label": "AsyncDriver",
       "_origin": "ast",
-      "community": 62,
-      "community_name": "tasks.py",
-      "file_type": "rationale",
-      "norm_label": "background job: download from s3, parse with docling, chunk, bulk-insert...",
-      "source_file": "app/workers/tasks.py",
-      "source_location": "L93"
+      "community": 63,
+      "community_name": "streamlit_app.py",
+      "file_type": "code",
+      "norm_label": "asyncdriver",
+      "source_file": "",
+      "source_location": ""
     },
     {
       "id": "streamlit_app",
@@ -14218,11 +14152,44 @@
       "source_location": "L1"
     },
     {
+      "id": "app_services_web_search_rationale_21",
+      "label": "Executes a search query and returns the results formatted as markdown.",
+      "_origin": "ast",
+      "community": 63,
+      "community_name": "streamlit_app.py",
+      "file_type": "rationale",
+      "norm_label": "executes a search query and returns the results formatted as markdown.",
+      "source_file": "app/services/web_search.py",
+      "source_location": "L21"
+    },
+    {
+      "id": "app_repositories_block_py_asyncsession",
+      "label": "AsyncSession",
+      "_origin": "ast",
+      "community": 64,
+      "community_name": "tasks.py",
+      "file_type": "code",
+      "norm_label": "asyncsession",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "app_workers_tasks",
+      "label": "tasks.py",
+      "_origin": "ast",
+      "community": 64,
+      "community_name": "tasks.py",
+      "file_type": "code",
+      "norm_label": "tasks.py",
+      "source_file": "app/workers/tasks.py",
+      "source_location": "L1"
+    },
+    {
       "id": "app_workers_tasks_py_asyncsession",
       "label": "AsyncSession",
       "_origin": "ast",
       "community": 64,
-      "community_name": "_get_source_and_snapshot",
+      "community_name": "tasks.py",
       "file_type": "code",
       "norm_label": "asyncsession",
       "source_file": "",
@@ -14233,77 +14200,99 @@
       "label": "UUID",
       "_origin": "ast",
       "community": 64,
-      "community_name": "_get_source_and_snapshot",
+      "community_name": "tasks.py",
       "file_type": "code",
       "norm_label": "uuid",
       "source_file": "",
       "source_location": ""
     },
     {
-      "id": "app_workers_tasks_rationale_1028",
-      "label": "Background job: Projects a new source snapshot to Open Notebook.",
+      "id": "app_services_chat_context_rationale_200",
+      "label": "Validates and sanitizes structured scratchpad content. Strictly prohibits raw\u2026",
       "_origin": "ast",
       "community": 64,
-      "community_name": "_get_source_and_snapshot",
+      "community_name": "tasks.py",
       "file_type": "rationale",
-      "norm_label": "background job: projects a new source snapshot to open notebook.",
+      "norm_label": "validates and sanitizes structured scratchpad content. strictly prohibits raw...",
+      "source_file": "app/services/chat/context.py",
+      "source_location": "L200"
+    },
+    {
+      "id": "app_workers_tasks_rationale_1",
+      "label": "Background job functions executed by the arq worker. Design rules: - Every job\u2026",
+      "_origin": "ast",
+      "community": 64,
+      "community_name": "tasks.py",
+      "file_type": "rationale",
+      "norm_label": "background job functions executed by the arq worker. design rules: - every job...",
       "source_file": "app/workers/tasks.py",
-      "source_location": "L1028"
+      "source_location": "L1"
     },
     {
       "id": "app_workers_tasks_rationale_66",
       "label": "Load the source + its first snapshot in a single query.",
       "_origin": "ast",
       "community": 64,
-      "community_name": "_get_source_and_snapshot",
+      "community_name": "tasks.py",
       "file_type": "rationale",
       "norm_label": "load the source + its first snapshot in a single query.",
       "source_file": "app/workers/tasks.py",
       "source_location": "L66"
     },
     {
-      "id": "app_api_routes_rate_limiter_py_get",
-      "label": "get",
+      "id": "app_workers_tasks_rationale_93",
+      "label": "Background job: download from S3, parse with Docling, chunk, bulk-insert\u2026",
       "_origin": "ast",
-      "community": 65,
-      "community_name": "get_rate_limit_status",
-      "file_type": "code",
-      "norm_label": "get",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "app_api_routes_rate_limiter_py_redis",
-      "label": "Redis",
-      "_origin": "ast",
-      "community": 65,
-      "community_name": "get_rate_limit_status",
-      "file_type": "code",
-      "norm_label": "redis",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "app_api_routes_rate_limiter_py_uuid",
-      "label": "UUID",
-      "_origin": "ast",
-      "community": 65,
-      "community_name": "get_rate_limit_status",
-      "file_type": "code",
-      "norm_label": "uuid",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "app_api_routes_rate_limiter_rationale_16",
-      "label": "Get the current rate limit status for the user.",
-      "_origin": "ast",
-      "community": 65,
-      "community_name": "get_rate_limit_status",
+      "community": 64,
+      "community_name": "tasks.py",
       "file_type": "rationale",
-      "norm_label": "get the current rate limit status for the user.",
-      "source_file": "app/api/routes/rate_limiter.py",
-      "source_location": "L16"
+      "norm_label": "background job: download from s3, parse with docling, chunk, bulk-insert...",
+      "source_file": "app/workers/tasks.py",
+      "source_location": "L93"
+    },
+    {
+      "id": "app_repositories_research_py_any",
+      "label": "Any",
+      "_origin": "ast",
+      "community": 65,
+      "community_name": "ResearchEvidence",
+      "file_type": "code",
+      "norm_label": "any",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "app_repositories_research_rationale_126",
+      "label": "Creates multiple evidence records in batches with fingerprint deduplication.",
+      "_origin": "ast",
+      "community": 65,
+      "community_name": "ResearchEvidence",
+      "file_type": "rationale",
+      "norm_label": "creates multiple evidence records in batches with fingerprint deduplication.",
+      "source_file": "app/repositories/research.py",
+      "source_location": "L126"
+    },
+    {
+      "id": "app_repositories_research_rationale_159",
+      "label": "Retrieves evidence records by their fingerprints.",
+      "_origin": "ast",
+      "community": 65,
+      "community_name": "ResearchEvidence",
+      "file_type": "rationale",
+      "norm_label": "retrieves evidence records by their fingerprints.",
+      "source_file": "app/repositories/research.py",
+      "source_location": "L159"
+    },
+    {
+      "id": "app_repositories_research_rationale_170",
+      "label": "Performs a bulk insert of evidence records.",
+      "_origin": "ast",
+      "community": 65,
+      "community_name": "ResearchEvidence",
+      "file_type": "rationale",
+      "norm_label": "performs a bulk insert of evidence records.",
+      "source_file": "app/repositories/research.py",
+      "source_location": "L170"
     },
     {
       "id": "app_services_research_retrievers_registry_py_any",
@@ -14372,55 +14361,22 @@
       "source_location": "L6"
     },
     {
-      "id": "app_repositories_episodic",
-      "label": "repositories/episodic.py",
+      "id": "app_schemas_source",
+      "label": "schemas/source.py",
       "_origin": "ast",
-      "community": 7,
-      "community_name": "WorkingMemoryState",
+      "community": 68,
+      "community_name": "schemas/source.py",
       "file_type": "code",
-      "norm_label": "repositories/episodic.py",
-      "source_file": "app/repositories/episodic.py",
+      "norm_label": "schemas/source.py",
+      "source_file": "app/schemas/source.py",
       "source_location": "L1"
     },
     {
-      "id": "app_repositories_episodic_py_asyncsession",
-      "label": "AsyncSession",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "WorkingMemoryState",
-      "file_type": "code",
-      "norm_label": "asyncsession",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "app_repositories_episodic_py_uuid",
-      "label": "UUID",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "WorkingMemoryState",
-      "file_type": "code",
-      "norm_label": "uuid",
-      "source_file": "",
-      "source_location": ""
-    },
-    {
-      "id": "app_schemas_episodic",
-      "label": "schemas/episodic.py",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "WorkingMemoryState",
-      "file_type": "code",
-      "norm_label": "schemas/episodic.py",
-      "source_file": "app/schemas/episodic.py",
-      "source_location": "L1"
-    },
-    {
-      "id": "app_schemas_episodic_py_basemodel",
+      "id": "app_schemas_source_py_basemodel",
       "label": "BaseModel",
       "_origin": "ast",
-      "community": 7,
-      "community_name": "WorkingMemoryState",
+      "community": 68,
+      "community_name": "schemas/source.py",
       "file_type": "code",
       "norm_label": "basemodel",
       "source_file": "",
@@ -14480,17 +14436,6 @@
       "norm_label": "retry",
       "source_file": "",
       "source_location": ""
-    },
-    {
-      "id": "app_repositories_episodic_rationale_32",
-      "label": "Used by the background worker to detect duplicate compress_episodic_job calls.",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "WorkingMemoryState",
-      "file_type": "rationale",
-      "norm_label": "used by the background worker to detect duplicate compress_episodic_job calls.",
-      "source_file": "app/repositories/episodic.py",
-      "source_location": "L32"
     },
     {
       "id": "app_services_episodic_rationale_20",
@@ -14702,37 +14647,92 @@
       "source_location": "L908"
     },
     {
-      "id": "app_schemas_knowledge",
-      "label": "schemas/knowledge.py",
+      "id": "app_models_episodic",
+      "label": "models/episodic.py",
       "_origin": "ast",
       "community": 9,
-      "community_name": "KnowledgeMemoryCreate",
+      "community_name": "EpisodicMemory",
       "file_type": "code",
-      "norm_label": "schemas/knowledge.py",
-      "source_file": "app/schemas/knowledge.py",
+      "norm_label": "models/episodic.py",
+      "source_file": "app/models/episodic.py",
       "source_location": "L1"
     },
     {
-      "id": "app_schemas_knowledge_py_basemodel",
+      "id": "app_models_episodic_py_base",
+      "label": "Base",
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "EpisodicMemory",
+      "file_type": "code",
+      "norm_label": "base",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "app_repositories_episodic",
+      "label": "repositories/episodic.py",
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "EpisodicMemory",
+      "file_type": "code",
+      "norm_label": "repositories/episodic.py",
+      "source_file": "app/repositories/episodic.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "app_repositories_episodic_py_asyncsession",
+      "label": "AsyncSession",
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "EpisodicMemory",
+      "file_type": "code",
+      "norm_label": "asyncsession",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "app_repositories_episodic_py_uuid",
+      "label": "UUID",
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "EpisodicMemory",
+      "file_type": "code",
+      "norm_label": "uuid",
+      "source_file": "",
+      "source_location": ""
+    },
+    {
+      "id": "app_schemas_episodic",
+      "label": "schemas/episodic.py",
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "EpisodicMemory",
+      "file_type": "code",
+      "norm_label": "schemas/episodic.py",
+      "source_file": "app/schemas/episodic.py",
+      "source_location": "L1"
+    },
+    {
+      "id": "app_schemas_episodic_py_basemodel",
       "label": "BaseModel",
       "_origin": "ast",
       "community": 9,
-      "community_name": "KnowledgeMemoryCreate",
+      "community_name": "EpisodicMemory",
       "file_type": "code",
       "norm_label": "basemodel",
       "source_file": "",
       "source_location": ""
     },
     {
-      "id": "app_services_research_service_rationale_30",
-      "label": "Finds all ResearchArtifacts for a given run with type='memory_candidate' and\u2026",
+      "id": "app_repositories_episodic_rationale_32",
+      "label": "Used by the background worker to detect duplicate compress_episodic_job calls.",
       "_origin": "ast",
       "community": 9,
-      "community_name": "KnowledgeMemoryCreate",
+      "community_name": "EpisodicMemory",
       "file_type": "rationale",
-      "norm_label": "finds all researchartifacts for a given run with type='memory_candidate' and...",
-      "source_file": "app/services/research/service.py",
-      "source_location": "L30"
+      "norm_label": "used by the background worker to detect duplicate compress_episodic_job calls.",
+      "source_file": "app/repositories/episodic.py",
+      "source_location": "L32"
     }
   ],
   "links": [
@@ -22257,7 +22257,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L20",
+      "source_location": "L26",
       "weight": 1.0
     },
     {
@@ -22269,7 +22269,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L20",
+      "source_location": "L26",
       "weight": 1.0
     },
     {
@@ -22281,7 +22281,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L86",
+      "source_location": "L152",
       "weight": 1.0
     },
     {
@@ -24333,7 +24333,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "app/integrations/research_engine/open_deep_research/engine.py",
-      "source_location": "L195",
+      "source_location": "L196",
       "weight": 1.0
     },
     {
@@ -27002,6 +27002,30 @@
     },
     {
       "source": "app_services_research_metrics",
+      "target": "app_models_research_researchevent",
+      "relation": "imports",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "app/services/research/metrics.py",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "app_services_research_metrics",
+      "target": "app_models_research_researchrun",
+      "relation": "imports",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "app/services/research/metrics.py",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "app_services_research_metrics",
       "target": "app_repositories_research_researchrepository",
       "relation": "imports",
       "_origin": "ast",
@@ -27009,7 +27033,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L6",
+      "source_location": "L9",
       "weight": 1.0
     },
     {
@@ -31958,6 +31982,30 @@
     },
     {
       "source": "app_services_research_metrics",
+      "target": "app_models_research",
+      "relation": "imports_from",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "app/services/research/metrics.py",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "app_services_research_metrics",
+      "target": "app_services_research_budget",
+      "relation": "imports_from",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "import",
+      "source_file": "app/services/research/metrics.py",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "app_services_research_metrics",
       "target": "app_services_research_metrics_py_datetime",
       "relation": "imports_from",
       "_origin": "ast",
@@ -31977,7 +32025,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L5",
+      "source_location": "L6",
       "weight": 1.0
     },
     {
@@ -31989,19 +32037,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L6",
-      "weight": 1.0
-    },
-    {
-      "source": "app_services_research_metrics",
-      "target": "app_services_research_budget",
-      "relation": "imports_from",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "import",
-      "source_file": "app/services/research/metrics.py",
-      "source_location": "L7",
+      "source_location": "L9",
       "weight": 1.0
     },
     {
@@ -36945,7 +36981,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L20",
+      "source_location": "L26",
       "weight": 1.0
     },
     {
@@ -36957,7 +36993,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L86",
+      "source_location": "L152",
       "weight": 1.0
     },
     {
@@ -36969,7 +37005,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L17",
+      "source_location": "L23",
       "weight": 1.0
     },
     {
@@ -36981,7 +37017,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L62",
+      "source_location": "L119",
       "weight": 1.0
     },
     {
@@ -36993,7 +37029,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L69",
+      "source_location": "L135",
       "weight": 1.0
     },
     {
@@ -37005,7 +37041,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L55",
+      "source_location": "L102",
       "weight": 1.0
     },
     {
@@ -37017,7 +37053,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L55",
+      "source_location": "L102",
       "weight": 1.0
     },
     {
@@ -40974,7 +41010,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L11",
+      "source_location": "L16",
       "weight": 1.0
     },
     {
@@ -43515,7 +43551,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/integrations/research_engine/open_deep_research/engine.py",
-      "source_location": "L369",
+      "source_location": "L370",
       "weight": 1.0
     },
     {
@@ -43526,7 +43562,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/integrations/research_engine/open_deep_research/engine.py",
-      "source_location": "L500",
+      "source_location": "L501",
       "weight": 1.0
     },
     {
@@ -45533,35 +45569,13 @@
     },
     {
       "source": "app_services_research_metrics_researchmetricsservice",
-      "target": "app_services_research_metrics_researchmetricsservice_init",
-      "relation": "method",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "app/services/research/metrics.py",
-      "source_location": "L17",
-      "weight": 1.0
-    },
-    {
-      "source": "app_services_research_metrics_researchmetricsservice",
-      "target": "app_services_research_metrics_researchmetricsservice_emit_metrics",
-      "relation": "method",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "app/services/research/metrics.py",
-      "source_location": "L20",
-      "weight": 1.0
-    },
-    {
-      "source": "app_services_research_metrics_researchmetricsservice",
       "target": "app_services_research_metrics_researchmetricsservice_track_time_to_first_event",
       "relation": "method",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L55",
+      "source_location": "L102",
       "weight": 1.0
     },
     {
@@ -45572,7 +45586,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L62",
+      "source_location": "L119",
       "weight": 1.0
     },
     {
@@ -45583,7 +45597,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L69",
+      "source_location": "L135",
       "weight": 1.0
     },
     {
@@ -45594,7 +45608,29 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L86",
+      "source_location": "L152",
+      "weight": 1.0
+    },
+    {
+      "source": "app_services_research_metrics_researchmetricsservice",
+      "target": "app_services_research_metrics_researchmetricsservice_init",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "app/services/research/metrics.py",
+      "source_location": "L23",
+      "weight": 1.0
+    },
+    {
+      "source": "app_services_research_metrics_researchmetricsservice",
+      "target": "app_services_research_metrics_researchmetricsservice_emit_metrics",
+      "relation": "method",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "app/services/research/metrics.py",
+      "source_location": "L26",
       "weight": 1.0
     },
     {
@@ -46764,14 +46800,14 @@
       "weight": 1.0
     },
     {
-      "source": "app_integrations_research_engine_open_deep_research_engine_rationale_370",
+      "source": "app_integrations_research_engine_open_deep_research_engine_rationale_371",
       "target": "app_integrations_research_engine_open_deep_research_engine_opendeepresearchengine_format_research_context",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/integrations/research_engine/open_deep_research/engine.py",
-      "source_location": "L370",
+      "source_location": "L371",
       "weight": 1.0
     },
     {
@@ -46786,14 +46822,14 @@
       "weight": 1.0
     },
     {
-      "source": "app_integrations_research_engine_open_deep_research_engine_rationale_501",
+      "source": "app_integrations_research_engine_open_deep_research_engine_rationale_502",
       "target": "app_integrations_research_engine_open_deep_research_engine_opendeepresearchengine_cancel",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/integrations/research_engine/open_deep_research/engine.py",
-      "source_location": "L501",
+      "source_location": "L502",
       "weight": 1.0
     },
     {
@@ -48381,69 +48417,69 @@
       "weight": 1.0
     },
     {
-      "source": "app_services_research_metrics_rationale_12",
-      "target": "app_services_research_metrics_researchmetricsservice",
-      "relation": "rationale_for",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "app/services/research/metrics.py",
-      "source_location": "L12",
-      "weight": 1.0
-    },
-    {
-      "source": "app_services_research_metrics_rationale_21",
-      "target": "app_services_research_metrics_researchmetricsservice_emit_metrics",
-      "relation": "rationale_for",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "app/services/research/metrics.py",
-      "source_location": "L21",
-      "weight": 1.0
-    },
-    {
-      "source": "app_services_research_metrics_rationale_56",
+      "source": "app_services_research_metrics_rationale_103",
       "target": "app_services_research_metrics_researchmetricsservice_track_time_to_first_event",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L56",
+      "source_location": "L103",
       "weight": 1.0
     },
     {
-      "source": "app_services_research_metrics_rationale_63",
+      "source": "app_services_research_metrics_rationale_120",
       "target": "app_services_research_metrics_researchmetricsservice_track_cost",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L63",
+      "source_location": "L120",
       "weight": 1.0
     },
     {
-      "source": "app_services_research_metrics_rationale_70",
+      "source": "app_services_research_metrics_rationale_136",
       "target": "app_services_research_metrics_researchmetricsservice_track_failures",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L70",
+      "source_location": "L136",
       "weight": 1.0
     },
     {
-      "source": "app_services_research_metrics_rationale_87",
+      "source": "app_services_research_metrics_rationale_153",
       "target": "app_services_research_metrics_researchmetricsservice_get_observability_dashboard_data",
       "relation": "rationale_for",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "app/services/research/metrics.py",
-      "source_location": "L87",
+      "source_location": "L153",
+      "weight": 1.0
+    },
+    {
+      "source": "app_services_research_metrics_rationale_17",
+      "target": "app_services_research_metrics_researchmetricsservice",
+      "relation": "rationale_for",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "app/services/research/metrics.py",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "app_services_research_metrics_rationale_36",
+      "target": "app_services_research_metrics_researchmetricsservice_emit_metrics",
+      "relation": "rationale_for",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "app/services/research/metrics.py",
+      "source_location": "L36",
       "weight": 1.0
     },
     {
@@ -50399,7 +50435,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.95,
       "source_file": "app/integrations/research_engine/open_deep_research/engine.py",
-      "source_location": "L210",
+      "source_location": "L211",
       "weight": 0.8
     },
     {
@@ -50410,7 +50446,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.95,
       "source_file": "app/integrations/research_engine/open_deep_research/engine.py",
-      "source_location": "L331",
+      "source_location": "L332",
       "weight": 0.8
     },
     {
@@ -51624,6 +51660,28 @@
       "weight": 0.8
     },
     {
+      "source": "app_services_research_metrics_researchmetricsservice",
+      "target": "app_models_research_researchrun",
+      "relation": "uses",
+      "_origin": "ast",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "app/services/research/metrics.py",
+      "source_location": "L163",
+      "weight": 0.8
+    },
+    {
+      "source": "app_services_research_metrics_researchmetricsservice",
+      "target": "app_models_research_researchevent",
+      "relation": "uses",
+      "_origin": "ast",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "app/services/research/metrics.py",
+      "source_location": "L181",
+      "weight": 0.8
+    },
+    {
       "source": "app_services_research_promotion_promotionservice",
       "target": "app_models_research_researchartifact",
       "relation": "uses",
@@ -52186,5 +52244,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "919f901234481edd4fcb001fedeb6550c9de2616"
+  "built_at_commit": "e677c3f084e412b30c6fc4a5a9545cea32a75b36"
 }

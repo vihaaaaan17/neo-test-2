@@ -48,11 +48,12 @@ data: <json_stringified_payload>\n\n
 | `turn.promotion_available` | Research | Server -> Client | No | 1–5 per research turn |
 | `turn.completed` | General | Server -> Client | No | 1 per successful turn |
 | `turn.partial` | General | Server -> Client | No | Periodic |
-| `turn.cancelled` | General | Server -> Client | No | 1 on user cancel |
 | `turn.failed` | General | Server -> Client | No | 1 on error |
 | `status_change` | General | Server -> Client | No | 2–5 per turn |
+| `aborted_by_timeline_fence` | Concurrency / Fencing | Server -> Client | **Yes** | 1 on rollback fence abort |
 | `done` | Protocol | Server -> Client | **Yes** | 1 per stream |
 | `error` | Protocol | Server -> Client | **Yes** | 1 on stream abort |
+
 
 ---
 
