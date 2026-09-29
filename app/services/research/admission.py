@@ -33,7 +33,8 @@ class ResearchAdmissionController:
         engine_revision: Optional[str] = None,
         conversation_id: Optional[UUID] = None,
         turn_id: Optional[UUID] = None,
-        base_commit_id: Optional[UUID] = None
+        base_commit_id: Optional[UUID] = None,
+        timeline_epoch: Optional[int] = None
     ) -> ResearchRun:
         """
         Admits a new research run after checking quotas and rate limits.
@@ -81,7 +82,8 @@ class ResearchAdmissionController:
             engine_revision=engine_revision,
             conversation_id=conversation_id,
             turn_id=turn_id,
-            base_commit_id=base_commit_id
+            base_commit_id=base_commit_id,
+            timeline_epoch=timeline_epoch
         )
 
     async def get_queue_status(self) -> Dict[str, Any]:

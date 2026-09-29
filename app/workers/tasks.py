@@ -262,6 +262,7 @@ async def sync_knowledge_to_graph_job(
     ctx: dict,
     *,
     knowledge_id: str,
+    expected_epoch: int | None = None,
 ) -> dict[str, Any]:
     """
     Background job: synchronizes a KnowledgeMemory row from Postgres to the Neo4j Graph.
@@ -269,22 +270,34 @@ async def sync_knowledge_to_graph_job(
     Idempotency contract:
     - Re-running on the same knowledge_id will run a Neo4j MERGE, which safely
       updates properties without duplicating the node or edge.
+    - Timeline epoch fence: aborts if workspace epoch has advanced.
     """
     k_uuid = UUID(knowledge_id)
 
     async with async_session_maker() as session:
         repo = KnowledgeRepository(session)
         # We don't have the owner_id in the payload, but get_knowledge requires it.
-        # Let's query by knowledge_id directly.
+        from app.models.knowledge import KnowledgeMemory
         result = await session.execute(
-            select(repo.session.info.get("model", __import__("app.models.knowledge", fromlist=["KnowledgeMemory"]).KnowledgeMemory))
-            .where(__import__("app.models.knowledge", fromlist=["KnowledgeMemory"]).KnowledgeMemory.knowledge_id == k_uuid)
+            select(KnowledgeMemory).where(KnowledgeMemory.knowledge_id == k_uuid)
         )
         knowledge = result.scalars().first()
 
         if not knowledge:
             logger.error("sync_knowledge_to_graph_job: knowledge_id %s not found", knowledge_id)
             return {"status": "not_found", "knowledge_id": knowledge_id}
+
+        # Concurrency Fence: Check timeline_epoch
+        from app.models.workspace import Workspace
+        ws_stmt = select(Workspace).where(Workspace.workspace_id == knowledge.workspace_id)
+        ws_res = await session.execute(ws_stmt)
+        ws = ws_res.scalars().first()
+        if ws and expected_epoch is not None:
+            current_epoch = getattr(ws, "timeline_epoch", 1) or 1
+            if current_epoch > expected_epoch:
+                fence_reason = f"Aborted by timeline fence: workspace epoch advanced from {expected_epoch} to {current_epoch}."
+                logger.warning("Timeline fence triggered in sync_knowledge_to_graph_job: %s", fence_reason)
+                return {"status": "aborted_by_timeline_fence", "knowledge_id": knowledge_id, "reason": fence_reason}
 
         try:
             # Ensure GraphStore is connected
@@ -385,7 +398,6 @@ async def run_research_agent_job(
         workspace = (await session.execute(
             select(Workspace).where(Workspace.workspace_id == UUID(workspace_id))
         )).scalars().first()
-        expected_epoch = workspace.timeline_epoch if workspace and isinstance(getattr(workspace, "timeline_epoch", None), int) else 1
         
         run = (await session.execute(
             select(ResearchRun).where(ResearchRun.run_id == UUID(run_id))
@@ -394,6 +406,8 @@ async def run_research_agent_job(
         if not run:
             await publish_event({"status": "failed", "error": "ResearchRun not found"})
             return {"status": "failed", "error": "ResearchRun not found"}
+
+        expected_epoch = getattr(run, "timeline_epoch", None) or (workspace.timeline_epoch if workspace and isinstance(getattr(workspace, "timeline_epoch", None), int) else 1)
             
         owner_id = run.owner_id
         engine_flag = run.engine
@@ -768,8 +782,10 @@ async def run_research_agent_job(
                 from app.services.research.lifecycle import ResearchLifecycleService
                 repo = ResearchRepository(session)
                 lifecycle = ResearchLifecycleService(repo)
-                await lifecycle.transition_run(UUID(workspace_id), actual_run_id, "failed", {"error": str(exc)})
-                await session.commit()
+                current_run_obj = await repo.get_run(UUID(workspace_id), actual_run_id)
+                if not current_run_obj or current_run_obj.status != "aborted_by_timeline_fence":
+                    await lifecycle.transition_run(UUID(workspace_id), actual_run_id, "failed", {"error": str(exc)})
+                    await session.commit()
         except Exception as transition_exc:
             logger.warning(f"Could not transition run to failed (might already be terminal): {transition_exc}")
 
@@ -815,26 +831,131 @@ async def project_output_graph_job(
     ctx: dict,
     *,
     workspace_id: str,
-    graph_dict: dict
+    graph_dict: dict,
+    commit_id: str | None = None,
+    expected_epoch: int | None = None,
 ) -> dict[str, Any]:
     """
     Background job: Projects the final OutputGraph from the research agent into Neo4j.
+    Validates Output KG topology, enforces active-commit authority and timeline epoch fencing.
     """
     from uuid import UUID
     from app.schemas.graph import OutputGraph
     from app.repositories.graph import graph_store, GraphRepository
-    
+    from app.models.workspace import Workspace
+    from sqlalchemy import select
+
     workspace_uuid = UUID(workspace_id)
-    
+
     try:
-        # Reconstruct Pydantic model
-        graph = OutputGraph(**graph_dict)
-        
+        # 1. Topology validation before projection
+        if not isinstance(graph_dict, dict):
+            logger.warning("project_output_graph_job: malformed topology - graph_dict must be a dictionary")
+            return {
+                "status": "failed",
+                "workspace_id": workspace_id,
+                "error": "malformed_graph_topology",
+                "detail": "graph_dict must be a dict"
+            }
+
+        try:
+            graph = OutputGraph(**graph_dict)
+        except Exception as pydantic_err:
+            logger.warning("project_output_graph_job: malformed graph topology schema: %s", pydantic_err)
+            return {
+                "status": "failed",
+                "workspace_id": workspace_id,
+                "error": "malformed_graph_topology",
+                "detail": str(pydantic_err)
+            }
+
+        node_ids = set()
+        for node in graph.nodes:
+            if not node.id or not str(node.id).strip():
+                logger.warning("project_output_graph_job: malformed topology - node ID is empty")
+                return {
+                    "status": "failed",
+                    "workspace_id": workspace_id,
+                    "error": "malformed_graph_topology",
+                    "detail": "Node ID cannot be empty"
+                }
+            node_ids.add(str(node.id))
+
+        for edge in graph.edges:
+            if not edge.source_id or str(edge.source_id) not in node_ids:
+                logger.warning("project_output_graph_job: malformed topology - edge source endpoint %s not in nodes", edge.source_id)
+                return {
+                    "status": "failed",
+                    "workspace_id": workspace_id,
+                    "error": "malformed_graph_topology",
+                    "detail": f"Edge source endpoint '{edge.source_id}' does not exist in graph nodes"
+                }
+            if not edge.target_id or str(edge.target_id) not in node_ids:
+                logger.warning("project_output_graph_job: malformed topology - edge target endpoint %s not in nodes", edge.target_id)
+                return {
+                    "status": "failed",
+                    "workspace_id": workspace_id,
+                    "error": "malformed_graph_topology",
+                    "detail": f"Edge target endpoint '{edge.target_id}' does not exist in graph nodes"
+                }
+
+        # 2. Check active-commit authority and timeline epoch fence
+        resolved_commit_id = None
+        async with async_session_maker() as session:
+            stmt = select(Workspace).where(Workspace.workspace_id == workspace_uuid)
+            ws_res = await session.execute(stmt)
+            ws = ws_res.scalars().first()
+
+            if not ws:
+                return {
+                    "status": "failed",
+                    "workspace_id": workspace_id,
+                    "error": "workspace_not_found"
+                }
+
+            # Check timeline epoch if expected_epoch provided
+            current_epoch = getattr(ws, "timeline_epoch", 1) or 1
+            if expected_epoch is not None and current_epoch > expected_epoch:
+                fence_reason = f"Aborted by timeline fence: workspace epoch advanced from {expected_epoch} to {current_epoch}."
+                logger.warning("Timeline fence triggered in project_output_graph_job for workspace %s: %s", workspace_id, fence_reason)
+                return {
+                    "status": "aborted_by_timeline_fence",
+                    "workspace_id": workspace_id,
+                    "reason": fence_reason
+                }
+
+            # Check active-commit authority: reject independent projection jobs that lack active-commit authority
+            active_commit = ws.active_commit_id
+            if active_commit is None:
+                logger.warning("project_output_graph_job: rejected - workspace %s has no active commit authority", workspace_id)
+                return {
+                    "status": "rejected",
+                    "workspace_id": workspace_id,
+                    "error": "lacks_active_commit_authority",
+                    "detail": "Workspace has no active commit"
+                }
+
+            if commit_id is not None and str(commit_id) != str(active_commit):
+                logger.warning("project_output_graph_job: rejected - commit %s does not match active commit %s", commit_id, active_commit)
+                return {
+                    "status": "rejected",
+                    "workspace_id": workspace_id,
+                    "error": "lacks_active_commit_authority",
+                    "detail": f"Commit {commit_id} does not match active commit {active_commit}"
+                }
+
+            resolved_commit_id = active_commit
+
+        # 3. Project into Neo4j carrying commit_id and workspace_id
         repo = GraphRepository(graph_store)
-        await repo.project_output_graph(workspace_uuid, graph)
-        
-        logger.info(f"project_output_graph_job: Successfully projected graph for workspace {workspace_id}")
-        return {"status": "completed", "workspace_id": workspace_id}
+        await repo.project_output_graph(workspace_uuid, graph, commit_id=resolved_commit_id)
+
+        logger.info(f"project_output_graph_job: Successfully projected graph for workspace {workspace_id} under commit {resolved_commit_id}")
+        return {
+            "status": "completed",
+            "workspace_id": workspace_id,
+            "commit_id": str(resolved_commit_id)
+        }
         
     except Exception as exc:
         logger.exception("project_output_graph_job: failed to project graph for workspace %s: %s", workspace_id, exc)

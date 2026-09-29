@@ -192,7 +192,46 @@ class OpenDeepResearchEngine(ResearchEngine):
 
                         # Persist the final ResearchReport as canonical report state.
                         async with async_session_maker() as session:
+                            from app.models.workspace import Workspace
+                            from sqlalchemy import select
                             repo = ResearchRepository(session)
+
+                            # Check timeline epoch before durable writes
+                            expected_epoch = None
+                            try:
+                                run_obj = await repo.get_run(workspace_id, run_id)
+                                if run_obj and isinstance(getattr(run_obj, "timeline_epoch", None), int):
+                                    expected_epoch = run_obj.timeline_epoch
+                            except Exception:
+                                pass
+
+                            current_ws_epoch = None
+                            try:
+                                ws_epoch_stmt = select(Workspace.timeline_epoch).where(Workspace.workspace_id == workspace_id)
+                                ws_epoch_res = await session.execute(ws_epoch_stmt)
+                                if hasattr(ws_epoch_res, "scalar_one_or_none"):
+                                    sc_val = ws_epoch_res.scalar_one_or_none()
+                                    if isinstance(sc_val, int):
+                                        current_ws_epoch = sc_val
+                            except Exception:
+                                pass
+
+                            if (
+                                isinstance(current_ws_epoch, int)
+                                and isinstance(expected_epoch, int)
+                                and current_ws_epoch > expected_epoch
+                            ):
+                                logger.warning(
+                                    "Timeline fence triggered in final_report_generation for workspace %s: epoch advanced from %s to %s",
+                                    workspace_id, expected_epoch, current_ws_epoch
+                                )
+                                yield {
+                                    "status": "aborted_by_timeline_fence",
+                                    "message": f"Aborted by timeline fence: workspace epoch advanced from {expected_epoch} to {current_ws_epoch}",
+                                    "run_id": str(run_id)
+                                }
+                                return
+
                             await repo.create_report(
                                 workspace_id=workspace_id,
                                 run_id=run_id,

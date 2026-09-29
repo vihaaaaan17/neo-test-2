@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 CandidateType = Literal[
     "memory_candidate",
@@ -34,17 +34,40 @@ class DerivationExpression(BaseModel):
 
 
 class MemoryCandidatePayload(BaseModel):
-    text: str
+    model_config = ConfigDict(extra="ignore")
+
+    text: Optional[str] = None
+    content: Optional[str] = None
     domain: str = "deep_research"
     confidence: Optional[float] = None
     derivation: Optional[DerivationExpression] = None
     provenance: Optional[Dict[str, Any]] = None
+    evidence_refs: Optional[List[Any]] = None
+    source_refs: Optional[List[Any]] = None
+    proposed_memory_type: Optional[str] = None
+    candidate_type: Optional[str] = None
+    timeline_epoch: Optional[int] = None
+
+    @model_validator(mode="after")
+    def validate_text_or_content(self) -> "MemoryCandidatePayload":
+        val = self.text or self.content
+        if not val or not str(val).strip():
+            raise ValueError("Memory candidate payload must contain non-empty 'text' or 'content'")
+        if not self.text and self.content:
+            self.text = self.content
+        return self
 
 
 class GraphCandidatePayload(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     nodes: List[Dict[str, Any]] = Field(default_factory=list)
     edges: List[Dict[str, Any]] = Field(default_factory=list)
     provenance: Optional[Dict[str, Any]] = None
+    evidence_refs: Optional[List[Any]] = None
+    source_refs: Optional[List[Any]] = None
+    candidate_type: Optional[str] = None
+    timeline_epoch: Optional[int] = None
 
 
 class ClaimCandidatePayload(BaseModel):

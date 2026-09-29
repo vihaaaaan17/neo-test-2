@@ -69,19 +69,40 @@ class GraphRepository:
     def __init__(self, store: GraphStore):
         self.store = store
 
-    async def project_output_graph(self, workspace_id: UUID, graph: OutputGraph) -> None:
+    async def project_output_graph(
+        self,
+        workspace_id: UUID,
+        graph: OutputGraph,
+        commit_id: UUID | None = None
+    ) -> None:
         """
         Projects an OutputGraph into Neo4j.
         Nodes get labels: OutputNode, plus their specific label.
         Provenance properties are serialized to JSON strings.
+        Projected subgraphs carry commit_id and workspace_id.
         """
+        # Topology validation: non-empty node IDs and valid edge endpoints
+        node_ids = set()
+        for node in graph.nodes:
+            if not node.id or not str(node.id).strip():
+                raise ValueError("Node ID cannot be empty")
+            node_ids.add(str(node.id))
+
+        for edge in graph.edges:
+            if not edge.source_id or str(edge.source_id) not in node_ids:
+                raise ValueError(f"Invalid edge source endpoint '{edge.source_id}' does not exist in graph nodes")
+            if not edge.target_id or str(edge.target_id) not in node_ids:
+                raise ValueError(f"Invalid edge target endpoint '{edge.target_id}' does not exist in graph nodes")
+
         await self.store.connect()
-        
+
+        commit_id_str = str(commit_id) if commit_id else None
+
         # 1. Project Nodes
         nodes_by_label = {}
         for node in graph.nodes:
             nodes_by_label.setdefault(node.label, []).append(node)
-            
+
         for label, nodes in nodes_by_label.items():
             # Sanitize label to prevent injection (though it's internal)
             safe_label = "".join([c for c in label if c.isalnum() or c == "_"])
@@ -90,11 +111,13 @@ class GraphRepository:
             MERGE (on:OutputNode {{id: n.id, workspace_id: $workspace_id}})
             SET on:{safe_label}
             SET on += n.props
+            SET on.workspace_id = $workspace_id
+            SET on.commit_id = $commit_id
             WITH on
             MERGE (w:Workspace {{id: $workspace_id}})
             MERGE (on)-[:BELONGS_TO]->(w)
             """
-            
+
             node_params = []
             for node in nodes:
                 props = dict(node.properties)
@@ -105,14 +128,18 @@ class GraphRepository:
                     if node.provenance.verification_status:
                         props["provenance_verification_status"] = node.provenance.verification_status
                 node_params.append({"id": node.id, "props": props})
-            
-            await self.store.execute_query(query, {"workspace_id": str(workspace_id), "nodes": node_params})
-            
+
+            await self.store.execute_query(query, {
+                "workspace_id": str(workspace_id),
+                "commit_id": commit_id_str,
+                "nodes": node_params
+            })
+
         # 2. Project Edges
         edges_by_type = {}
         for edge in graph.edges:
             edges_by_type.setdefault(edge.type, []).append(edge)
-            
+
         for edge_type, edges in edges_by_type.items():
             safe_edge_type = "".join([c for c in edge_type if c.isalnum() or c == "_"])
             query = f"""
@@ -121,9 +148,15 @@ class GraphRepository:
             MATCH (target:OutputNode {{id: e.target_id, workspace_id: $workspace_id}})
             MERGE (source)-[rel:{safe_edge_type}]->(target)
             SET rel += e.props
+            SET rel.workspace_id = $workspace_id
+            SET rel.commit_id = $commit_id
             """
             edge_params = [{"source_id": e.source_id, "target_id": e.target_id, "props": e.properties} for e in edges]
-            await self.store.execute_query(query, {"workspace_id": str(workspace_id), "edges": edge_params})
+            await self.store.execute_query(query, {
+                "workspace_id": str(workspace_id),
+                "commit_id": commit_id_str,
+                "edges": edge_params
+            })
 
     async def get_output_graph(self, workspace_id: UUID) -> OutputGraph:
         await self.store.connect()

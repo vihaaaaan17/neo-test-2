@@ -54,9 +54,21 @@ class ResearchRepository:
         engine_revision: Optional[str] = None,
         conversation_id: Optional[UUID] = None,
         turn_id: Optional[UUID] = None,
-        base_commit_id: Optional[UUID] = None
+        base_commit_id: Optional[UUID] = None,
+        timeline_epoch: Optional[int] = None
     ) -> ResearchRun:
         attempt_id = uuid.uuid4()
+        if timeline_epoch is None:
+            from app.models.workspace import Workspace
+            try:
+                stmt = select(Workspace.timeline_epoch).where(Workspace.workspace_id == workspace_id)
+                res = await self.session.execute(stmt)
+                timeline_epoch = res.scalar_one_or_none()
+            except Exception:
+                timeline_epoch = 1
+        if timeline_epoch is None:
+            timeline_epoch = 1
+
         run = ResearchRun(
             workspace_id=workspace_id,
             owner_id=owner_id,
@@ -66,6 +78,7 @@ class ResearchRepository:
             conversation_id=conversation_id,
             turn_id=turn_id,
             base_commit_id=base_commit_id,
+            timeline_epoch=timeline_epoch,
             status="pending",
             current_attempt_id=attempt_id
         )

@@ -10,11 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.research import ResearchArtifact
 from app.models.knowledge import KnowledgeMemory
+from app.models.workspace import Workspace
 from app.repositories.research import ResearchRepository
 from app.repositories.knowledge import KnowledgeRepository
 from app.repositories.graph import GraphRepository
 from app.schemas.knowledge import Provenance
 from app.schemas.graph import ProvenanceRef
+from app.schemas.promotion import MemoryCandidatePayload, GraphCandidatePayload
 from app.services.research.derivation import DerivationService
 
 logger = logging.getLogger(__name__)
@@ -33,6 +35,30 @@ class CandidateNotFoundError(PromotionError):
 class InvalidLifecycleTransitionError(PromotionError):
     """Raised when an illegal candidate lifecycle transition is attempted."""
     pass
+
+
+class InvalidCandidateTypeError(PromotionError):
+    """Raised when an unsupported candidate type is submitted for promotion."""
+    def __init__(self, detail: str = "invalid_candidate_type"):
+        super().__init__(detail)
+        self.detail = detail
+        self.status_code = 400
+
+
+class TimelineEpochFencedError(PromotionError):
+    """Raised when active workspace timeline epoch has advanced beyond the run's baseline epoch."""
+    def __init__(self, detail: str = "aborted_by_timeline_fence"):
+        super().__init__(detail)
+        self.detail = detail
+        self.status_code = 409
+
+
+class InvalidPayloadError(PromotionError):
+    """Raised when candidate payload fails Pydantic schema validation."""
+    def __init__(self, detail: str):
+        super().__init__(detail)
+        self.detail = detail
+        self.status_code = 400
 
 
 class PromotionService:
@@ -148,7 +174,65 @@ class PromotionService:
                 f"Candidate {artifact_id} is in status '{candidate.promotion_status}' and cannot be accepted."
             )
 
+        # Gate 3: Restrict promotion candidates strictly to memory_candidate and graph_candidate
+        if candidate.type not in ("memory_candidate", "graph_candidate"):
+            raise InvalidCandidateTypeError("invalid_candidate_type")
+
+        # Gate 2: Verify active workspace timeline epoch and abort if epoch has advanced
+        expected_epoch = None
+        if hasattr(self.research_repo, "get_run"):
+            try:
+                run_obj = await self.research_repo.get_run(workspace_id, candidate.run_id)
+                if run_obj and isinstance(getattr(run_obj, "timeline_epoch", None), int):
+                    expected_epoch = run_obj.timeline_epoch
+            except Exception:
+                pass
+        if expected_epoch is None and isinstance(getattr(candidate, "timeline_epoch", None), int):
+            expected_epoch = candidate.timeline_epoch
+        if expected_epoch is None and isinstance(candidate.payload, dict):
+            p_epoch = candidate.payload.get("timeline_epoch")
+            if isinstance(p_epoch, int):
+                expected_epoch = p_epoch
+
+        active_epoch = None
+        try:
+            ws_res = self.session.execute(
+                select(Workspace).where(Workspace.workspace_id == workspace_id)
+            )
+            if inspect.isawaitable(ws_res):
+                ws_res = await ws_res
+            scalars_fn = getattr(ws_res, "scalars", None)
+            if callable(scalars_fn):
+                sc = scalars_fn()
+                if inspect.isawaitable(sc):
+                    sc = await sc
+                first_fn = getattr(sc, "first", None)
+                if callable(first_fn):
+                    ws_obj = first_fn()
+                    if inspect.isawaitable(ws_obj):
+                        ws_obj = await ws_obj
+                    if ws_obj and isinstance(getattr(ws_obj, "timeline_epoch", None), int):
+                        active_epoch = ws_obj.timeline_epoch
+        except Exception:
+            pass
+
+        if isinstance(expected_epoch, int) and isinstance(active_epoch, int):
+            if active_epoch > expected_epoch:
+                raise TimelineEpochFencedError("aborted_by_timeline_fence")
+
         payload = candidate.payload or {}
+
+        # Gate 4: Validate candidate payloads strictly against Pydantic schemas
+        if candidate.type == "memory_candidate":
+            try:
+                MemoryCandidatePayload(**payload)
+            except Exception as val_err:
+                raise InvalidPayloadError(f"Invalid memory_candidate payload: {val_err}")
+        elif candidate.type == "graph_candidate":
+            try:
+                GraphCandidatePayload(**payload)
+            except Exception as val_err:
+                raise InvalidPayloadError(f"Invalid graph_candidate payload: {val_err}")
 
         # Validate provenance lineage (fail-closed)
         prov_dict = payload.get("provenance") or {}
@@ -169,45 +253,29 @@ class PromotionService:
 
         target_type: Optional[str] = None
         target_id: Optional[UUID] = None
+        post_commit_jobs: List[Tuple[str, Dict[str, Any]]] = []
 
         # Materialize Target
         if candidate.type == "memory_candidate":
             memory = await self.materialize_memory_candidate(workspace_id, candidate, user_id)
             target_type = "knowledge_memory"
             target_id = memory.knowledge_id
-
-            if self.arq_pool:
-                try:
-                    await self.arq_pool.enqueue_job("sync_knowledge_to_graph_job", knowledge_id=str(memory.knowledge_id))
-                except Exception as exc:
-                    logger.warning("Failed to enqueue sync_knowledge_to_graph_job: %s", exc)
+            post_commit_jobs.append((
+                "sync_knowledge_to_graph_job",
+                {"knowledge_id": str(memory.knowledge_id)}
+            ))
 
         elif candidate.type == "graph_candidate":
             graph_dict = await self.materialize_graph_candidate(workspace_id, candidate)
             target_type = "output_graph"
             target_id = candidate.artifact_id
-
-            if self.arq_pool:
-                try:
-                    await self.arq_pool.enqueue_job(
-                        "project_output_graph_job",
-                        workspace_id=str(workspace_id),
-                        graph_dict=graph_dict,
-                    )
-                except Exception as exc:
-                    logger.warning("Failed to enqueue project_output_graph_job: %s", exc)
-
-        elif candidate.type == "hypothesis_candidate":
-            target_type = "scratchpad_entry"
-            target_id = candidate.artifact_id
-
-        elif candidate.type in ("claim_candidate", "finding_candidate"):
-            target_type = "claim_finding"
-            target_id = candidate.artifact_id
-
-        else:
-            target_type = candidate.type
-            target_id = candidate.artifact_id
+            post_commit_jobs.append((
+                "project_output_graph_job",
+                {
+                    "workspace_id": str(workspace_id),
+                    "graph_dict": graph_dict,
+                }
+            ))
 
         # Update candidate state in DB
         candidate.promotion_status = "accepted"
@@ -216,8 +284,17 @@ class PromotionService:
         candidate.promoted_target_type = target_type
         candidate.promoted_target_id = target_id
 
+        # Gate 5: Database commit occurs strictly before enqueuing background projection jobs
         await self.session.commit()
         await self.session.refresh(candidate)
+
+        # Gate 5: Background projection jobs enqueued strictly post-commit
+        if self.arq_pool:
+            for job_name, job_kwargs in post_commit_jobs:
+                try:
+                    await self.arq_pool.enqueue_job(job_name, **job_kwargs)
+                except Exception as exc:
+                    logger.warning("Failed to enqueue %s: %s", job_name, exc)
 
         logger.info(json.dumps({
             "event": "candidate_promotion_decision",

@@ -32,8 +32,9 @@ def upgrade() -> None:
     op.add_column('research_artifacts', sa.Column('verification_metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
     op.create_index('ix_research_artifacts_promotion_status', 'research_artifacts', ['promotion_status'])
 
-    # 2. research_runs: base_commit_id
+    # 2. research_runs: base_commit_id & timeline_epoch
     op.add_column('research_runs', sa.Column('base_commit_id', sa.UUID(), nullable=True))
+    op.add_column('research_runs', sa.Column('timeline_epoch', sa.Integer(), server_default='1', nullable=False))
     op.create_foreign_key(
         'fk_research_runs_base_commit_id',
         'research_runs',
@@ -61,6 +62,7 @@ def downgrade() -> None:
     # 2. research_runs
     op.drop_index('ix_research_runs_base_commit_id', table_name='research_runs')
     op.drop_constraint('fk_research_runs_base_commit_id', 'research_runs', type_='foreignkey')
+    op.drop_column('research_runs', 'timeline_epoch')
     op.drop_column('research_runs', 'base_commit_id')
 
     # 1. research_artifacts

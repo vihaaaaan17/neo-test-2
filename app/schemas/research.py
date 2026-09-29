@@ -17,5 +17,6 @@ class ResearchRunResponse(BaseModel):
     current_attempt_id: Optional[UUID] = None
     conversation_id: Optional[UUID] = None
     turn_id: Optional[UUID] = None
+    timeline_epoch: int = 1
     created_at: datetime
     updated_at: datetime

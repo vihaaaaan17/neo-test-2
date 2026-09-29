@@ -13,6 +13,8 @@ from app.services.research.promotion import (
     PromotionService,
     CandidateNotFoundError,
     InvalidLifecycleTransitionError,
+    InvalidCandidateTypeError,
+    TimelineEpochFencedError,
     PromotionError,
 )
 from app.services.research.derivation import CrossWorkspaceBoundaryError
@@ -124,6 +126,16 @@ async def accept_promotion(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Candidate {artifact_id} not found"
+        )
+    except InvalidCandidateTypeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_candidate_type"
+        )
+    except TimelineEpochFencedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="aborted_by_timeline_fence"
         )
     except InvalidLifecycleTransitionError as exc:
         raise HTTPException(

@@ -5,11 +5,11 @@ Fix timeline epoch fencing, candidate eligibility, and Output Knowledge Graph pr
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] `ResearchRun` schema and Alembic migration include `timeline_epoch`.
-- [ ] Worker write operations and `PromotionService.accept_candidate()` verify the active workspace timeline epoch and abort if the epoch has advanced.
-- [ ] Only `memory_candidate` and `graph_candidate` can be accepted; unsupported candidate types return `HTTP 400 invalid_candidate_type`.
-- [ ] Candidate payloads are validated against Pydantic schemas prior to acceptance.
-- [ ] Background projection jobs are enqueued strictly post-transaction commit.
-- [ ] Malformed graph topologies are rejected before projection; projected subgraphs carry `commit_id` and `workspace_id`.
+- [x] `ResearchRun` schema and Alembic migration include `timeline_epoch`.
+- [x] Worker write operations and `PromotionService.accept_candidate()` verify the active workspace timeline epoch and abort if the epoch has advanced.
+- [x] Only `memory_candidate` and `graph_candidate` can be accepted; unsupported candidate types return `HTTP 400 invalid_candidate_type`.
+- [x] Candidate payloads are validated against Pydantic schemas prior to acceptance.
+- [x] Background projection jobs are enqueued strictly post-transaction commit.
+- [x] Malformed graph topologies are rejected before projection; projected subgraphs carry `commit_id` and `workspace_id`.

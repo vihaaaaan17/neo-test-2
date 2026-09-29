@@ -18,6 +18,7 @@ class ResearchRun(Base):
     conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.conversation_id", ondelete="SET NULL"), nullable=True, index=True)
     turn_id = Column(UUID(as_uuid=True), ForeignKey("conversation_turns.turn_id", ondelete="SET NULL"), nullable=True, index=True)
     base_commit_id = Column(UUID(as_uuid=True), ForeignKey("workspace_commits.commit_id", ondelete="SET NULL"), nullable=True, index=True)
+    timeline_epoch = Column(Integer, default=1, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
