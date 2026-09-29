@@ -582,9 +582,9 @@
     "semantic_hash": ""
   },
   "app/repositories/conversation.py": {
-    "mtime": 1790613860.8624918,
-    "seen": 1790614252.3422954,
-    "ast_hash": "0c99b84066066ce920feae185f124188",
+    "mtime": 1790690381.6421213,
+    "seen": 1790690490.8479002,
+    "ast_hash": "0e0ba1bd00989102cadca778916dd236",
     "semantic_hash": ""
   },
   "app/schemas/chat.py": {
@@ -600,9 +600,9 @@
     "semantic_hash": ""
   },
   "app/services/chat/service.py": {
-    "mtime": 1790689103.241024,
-    "seen": 1790689805.5191598,
-    "ast_hash": "43745c11766def8547ae5825bf1e2aaa",
+    "mtime": 1790690375.6498158,
+    "seen": 1790690490.8479002,
+    "ast_hash": "9f763eaf8dcaa494df615a6230705e42",
     "semantic_hash": ""
   },
   "app/services/chat/events.py": {

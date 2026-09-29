@@ -200,7 +200,7 @@ class ConversationRepository:
         turn_id: UUID,
         status: str,
         assistant_message: Optional[str] = None,
-        ground_evidence_refs: Optional[List[Dict[str, Any]]] = None,
+        ground_evidence_refs: Optional[List[Any]] = None,
         research_run_id: Optional[UUID] = None,
         context_version: Optional[Dict[str, Any]] = None,
         error_code: Optional[str] = None,

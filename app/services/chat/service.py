@@ -436,7 +436,7 @@ class ChatService:
 
                 final_answer_text = "".join(full_answer)
                 formatted_evidence_refs = [
-                    e if isinstance(e, dict) else {"source_id": str(e)}
+                    e if isinstance(e, dict) else str(e)
                     for e in evidence_refs
                 ]
 
@@ -696,7 +696,7 @@ class ChatService:
             prov_status = state.get("provenance_status", "full")
 
             formatted_evidence_refs = [
-                e if isinstance(e, dict) else {"source_id": str(e)}
+                e if isinstance(e, dict) else str(e)
                 for e in evidence_refs
             ]
 
