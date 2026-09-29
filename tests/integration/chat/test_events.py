@@ -190,7 +190,7 @@ async def test_ground_turn_sse_streaming(test_env, db_session: AsyncSession):
 
     evidence_id = str(uuid.uuid4())
 
-    async def mock_stream(session_id, notebook_id, message):
+    async def mock_stream(session_id, notebook_id, message, context_config=None):
         yield {"event": "strategy", "data": {"reasoning": "analyzing sources...", "searches": ["specs"]}}
         yield {"event": "token", "data": {"token": "The "}}
         yield {"event": "token", "data": {"token": "architecture "}}
@@ -320,8 +320,10 @@ async def test_client_disconnect_does_not_abort_turn(test_env, db_session: Async
     conv_a = test_env["conv_a"]
 
     app.dependency_overrides[get_current_user] = lambda: user_a
+    mock_redis = MockArqRedis()
+    app.dependency_overrides[get_arq_redis] = lambda: mock_redis
 
-    async def slow_stream(session_id, notebook_id, message):
+    async def slow_stream(session_id, notebook_id, message, context_config=None):
         yield {"event": "token", "data": {"token": "Part 1 "}}
         await asyncio.sleep(0.15)
         yield {"event": "token", "data": {"token": "Part 2."}}
@@ -357,6 +359,7 @@ async def test_client_disconnect_does_not_abort_turn(test_env, db_session: Async
                 assert "Part 1 Part 2." in turn_data["assistant_message"]
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_arq_redis, None)
 
 
 # ============================================================================ #
@@ -368,7 +371,9 @@ async def test_replay_historical_events(test_env, db_session: AsyncSession):
     ws_a = test_env["ws_a"]
     conv_a = test_env["conv_a"]
 
+    mock_redis = MockArqRedis()
     app.dependency_overrides[get_current_user] = lambda: user_a
+    app.dependency_overrides[get_arq_redis] = lambda: mock_redis
 
     # Create a turn with 4 events
     turn = ConversationTurn(
@@ -422,6 +427,7 @@ async def test_replay_historical_events(test_env, db_session: AsyncSession):
             assert stream_events[1]["event"] == "done"
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_arq_redis, None)
 
 
 # ============================================================================ #
@@ -434,6 +440,9 @@ async def test_replay_multi_tenant_isolation(test_env, db_session: AsyncSession)
     ws_a = test_env["ws_a"]
     ws_b = test_env["ws_b"]
     conv_a = test_env["conv_a"]
+
+    mock_redis = MockArqRedis()
+    app.dependency_overrides[get_arq_redis] = lambda: mock_redis
 
     # Turn belonging to user_a
     turn = ConversationTurn(
@@ -469,3 +478,72 @@ async def test_replay_multi_tenant_isolation(test_env, db_session: AsyncSession)
             assert resp_mismatch.status_code in [403, 404]
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_arq_redis, None)
+
+
+# ============================================================================ #
+# 7. Last-Event-ID Reconnect Cursor (G6 gate)
+# ============================================================================ #
+
+async def test_last_event_id_reconnect_cursor(test_env, db_session: AsyncSession):
+    """
+    Verifies that the Last-Event-ID header drives SSE reconnect cursor:
+    - Four events are persisted (sequence 1-4).
+    - Client reconnects with Last-Event-ID: 2.
+    - Only events with sequence > 2 (i.e. sequences 3 and 4) are streamed.
+    - Each SSE frame carries an id: <sequence> line.
+    """
+    user_a = test_env["user_a"]
+    ws_a = test_env["ws_a"]
+    conv_a = test_env["conv_a"]
+
+    mock_redis = MockArqRedis()
+    app.dependency_overrides[get_current_user] = lambda: user_a
+    app.dependency_overrides[get_arq_redis] = lambda: mock_redis
+
+    turn = ConversationTurn(
+        conversation_id=conv_a.conversation_id,
+        workspace_id=ws_a.workspace_id,
+        owner_id=user_a,
+        sequence=10,
+        mode="ground",
+        user_message="Reconnect test",
+        status="completed",
+    )
+    db_session.add(turn)
+    await db_session.commit()
+    await db_session.refresh(turn)
+
+    repo = ChatEventRepository(db_session)
+    await repo.append_event(turn.turn_id, "status_change", {"status": "running"})
+    await repo.append_event(turn.turn_id, "token", {"content": "Hello "})
+    await repo.append_event(turn.turn_id, "token", {"content": "World"})
+    await repo.append_event(turn.turn_id, "done", {"status": "completed"})
+
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # Reconnect: pretend client last saw sequence 2
+            resp = await client.get(
+                f"/api/v1/workspaces/{ws_a.workspace_id}/conversations/{conv_a.conversation_id}"
+                f"/turns/{turn.turn_id}/events?stream=true",
+                headers={"Last-Event-ID": "2"},
+            )
+            assert resp.status_code == 200
+            assert "text/event-stream" in resp.headers["content-type"]
+
+            raw_text = resp.text
+            # Only sequences 3 and 4 should appear
+            stream_events = parse_sse_events(raw_text)
+            assert len(stream_events) == 2, (
+                f"Expected 2 events after reconnect, got {len(stream_events)}: {stream_events}"
+            )
+            assert stream_events[0]["event"] == "token"
+            assert stream_events[0]["data"]["content"] == "World"
+            assert stream_events[1]["event"] == "done"
+
+            # Each frame must carry an id: <sequence> header
+            assert "id: 3" in raw_text, "SSE frame for sequence 3 missing 'id: 3'"
+            assert "id: 4" in raw_text, "SSE frame for sequence 4 missing 'id: 4'"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_arq_redis, None)

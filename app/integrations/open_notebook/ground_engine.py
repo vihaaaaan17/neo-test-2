@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi import HTTPException
 from app.integrations.open_notebook.client import OpenNotebookClient
-from app.integrations.open_notebook.citation_mapper import map_citations
+from app.integrations.open_notebook.citation_mapper import map_citations, map_canonical_sources_to_upstream
 from app.models.open_notebook_binding import OpenNotebookWorkspaceBinding, OpenNotebookConversationBinding
 
 logger = logging.getLogger(__name__)
@@ -102,7 +102,7 @@ class OpenNotebookGroundEngine:
     ) -> tuple[OpenNotebookConversationBinding, str]:
         conv_bind_stmt = select(OpenNotebookConversationBinding).where(
             OpenNotebookConversationBinding.conversation_id == conversation_id
-        )
+        ).with_for_update()
         conv_res = await db.execute(conv_bind_stmt)
         conv_binding = conv_res.scalars().first()
 
@@ -113,8 +113,21 @@ class OpenNotebookGroundEngine:
                 open_notebook_session_id=session_id
             )
             db.add(conv_binding)
-            await db.commit()
-            await db.refresh(conv_binding)
+            try:
+                await db.commit()
+                await db.refresh(conv_binding)
+            except Exception:
+                await db.rollback()
+                conv_res = await db.execute(
+                    select(OpenNotebookConversationBinding).where(
+                        OpenNotebookConversationBinding.conversation_id == conversation_id
+                    )
+                )
+                conv_binding = conv_res.scalars().first()
+                if conv_binding:
+                    session_id = conv_binding.open_notebook_session_id
+                else:
+                    raise
         else:
             session_id = conv_binding.open_notebook_session_id
 
@@ -142,6 +155,32 @@ class OpenNotebookGroundEngine:
         binding = await self._get_active_binding(workspace_id, db)
         notebook_id = binding.open_notebook_notebook_id
 
+        # Map canonical source scope to Open Notebook upstream IDs
+        mapped_upstream_ids: List[str] = []
+        if source_scope:
+            canonical_uuids = [
+                UUID(str(s.get("source_id") or s.get("id"))) if isinstance(s, dict) else UUID(str(s))
+                for s in source_scope
+                if (isinstance(s, dict) and (s.get("source_id") or s.get("id"))) or (not isinstance(s, dict) and s)
+            ]
+            if canonical_uuids:
+                mapped_upstream_ids = await map_canonical_sources_to_upstream(
+                    canonical_uuids,
+                    workspace_id,
+                    db
+                )
+                if not mapped_upstream_ids:
+                    raise HTTPException(
+                        status_code=422,
+                        detail="ground_provenance_failure: Zero mapped canonical evidence."
+                    )
+
+        context_config = {
+            "sources": {
+                sid: "full content" for sid in mapped_upstream_ids
+            }
+        } if mapped_upstream_ids else {}
+
         try:
             # 1. Concurrently search and ask/chat
             if conversation_id and hasattr(self.client, "chat_execute"):
@@ -158,7 +197,8 @@ class OpenNotebookGroundEngine:
                             self.client.chat_execute(
                                 session_id=session_id,
                                 notebook_id=notebook_id,
-                                message=query
+                                message=query,
+                                context_config=context_config
                             ),
                             return_exceptions=True
                         )
@@ -168,6 +208,8 @@ class OpenNotebookGroundEngine:
                         if isinstance(search_results, Exception):
                             logger.warning("Open Notebook search failed: %s", search_results)
                             search_results = []
+                        elif mapped_upstream_ids and isinstance(search_results, list):
+                            search_results = [r for r in search_results if isinstance(r, dict) and r.get("id") in mapped_upstream_ids]
                         answer_text = chat_res.get("answer", "")
                         extra_evidence = chat_res.get("evidence", [])
                         break
@@ -276,6 +318,32 @@ class OpenNotebookGroundEngine:
         binding = await self._get_active_binding(workspace_id, db)
         notebook_id = binding.open_notebook_notebook_id
 
+        # Map canonical source scope to Open Notebook upstream IDs
+        mapped_upstream_ids: List[str] = []
+        if source_scope:
+            canonical_uuids = [
+                UUID(str(s.get("source_id") or s.get("id"))) if isinstance(s, dict) else UUID(str(s))
+                for s in source_scope
+                if (isinstance(s, dict) and (s.get("source_id") or s.get("id"))) or (not isinstance(s, dict) and s)
+            ]
+            if canonical_uuids:
+                mapped_upstream_ids = await map_canonical_sources_to_upstream(
+                    canonical_uuids,
+                    workspace_id,
+                    db
+                )
+                if not mapped_upstream_ids:
+                    raise HTTPException(
+                        status_code=422,
+                        detail="ground_provenance_failure: Zero mapped canonical evidence."
+                    )
+
+        context_config = {
+            "sources": {
+                sid: "full content" for sid in mapped_upstream_ids
+            }
+        } if mapped_upstream_ids else {}
+
         # 1. Resolve citations & provenance upfront
         try:
             valid_source_ids, partial = await self._resolve_citations(
@@ -315,7 +383,8 @@ class OpenNotebookGroundEngine:
                         async for chunk in self.client.chat_stream(
                             session_id=session_id,
                             notebook_id=notebook_id,
-                            message=query
+                            message=query,
+                            context_config=context_config
                         ):
                             ev_type = chunk.get("event") or chunk.get("type") or "token"
                             ev_data = chunk.get("data") or {}

@@ -14,9 +14,10 @@ from app.models.conversation import ChatEvent, ConversationTurn
 logger = logging.getLogger(__name__)
 
 
-def format_sse_event(event_type: str, data: Any) -> str:
+def format_sse_event(event_type: str, data: Any, event_id: Optional[int] = None) -> str:
     """
     Formats an event as standard Server-Sent Event (SSE):
+    id: <sequence>\n
     event: <event_type>\n
     data: <json_payload>\n\n
     """
@@ -32,7 +33,10 @@ def format_sse_event(event_type: str, data: Any) -> str:
     else:
         payload_str = json.dumps(data)
 
-    return f"event: {event_type}\ndata: {payload_str}\n\n"
+    seq = event_id if event_id is not None else (data.get("sequence") if isinstance(data, dict) else None)
+    id_header = f"id: {seq}\n" if seq is not None else ""
+
+    return f"{id_header}event: {event_type}\ndata: {payload_str}\n\n"
 
 
 class ChatEventRepository:

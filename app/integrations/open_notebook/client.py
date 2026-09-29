@@ -1,6 +1,6 @@
 import httpx
 import logging
-from typing import Any
+from typing import Any, Optional, Dict
 from functools import wraps
 from fastapi import HTTPException
 from app.integrations.open_notebook.config import get_open_notebook_base_url, get_open_notebook_timeout
@@ -8,6 +8,8 @@ from app.integrations.open_notebook.config import get_open_notebook_base_url, ge
 import uuid
 import time
 import threading
+import asyncio
+import re
 from enum import Enum
 from opentelemetry import propagate, trace
 
@@ -318,7 +320,13 @@ class OpenNotebookClient:
             response.raise_for_status()
             return response.json().get("id")
 
-    async def chat_execute(self, session_id: str, notebook_id: str, message: str) -> dict[str, Any]:
+    async def chat_execute(
+        self,
+        session_id: str,
+        notebook_id: str,
+        message: str,
+        context_config: Optional[dict] = None
+    ) -> dict[str, Any]:
         """
         Executes a chat message. Returns the final answer text and the updated messages.
         Note: We manually handle HTTP errors here to specifically trap 404s for missing sessions.
@@ -331,7 +339,7 @@ class OpenNotebookClient:
             try:
                 context_res = await client.post(
                     f"{self.base_url}/api/chat/context",
-                    json={"notebook_id": notebook_id, "context_config": {}},
+                    json={"notebook_id": notebook_id, "context_config": context_config or {}},
                     headers=self._get_headers()
                 )
                 context_res.raise_for_status()
@@ -385,7 +393,8 @@ class OpenNotebookClient:
         self,
         session_id: str,
         notebook_id: str,
-        message: str
+        message: str,
+        context_config: Optional[dict] = None
     ):
         """
         Streams chat events and incremental tokens for a conversation session.
@@ -400,7 +409,7 @@ class OpenNotebookClient:
                 # 1. Fetch context
                 context_res = await client.post(
                     f"{self.base_url}/api/chat/context",
-                    json={"notebook_id": notebook_id, "context_config": {}},
+                    json={"notebook_id": notebook_id, "context_config": context_config or {}},
                     headers=self._get_headers()
                 )
                 context_res.raise_for_status()
@@ -427,7 +436,14 @@ class OpenNotebookClient:
                         answer = msg.get("content", "")
                         break
 
-                yield {"event": "token", "data": {"token": answer}}
+                if answer:
+                    tokens = re.findall(r'\S+\s*|\s+', answer)
+                    if not tokens:
+                        tokens = [answer]
+                    for token in tokens:
+                        yield {"event": "token", "data": {"token": token}}
+                        await asyncio.sleep(0.005)
+
                 yield {"event": "done", "data": {"answer": answer, "evidence": result.get("evidence", [])}}
             except httpx.HTTPStatusError as e:
                 if e.response.status_code >= 500:

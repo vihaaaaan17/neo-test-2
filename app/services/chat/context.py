@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from fastapi import HTTPException
 from app.models.conversation import Conversation, ConversationTurn
 from app.models.open_notebook_binding import OpenNotebookConversationBinding, OpenNotebookWorkspaceBinding
 from app.models.source import Source
@@ -33,16 +34,27 @@ async def resolve_ground_source_scope(
     """
     Validates and resolves canonical source scope for Ground mode.
     If explicit_scope is provided, ensures all UUIDs exist and belong to workspace.
+    Fails closed if any provided UUID does not exist or belongs to another workspace.
     """
     if not explicit_scope:
         return None
 
+    requested_set = {UUID(str(s)) for s in explicit_scope}
     stmt = select(Source.source_id).where(
         Source.workspace_id == workspace_id,
-        Source.source_id.in_(explicit_scope)
+        Source.source_id.in_(requested_set)
     )
     result = await session.execute(stmt)
     valid_ids = list(result.scalars().all())
+    found_set = {UUID(str(s)) for s in valid_ids}
+
+    if found_set != requested_set:
+        missing_ids = requested_set - found_set
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid source_scope: one or more source IDs do not exist or belong to another workspace: {[str(m) for m in missing_ids]}"
+        )
+
     return valid_ids if valid_ids else None
 
 

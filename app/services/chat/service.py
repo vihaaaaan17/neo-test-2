@@ -300,55 +300,122 @@ class ChatService:
                 detail=f"Unsupported turn mode: {turn_create.mode}"
             )
 
-    async def stream_turn_events(self, turn_id: UUID) -> AsyncGenerator[str, None]:
+    async def stream_turn_events(
+        self,
+        turn_id: UUID,
+        after_sequence: int = 0,
+    ) -> AsyncGenerator[str, None]:
         """
-        Yields standard SSE formatted events:
-        event: <type>\ndata: <json_payload>\n\n
-        Replays existing persisted events first, then streams live events until 'done'.
+        Unified SSE generator — supports reconnect replay via Last-Event-ID.
+
+        Protocol:
+          1. Subscribe to Redis pubsub and local broker *before* any DB read
+             so no event published after subscription can be missed.
+          2. Replay PostgreSQL ChatEvents with sequence > after_sequence,
+             emitting ``id: <sequence>`` on every frame.
+          3. If a terminal event ('done', 'error', 'cancelled') is found in
+             the replay, close immediately without opening the live loop.
+          4. Drain live messages from local broker (with a Redis pubsub
+             fallback when arq_redis supports pubsub), deduplicating by
+             sequence against last_seq.  Emit keep-alive comments on timeout.
+          5. Exit cleanly on any terminal event_type.
         """
+        _TERMINAL = frozenset({"done", "error", "cancelled"})
         channel = f"turn_events:{turn_id}"
-        q = TurnEventBroker.subscribe_local(channel)
+
+        # ------------------------------------------------------------------
+        # Step 0: Subscribe BEFORE any DB read to avoid a missed-event race.
+        # ------------------------------------------------------------------
+        local_q = TurnEventBroker.subscribe_local(channel)
+        pubsub = None
+        if self.arq_redis and hasattr(self.arq_redis, "pubsub"):
+            try:
+                _ps = self.arq_redis.pubsub()
+                await asyncio.wait_for(_ps.subscribe(channel), timeout=1.0)
+                pubsub = _ps
+            except (asyncio.TimeoutError, Exception) as _ps_err:
+                logger.debug("Redis pubsub unavailable for %s: %s", channel, _ps_err)
+                pubsub = None
 
         try:
-            # 1. Fetch any already-persisted events to catch up
-            last_seq = 0
-            existing_events = await self.event_repo.list_events_after(turn_id, after_sequence=0)
+            # ---------------------------------------------------------------
+            # Step 1: Replay persisted events (catch-up / reconnect support).
+            # ---------------------------------------------------------------
+            last_seq: int = after_sequence
+            existing_events = await self.event_repo.list_events_after(
+                turn_id, after_sequence=after_sequence
+            )
             for ev in existing_events:
-                yield format_sse_event(ev.event_type, ev.payload)
+                yield format_sse_event(ev.event_type, ev.payload, event_id=ev.sequence)
                 last_seq = max(last_seq, ev.sequence)
-                if ev.event_type == "done":
+                if ev.event_type in _TERMINAL:
                     return
 
-            # 2. Stream live events
+            # ---------------------------------------------------------------
+            # Step 2: Stream live events until terminal.
+            # ---------------------------------------------------------------
             while True:
+                msg: Optional[Dict[str, Any]] = None
+
+                # 2a. Prefer in-process local broker (zero-latency on same node)
                 try:
-                    msg = await asyncio.wait_for(q.get(), timeout=10.0)
+                    msg = await asyncio.wait_for(local_q.get(), timeout=10.0)
                 except asyncio.TimeoutError:
-                    yield ": keep-alive\n\n"
-                    # Also double check DB if done event was recorded
+                    pass
+
+                # 2b. If local queue timed-out, poll Redis pubsub once
+                if msg is None and pubsub is not None:
                     try:
-                        async with async_session_maker() as check_s:
-                            ch_repo = ChatEventRepository(check_s)
-                            recent = await ch_repo.list_events_after(turn_id, after_sequence=last_seq)
+                        raw_msg = await asyncio.wait_for(
+                            pubsub.get_message(ignore_subscribe_messages=True, timeout=0.0),
+                            timeout=0.5
+                        )
+                        if raw_msg and raw_msg.get("type") == "message":
+                            raw_data = raw_msg.get("data", b"")
+                            if isinstance(raw_data, bytes):
+                                raw_data = raw_data.decode("utf-8")
+                            msg = json.loads(raw_data) if raw_data else None
+                    except (asyncio.TimeoutError, Exception) as _redis_err:
+                        logger.debug("Redis pubsub poll error: %s", _redis_err)
+
+                # 2c. Keep-alive + DB safety-net when both sources are idle
+                if msg is None:
+                    yield ": keep-alive\n\n"
+                    try:
+                        async with async_session_maker() as _check_s:
+                            _ch_repo = ChatEventRepository(_check_s)
+                            recent = await _ch_repo.list_events_after(
+                                turn_id, after_sequence=last_seq
+                            )
                             for ev in recent:
-                                yield format_sse_event(ev.event_type, ev.payload)
+                                yield format_sse_event(
+                                    ev.event_type, ev.payload, event_id=ev.sequence
+                                )
                                 last_seq = max(last_seq, ev.sequence)
-                                if ev.event_type == "done":
+                                if ev.event_type in _TERMINAL:
                                     return
-                    except Exception as db_err:
-                        logger.debug("Failed checking DB during keepalive: %s", db_err)
+                    except Exception as _db_err:
+                        logger.debug("DB safety-net check failed: %s", _db_err)
                     continue
 
+                # 2d. Deduplicate and emit
                 seq = msg.get("sequence", 0)
                 if seq > last_seq:
                     last_seq = seq
                     ev_type = msg.get("event_type", "message")
                     payload = msg.get("payload", {})
-                    yield format_sse_event(ev_type, payload)
-                    if ev_type == "done":
+                    yield format_sse_event(ev_type, payload, event_id=seq)
+                    if ev_type in _TERMINAL:
                         break
+
         finally:
-            TurnEventBroker.unsubscribe_local(channel, q)
+            TurnEventBroker.unsubscribe_local(channel, local_q)
+            if pubsub is not None:
+                try:
+                    await pubsub.unsubscribe(channel)
+                    await pubsub.close()
+                except Exception:
+                    pass
 
     async def _execute_ground_stream_background(
         self,

@@ -46,6 +46,31 @@ async def map_citations(
     partial = len(valid_source_ids) < len(upstream_ids)
     if partial:
         unmapped = set(upstream_ids) - {b.open_notebook_source_id for b in bindings if b.source_id in valid_source_ids}
-        logger.warning(f"Partial provenance: some upstream IDs could not be mapped to workspace {workspace_id}: {unmapped}")
-    
     return list(valid_source_ids), partial
+
+
+async def map_canonical_sources_to_upstream(
+    canonical_source_ids: list[UUID],
+    workspace_id: UUID,
+    db: AsyncSession
+) -> list[str]:
+    """
+    Map canonical Neosis source_ids (UUIDs) to upstream Open Notebook source IDs (strings).
+    Ensures that mapped sources actually belong to the given workspace_id.
+    """
+    if not canonical_source_ids:
+        return []
+
+    canonical_set = {UUID(str(s)) for s in canonical_source_ids}
+    stmt = (
+        select(OpenNotebookSourceBinding.open_notebook_source_id)
+        .join(Source, Source.source_id == OpenNotebookSourceBinding.source_id)
+        .where(
+            Source.workspace_id == workspace_id,
+            OpenNotebookSourceBinding.source_id.in_(canonical_set),
+            OpenNotebookSourceBinding.open_notebook_source_id.isnot(None)
+        )
+    )
+    result = await db.execute(stmt)
+    return [str(s) for s in result.scalars().all() if s]
+

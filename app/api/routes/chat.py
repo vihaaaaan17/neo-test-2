@@ -1,6 +1,6 @@
 from typing import Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response, Header
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from arq.connections import ArqRedis
@@ -282,28 +282,39 @@ async def list_turn_events(
     turn_id: UUID,
     after_sequence: int = Query(0, ge=0, description="Retrieve events strictly after sequence number"),
     stream: bool = Query(False, description="Stream events as SSE instead of JSON"),
+    last_event_id: Optional[str] = Header(None, alias="Last-Event-ID"),
     current_user_id: UUID = Depends(get_current_user),
     chat_service: ChatService = Depends(get_chat_service)
 ):
-    events = await chat_service.get_turn_events(
+    # Resolve reconnect cursor: Last-Event-ID header takes precedence over QS param
+    cursor: int = after_sequence
+    if last_event_id is not None:
+        try:
+            cursor = int(last_event_id)
+        except (ValueError, TypeError):
+            pass  # malformed header — fall back to query param
+
+    # Always validate workspace + conversation + turn ownership
+    await chat_service.get_turn_events(
         workspace_id=workspace_id,
         conversation_id=conversation_id,
         turn_id=turn_id,
         owner_id=current_user_id,
-        after_sequence=after_sequence
+        after_sequence=cursor,
     )
+
     if stream:
-        async def replay_generator():
-            for ev in events:
-                yield format_sse_event(ev.event_type, ev.payload)
         return StreamingResponse(
-            replay_generator(),
+            chat_service.stream_turn_events(turn_id, after_sequence=cursor),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
-                "Connection": "keep-alive"
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
             }
         )
+
+    events = await chat_service.event_repo.list_events_after(turn_id, after_sequence=cursor)
     return ChatEventListResponse(
         events=[ChatEventResponse.model_validate(ev) for ev in events],
         total=len(events)
