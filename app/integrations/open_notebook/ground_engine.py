@@ -86,7 +86,7 @@ class OpenNotebookGroundEngine:
             if len(valid_source_ids) < initial_count:
                 partial = True
 
-        if not valid_source_ids:
+        if upstream_ids and not valid_source_ids:
             raise HTTPException(
                 status_code=422,
                 detail="ground_provenance_failure: Zero mapped canonical evidence."
@@ -202,7 +202,7 @@ class OpenNotebookGroundEngine:
                     if len(valid_source_ids) < initial_count:
                         partial = True
 
-                if not valid_source_ids:
+                if upstream_ids and not valid_source_ids and not extra_evidence:
                     raise HTTPException(
                         status_code=422,
                         detail="ground_provenance_failure: Zero mapped canonical evidence."
@@ -236,7 +236,7 @@ class OpenNotebookGroundEngine:
                 if len(valid_source_ids) < initial_count:
                     partial = True
 
-            if not valid_source_ids:
+            if upstream_ids and not valid_source_ids:
                 raise HTTPException(
                     status_code=422,
                     detail="ground_provenance_failure: Zero mapped canonical evidence."
@@ -329,6 +329,12 @@ class OpenNotebookGroundEngine:
                                         "content": token,
                                         "data": {"content": token}
                                     }
+                            elif ev_type == "strategy":
+                                yield {
+                                    "event": "strategy",
+                                    "type": "strategy",
+                                    "data": ev_data
+                                }
                             elif ev_type == "done":
                                 ans = ev_data.get("answer") or chunk.get("answer")
                                 if ans and not full_answer:

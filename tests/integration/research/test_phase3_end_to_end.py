@@ -85,7 +85,19 @@ async def test_phase3_end_to_end_flow(mock_engine_factory, db_session: AsyncSess
     assert len(artifacts) == 1
     assert artifacts[0].type == "memory_candidate"
     
-    # Check memory promotion
+    # Check memory promotion via Promotion Service
+    from app.services.research.service import ResearchService
+    from app.services.memory_router import MemoryRouter
+    from app.repositories.knowledge import KnowledgeRepository
+
+    research_svc = ResearchService(
+        research_repo=ResearchRepository(db_session),
+        memory_router=MemoryRouter(repository=KnowledgeRepository(db_session)),
+        graph_repo=None
+    )
+    promoted = await research_svc.promote_memory_candidates(workspace_id=workspace_id, run_id=run_id, owner_id=owner_id)
+    assert promoted >= 1
+
     mem_result = await db_session.execute(select(KnowledgeMemory).where(KnowledgeMemory.workspace_id == workspace_id))
     memories = mem_result.scalars().all()
     assert len(memories) >= 1

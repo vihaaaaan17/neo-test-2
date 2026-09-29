@@ -12,6 +12,13 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 pytestmark = pytest.mark.asyncio
 
+@pytest.fixture(autouse=True)
+def mock_arq_redis_fixture():
+    from app.api.deps.arq import get_arq_redis
+    app.dependency_overrides[get_arq_redis] = lambda: AsyncMock()
+    yield
+    app.dependency_overrides.pop(get_arq_redis, None)
+
 @pytest.fixture
 async def setup_workspace_with_on(db_session: AsyncSession):
     user = await create_test_user(db_session)

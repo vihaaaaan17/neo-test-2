@@ -295,7 +295,12 @@ async def ask_ground_mode(
     evidence_uuids = []
     for e in (turn.ground_evidence_refs or []):
         try:
-            evidence_uuids.append(UUID(str(e)))
+            if isinstance(e, dict):
+                sid = e.get("source_id") or e.get("id")
+                if sid:
+                    evidence_uuids.append(UUID(str(sid)))
+            else:
+                evidence_uuids.append(UUID(str(e)))
         except (ValueError, TypeError):
             pass
 

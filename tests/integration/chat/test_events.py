@@ -184,7 +184,9 @@ async def test_ground_turn_sse_streaming(test_env, db_session: AsyncSession):
     ws_a = test_env["ws_a"]
     conv_a = test_env["conv_a"]
 
+    mock_redis = MockArqRedis()
     app.dependency_overrides[get_current_user] = lambda: user_a
+    app.dependency_overrides[get_arq_redis] = lambda: mock_redis
 
     evidence_id = str(uuid.uuid4())
 
@@ -237,6 +239,7 @@ async def test_ground_turn_sse_streaming(test_env, db_session: AsyncSession):
                 assert seqs == list(range(1, len(seqs) + 1))
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_arq_redis, None)
 
 
 # ============================================================================ #

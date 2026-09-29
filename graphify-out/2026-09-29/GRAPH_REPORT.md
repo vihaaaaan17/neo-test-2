@@ -1,16 +1,16 @@
 # Graph Report - NeosisLM  (2026-09-29)
 
 ## Corpus Check
-- 116 files · ~50,808 words
+- 116 files · ~50,926 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1238 nodes · 3121 edges · 64 communities (57 shown, 6 thin omitted)
+- 1238 nodes · 3125 edges · 63 communities (56 shown, 6 thin omitted)
 - Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 233 edges (avg confidence: 0.95)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `061519f9`
+- Built from commit: `1c19bc04`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -19,7 +19,7 @@
 - ProviderRateLimiter
 - OpenNotebookGroundEngine
 - ResearchRepository
-- ObjectStoreProtocol
+- .parse_document
 - ResearchQuotaService
 - utils.py
 - EpisodicMemory
@@ -46,7 +46,7 @@
 - ResearchModeOrchestrator
 - ResearchMetricsService
 - Source
-- get_rate_limit_status
+- QuotaService
 - WorkspaceRepository
 - repositories/block.py
 - chat/service.py
@@ -56,7 +56,7 @@
 - start_research
 - workspaces.py
 - telemetry.py
-- worker.py
+- settings.py
 - schemas/promotion.py
 - Neo4jAdapter
 - research/service.py
@@ -74,7 +74,6 @@
 - schemas/source.py
 - .__init__
 - .__init__
-- .admit_research_run
 - .list_retrievers
 - S3ObjectStore
 - .retrieve
@@ -106,11 +105,11 @@
 ## Import Cycles
 - None detected.
 
-## Communities (64 total, 6 thin omitted)
+## Communities (63 total, 6 thin omitted)
 
 ### Community 0 - "tasks.py"
-Cohesion: 0.11
-Nodes (25): BlockRepository, AsyncSession, Validates and sanitizes structured scratchpad content. Strictly prohibits raw…, sanitize_scratchpad_content(), ChunkingService, delete_open_notebook_source_job(), delete_open_notebook_workspace_job(), _get_source_and_snapshot() (+17 more)
+Cohesion: 0.10
+Nodes (26): BlockRepository, AsyncSession, Validates and sanitizes structured scratchpad content. Strictly prohibits raw…, sanitize_scratchpad_content(), ChunkingService, DocumentParser, delete_open_notebook_source_job(), delete_open_notebook_workspace_job() (+18 more)
 
 ### Community 1 - "ProviderRateLimiter"
 Cohesion: 0.12
@@ -122,11 +121,7 @@ Nodes (21): map_citations(), AsyncSession, UUID, Map upstream Open Notebook sour
 
 ### Community 3 - "ResearchRepository"
 Cohesion: 0.14
-Nodes (11): ResearchArtifact, Any, UUID, Creates multiple evidence records in batches with fingerprint deduplication., Retrieves evidence records by their fingerprints., Performs a bulk insert of evidence records., Unified repository for all Research Fabric models. Enforces workspace_id…, Internal helper to ensure a given run_id belongs to the workspace_id. Raises an… (+3 more)
-
-### Community 4 - "ObjectStoreProtocol"
-Cohesion: 0.18
-Nodes (6): DocumentParser, Any, Downloads a document from Object Storage and parses it using docling. Returns a…, ObjectStoreProtocol, Protocol, UUID
+Nodes (12): ResearchArtifact, ResearchEvidence, Any, UUID, Creates multiple evidence records in batches with fingerprint deduplication., Retrieves evidence records by their fingerprints., Performs a bulk insert of evidence records., Unified repository for all Research Fabric models. Enforces workspace_id… (+4 more)
 
 ### Community 5 - "ResearchQuotaService"
 Cohesion: 0.07
@@ -145,8 +140,8 @@ Cohesion: 0.15
 Nodes (26): Config, Configuration, RunnableConfig, Create a Configuration instance from a RunnableConfig., Pydantic configuration., Main configuration class for the Deep Research agent., clarify_with_user(), compress_research() (+18 more)
 
 ### Community 9 - "models/__init__.py"
-Cohesion: 0.16
-Nodes (19): Base, ResearchEvent, ResearchEvidence, ResearchReport, ResearchRun, ResearchTask, ResearchUsage, InvalidTransitionError (+11 more)
+Cohesion: 0.11
+Nodes (24): Base, ResearchEvent, ResearchReport, ResearchRun, ResearchTask, ResearchUsage, UUID, Admits a new research run after checking quotas and rate limits. (+16 more)
 
 ### Community 10 - "state.py"
 Cohesion: 0.12
@@ -205,8 +200,8 @@ Cohesion: 0.15
 Nodes (12): GPTResearcherInput, BaseModel, neosis_web_search(), InjectedToolArg, RunnableConfig, tool, Fetch search results, immediately persist them to Neosis DB, and return…, Normalizes a URL by parsing it, lowercasing the scheme and netloc, and sorting… (+4 more)
 
 ### Community 24 - "core/config.py"
-Cohesion: 0.14
-Nodes (14): Settings, Shared HTTP client for Open Notebook integration., get_checkpointer(), process_memory(), Any, Validates checkpointer configuration on startup. In production, durable…, Returns the checkpointer instance appropriate for the current environment., validate_checkpointer() (+6 more)
+Cohesion: 0.17
+Nodes (11): Settings, Shared HTTP client for Open Notebook integration., get_checkpointer(), process_memory(), Any, Validates checkpointer configuration on startup. In production, durable…, Returns the checkpointer instance appropriate for the current environment., validate_checkpointer() (+3 more)
 
 ### Community 25 - "GroundModeOrchestrator"
 Cohesion: 0.13
@@ -217,8 +212,8 @@ Cohesion: 0.24
 Nodes (7): Executes a search query and returns the results formatted as markdown., WebSearchTool, create_db_workspace(), get_litellm_gateway(), project_graph_to_neo4j(), run_agent(), run_ground_mode()
 
 ### Community 27 - "routes/chat.py"
-Cohesion: 0.15
-Nodes (33): cancel_turn(), create_conversation(), get_chat_service(), get_conversation(), get_conversation_repository(), get_turn(), get_workspace_repository(), list_conversations() (+25 more)
+Cohesion: 0.16
+Nodes (31): cancel_turn(), create_conversation(), get_conversation(), get_conversation_repository(), get_turn(), get_workspace_repository(), list_conversations(), list_turn_events() (+23 more)
 
 ### Community 28 - "ResearchModeOrchestrator"
 Cohesion: 0.21
@@ -229,24 +224,24 @@ Cohesion: 0.12
 Nodes (15): get_workspace_metrics(), AsyncSession, get, UUID, Get observability metrics for a workspace., Any, datetime, UUID (+7 more)
 
 ### Community 30 - "Source"
-Cohesion: 0.12
-Nodes (16): Base, Source, SourceSnapshot, AsyncSession, UUID, SourceRepository, UUID, WorkspaceExportService (+8 more)
+Cohesion: 0.24
+Nodes (8): Base, Source, SourceSnapshot, AsyncSession, UUID, SourceRepository, UUID, WorkspaceExportService
 
-### Community 31 - "get_rate_limit_status"
-Cohesion: 0.40
-Nodes (5): get_rate_limit_status(), get, Redis, UUID, Get the current rate limit status for the user.
+### Community 31 - "QuotaService"
+Cohesion: 0.17
+Nodes (10): get_memory_router(), get_quota(), get_quota_service(), AsyncSession, UUID, QuotaService, Check if user has exceeded their workspace limit., Check if workspace has exceeded its source count limit. (+2 more)
 
 ### Community 32 - "WorkspaceRepository"
-Cohesion: 0.24
-Nodes (7): Base, Workspace, WorkspaceCommit, AsyncSession, UUID, Atomically rolls back the workspace to a target commit under a row lock (FOR…, WorkspaceRepository
+Cohesion: 0.22
+Nodes (9): get_chat_service(), ArqRedis, Base, Workspace, WorkspaceCommit, AsyncSession, UUID, Atomically rolls back the workspace to a target commit under a row lock (FOR… (+1 more)
 
 ### Community 33 - "repositories/block.py"
 Cohesion: 0.25
 Nodes (6): UUID, DocumentBlockCreate, DocumentBlockResponse, BaseModel, Any, Takes the raw dictionary output from Docling and converts it into…
 
 ### Community 34 - "chat/service.py"
-Cohesion: 0.14
-Nodes (18): get_arq_redis(), Request, Dependency to get the arq Redis pool. We lazily initialize the pool and attach…, get_current_user(), UUID, get_rate_limit_key(), Request, Rate limit by user ID if authenticated, else fallback to IP. (+10 more)
+Cohesion: 0.11
+Nodes (23): get_arq_redis(), Request, Dependency to get the arq Redis pool. We lazily initialize the pool and attach…, get_current_user(), UUID, get_rate_limit_key(), Request, Rate limit by user ID if authenticated, else fallback to IP. (+15 more)
 
 ### Community 35 - "ground/factory.py"
 Cohesion: 0.13
@@ -261,24 +256,24 @@ Cohesion: 0.21
 Nodes (4): Exception, Raised when an execution exceeds its allocated budget., ResearchBudgetExceeded, UsageTracker
 
 ### Community 38 - "start_research"
-Cohesion: 0.14
-Nodes (23): ask_ground_mode(), ask_ground_mode_stream(), chat_ground_mode(), create_workspace_commit(), get_knowledge_repository(), get_memory_router(), get_quota(), get_research_repository() (+15 more)
+Cohesion: 0.15
+Nodes (22): ask_ground_mode(), ask_ground_mode_stream(), chat_ground_mode(), create_workspace_commit(), get_knowledge_repository(), get_research_repository(), get_source_repository(), get_workspace_repository() (+14 more)
 
 ### Community 39 - "workspaces.py"
-Cohesion: 0.25
-Nodes (13): create_workspace(), patch, rollback_workspace(), update_workspace(), FileUploadResponse, BaseModel, BaseModel, ResearchRequest (+5 more)
+Cohesion: 0.27
+Nodes (12): create_workspace(), patch, update_workspace(), FileUploadResponse, BaseModel, BaseModel, ResearchRequest, RollbackRequest (+4 more)
 
 ### Community 40 - "telemetry.py"
 Cohesion: 0.28
 Nodes (7): Sanitizes sensitive tokens, passwords, and API keys from log strings., Logging filter that intercepts log records and redacts any credentials, bearer…, Sets up OpenTelemetry and attaches secret sanitization to the logging root., sanitize_log_message(), SecretSanitizingFilter, setup_telemetry(), LogRecord
 
-### Community 41 - "worker.py"
-Cohesion: 0.25
-Nodes (7): get_worker_pool_status(), Any, get, Get the current status of worker pools and queues., Returns the configuration for a specific queue., arq worker settings class. Discovered by: python -m arq…, WorkerSettings
+### Community 41 - "settings.py"
+Cohesion: 0.15
+Nodes (12): get_worker_pool_status(), Any, get, Get the current status of worker pools and queues., arq WorkerSettings — defines the worker process configuration. Run the worker…, Returns the configuration for a specific queue., Runs once when the worker process shuts down., arq worker settings class. Discovered by: python -m arq… (+4 more)
 
 ### Community 42 - "schemas/promotion.py"
-Cohesion: 0.17
-Nodes (14): ClaimCandidatePayload, DerivationExpression, FindingCandidatePayload, GraphCandidatePayload, HypothesisCandidatePayload, MemoryCandidatePayload, PromotionCandidateResponse, PromotionReviewRequest (+6 more)
+Cohesion: 0.33
+Nodes (10): ClaimCandidatePayload, DerivationExpression, FindingCandidatePayload, GraphCandidatePayload, HypothesisCandidatePayload, MemoryCandidatePayload, PromotionCandidateResponse, PromotionReviewRequest (+2 more)
 
 ### Community 43 - "Neo4jAdapter"
 Cohesion: 0.17
@@ -329,8 +324,8 @@ Cohesion: 0.67
 Nodes (3): BaseModel, SourceResponse, SourceSnapshotResponse
 
 ### Community 62 - "S3ObjectStore"
-Cohesion: 0.18
-Nodes (7): AsyncSession, get_object_store(), Request, Dependency to provide shared S3ObjectStore from app state., S3ObjectStore, export_workspace_job(), Background job: Executes the workspace export using WorkspaceExportService and…
+Cohesion: 0.14
+Nodes (8): AsyncSession, get_object_store(), ObjectStoreProtocol, Protocol, Request, UUID, Dependency to provide shared S3ObjectStore from app state., S3ObjectStore
 
 ### Community 63 - ".retrieve"
 Cohesion: 0.40
@@ -346,7 +341,7 @@ _Questions this graph is uniquely positioned to answer:_
   _High betweenness centrality (0.249) - this node is a cross-community bridge._
 - **Why does `neosis_web_search()` connect `ResearchNormalizationService` to `ResearchRepository`, `get_all_tools`, `utils.py`?**
   _High betweenness centrality (0.138) - this node is a cross-community bridge._
-- **Why does `ResearchRun` connect `models/__init__.py` to `tasks.py`, `ProviderRateLimiter`, `chat/service.py`, `ResearchRepository`, `ResearchQuotaService`, `start_research`, `workspaces.py`, `chat/context.py`, `research/service.py`, `ChatService`, `run_research_agent_job`, `derivation.py`, `promotions.py`, `.admit_research_run`?**
+- **Why does `ResearchRun` connect `models/__init__.py` to `tasks.py`, `ProviderRateLimiter`, `chat/service.py`, `ResearchRepository`, `ResearchQuotaService`, `start_research`, `workspaces.py`, `chat/context.py`, `research/service.py`, `ChatService`, `run_research_agent_job`, `derivation.py`, `promotions.py`?**
   _High betweenness centrality (0.057) - this node is a cross-community bridge._
 - **Are the 7 inferred relationships involving `ResearchRepository` (e.g. with `ResearchArtifact` and `ResearchEvent`) actually correct?**
   _`ResearchRepository` has 7 INFERRED edges - model-reasoned connections that need verification._

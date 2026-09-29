@@ -15,6 +15,14 @@ from tests.utils import create_test_user, get_user_token_headers
 pytestmark = pytest.mark.asyncio
 
 
+@pytest.fixture(autouse=True)
+def mock_arq_redis_fixture():
+    from app.api.deps.arq import get_arq_redis
+    app.dependency_overrides[get_arq_redis] = lambda: AsyncMock()
+    yield
+    app.dependency_overrides.pop(get_arq_redis, None)
+
+
 @pytest.fixture
 async def setup_workspace(db_session: AsyncSession):
     user = await create_test_user(db_session)
@@ -70,7 +78,7 @@ async def test_partial_provenance_handling(setup_workspace, db_session: AsyncSes
          patch("app.integrations.open_notebook.ground_engine.map_citations", new_callable=AsyncMock) as mock_map:
 
         mock_client = mock_client_cls.return_value
-        mock_client.create_chat_session = AsyncMock(return_value="sess_123")
+        mock_client.create_chat_session = AsyncMock(side_effect=lambda *args, **kwargs: f"sess_{uuid.uuid4().hex}")
         mock_client.chat_execute = AsyncMock(return_value={"answer": "Partial answer", "evidence": []})
         mock_client.get_default_models = AsyncMock(return_value={"default_chat_model": "test"})
         mock_client.search = AsyncMock(return_value=[{"id": "mapped-1"}, {"id": "unmapped-2"}])
@@ -78,6 +86,9 @@ async def test_partial_provenance_handling(setup_workspace, db_session: AsyncSes
 
         mapped_uuid = uuid.uuid4()
         mock_map.return_value = ([mapped_uuid], True)
+
+        from app.api.deps.arq import get_arq_redis
+        app.dependency_overrides[get_arq_redis] = lambda: AsyncMock()
 
         try:
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -93,6 +104,7 @@ async def test_partial_provenance_handling(setup_workspace, db_session: AsyncSes
                 assert data["provenance_status"] == "partial"
         finally:
             settings.OPEN_NOTEBOOK_ENABLED = original_flag
+            app.dependency_overrides.pop(get_arq_redis, None)
 
 
 async def test_session_state_lost_409(setup_workspace, db_session: AsyncSession):
@@ -111,12 +123,15 @@ async def test_session_state_lost_409(setup_workspace, db_session: AsyncSession)
 
     with patch("app.integrations.open_notebook.ground_engine.OpenNotebookClient") as mock_client_cls:
         mock_client = mock_client_cls.return_value
-        mock_client.create_chat_session = AsyncMock(return_value="sess_123")
+        mock_client.create_chat_session = AsyncMock(side_effect=lambda *args, **kwargs: f"sess_{uuid.uuid4().hex}")
         mock_client.chat_execute = AsyncMock(side_effect=HTTPException(status_code=409, detail="session_state_lost"))
         mock_client.get_default_models = AsyncMock(return_value={"default_chat_model": "test"})
         mock_client.search = AsyncMock(return_value=[])
         # The wrapper maps 404 to 409 session_state_lost
         mock_client.ask_simple = AsyncMock(side_effect=HTTPException(status_code=409, detail="session_state_lost"))
+
+        from app.api.deps.arq import get_arq_redis
+        app.dependency_overrides[get_arq_redis] = lambda: AsyncMock()
 
         try:
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -129,3 +144,4 @@ async def test_session_state_lost_409(setup_workspace, db_session: AsyncSession)
                 assert response.json()["detail"] == "session_state_lost"
         finally:
             settings.OPEN_NOTEBOOK_ENABLED = original_flag
+            app.dependency_overrides.pop(get_arq_redis, None)

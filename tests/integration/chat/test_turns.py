@@ -83,6 +83,14 @@ class MockArqRedis:
         self.jobs.append((function, args, kwargs))
 
 
+@pytest.fixture(autouse=True)
+def mock_arq_redis_fixture():
+    mock_redis = MockArqRedis()
+    app.dependency_overrides[get_arq_redis] = lambda: mock_redis
+    yield mock_redis
+    app.dependency_overrides.pop(get_arq_redis, None)
+
+
 # ============================================================================ #
 # 1. Ground Turn Execution & Open Notebook 409 Transparent Recovery
 # ============================================================================ #

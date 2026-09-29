@@ -414,13 +414,16 @@ class ChatService:
                         if token:
                             full_answer.append(token)
                             await event_service.record_and_publish(turn_id, "token", {"content": token})
+                    elif ev_type == "strategy":
+                        await event_service.record_and_publish(turn_id, "strategy", ev_data)
                     elif ev_type == "citation":
                         evidence_refs = chunk.get("evidence") or ev_data.get("evidence") or []
                         prov_status = chunk.get("provenance_status") or ev_data.get("provenance_status") or "full"
+                        formatted_ev = [e if isinstance(e, dict) else {"source_id": str(e)} for e in evidence_refs]
                         await event_service.record_and_publish(
                             turn_id,
                             "citation",
-                            {"evidence": [str(e) for e in evidence_refs], "provenance_status": prov_status}
+                            {"evidence": formatted_ev, "provenance_status": prov_status}
                         )
                     elif ev_type == "done":
                         if not full_answer:
@@ -432,13 +435,16 @@ class ChatService:
                         prov_status = chunk.get("provenance_status") or ev_data.get("provenance_status") or prov_status
 
                 final_answer_text = "".join(full_answer)
-                ev_str_refs = [str(e) for e in evidence_refs]
+                formatted_evidence_refs = [
+                    e if isinstance(e, dict) else {"source_id": str(e)}
+                    for e in evidence_refs
+                ]
 
                 await conv_repo.set_turn_status(
                     turn_id=turn_id,
                     status="completed",
                     assistant_message=final_answer_text,
-                    ground_evidence_refs=ev_str_refs,
+                    ground_evidence_refs=formatted_evidence_refs,
                     context_version={"ground_context": ground_ctx.model_dump(mode="json")},
                     completed_at=datetime.now(timezone.utc)
                 )
@@ -448,7 +454,7 @@ class ChatService:
                     payload={
                         "status": "completed",
                         "assistant_message": final_answer_text,
-                        "ground_evidence_refs": ev_str_refs,
+                        "ground_evidence_refs": formatted_evidence_refs,
                         "provenance_status": prov_status
                     }
                 )
@@ -689,10 +695,15 @@ class ChatService:
                         evidence_refs.append(str(e))
             prov_status = state.get("provenance_status", "full")
 
+            formatted_evidence_refs = [
+                e if isinstance(e, dict) else {"source_id": str(e)}
+                for e in evidence_refs
+            ]
+
             await self.event_service.record_and_publish(
                 turn_id=turn.turn_id,
                 event_type="ground_answer",
-                payload={"answer": answer, "evidence": [str(e) for e in evidence_refs], "provenance_status": prov_status}
+                payload={"answer": answer, "evidence": formatted_evidence_refs, "provenance_status": prov_status}
             )
             await self.event_service.record_and_publish(
                 turn_id=turn.turn_id,
@@ -703,7 +714,7 @@ class ChatService:
                 await self.event_service.record_and_publish(
                     turn_id=turn.turn_id,
                     event_type="citation",
-                    payload={"evidence": [str(e) for e in evidence_refs], "provenance_status": prov_status}
+                    payload={"evidence": formatted_evidence_refs, "provenance_status": prov_status}
                 )
             await self.event_service.record_and_publish(
                 turn_id=turn.turn_id,
@@ -711,7 +722,7 @@ class ChatService:
                 payload={
                     "status": "completed",
                     "assistant_message": answer,
-                    "ground_evidence_refs": [str(e) for e in evidence_refs],
+                    "ground_evidence_refs": formatted_evidence_refs,
                     "provenance_status": prov_status
                 }
             )
@@ -720,7 +731,7 @@ class ChatService:
                 turn_id=turn.turn_id,
                 status="completed",
                 assistant_message=answer,
-                ground_evidence_refs=[str(e) for e in evidence_refs],
+                ground_evidence_refs=formatted_evidence_refs,
                 context_version={"ground_context": ground_ctx.model_dump(mode="json")},
                 completed_at=datetime.now(timezone.utc)
             )
