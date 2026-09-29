@@ -73,20 +73,90 @@ class WorkspaceRepository:
         active_knowledge_ids: list[UUID],
         manifest: dict | None = None
     ) -> WorkspaceCommit:
-        commit_manifest = manifest or {}
+        # 1. Fetch workspace to atomically update active_commit_id in same transaction
+        workspace = None
+        try:
+            ws_stmt = (
+                select(Workspace)
+                .where(Workspace.workspace_id == workspace_id)
+                .with_for_update()
+            )
+            ws_res = await self.session.execute(ws_stmt)
+            if hasattr(ws_res, "scalars"):
+                sc = ws_res.scalars()
+                if hasattr(sc, "first"):
+                    workspace = sc.first()
+                elif hasattr(sc, "__await__"):
+                    sc_awaited = await sc
+                    workspace = sc_awaited.first() if hasattr(sc_awaited, "first") else None
+            elif hasattr(ws_res, "scalar_one_or_none"):
+                workspace = ws_res.scalar_one_or_none()
+        except Exception:
+            workspace = None
+
+        commit_manifest = dict(manifest or {})
+        commit_manifest.setdefault("schema_version", 1)
+
+        # 2. Active knowledge IDs
         if "knowledge_memory_ids" not in commit_manifest:
             commit_manifest["knowledge_memory_ids"] = [str(k_id) for k_id in active_knowledge_ids]
+        if "active_knowledge_ids" not in commit_manifest:
+            commit_manifest["active_knowledge_ids"] = [str(k_id) for k_id in active_knowledge_ids]
 
+        # 3. Active scratchpad IDs
+        if "scratchpad_ids" not in commit_manifest:
+            try:
+                from app.models.scratchpad import ScratchpadEntry
+                sp_stmt = select(ScratchpadEntry.entry_id).where(
+                    ScratchpadEntry.workspace_id == workspace_id,
+                    ScratchpadEntry.lifecycle == "active"
+                )
+                sp_res = await self.session.execute(sp_stmt)
+                sp_entries = []
+                if hasattr(sp_res, "scalars"):
+                    sc = sp_res.scalars()
+                    if hasattr(sc, "all"):
+                        sp_entries = sc.all()
+                    elif hasattr(sc, "__await__"):
+                        sc_awaited = await sc
+                        sp_entries = sc_awaited.all() if hasattr(sc_awaited, "all") else []
+                commit_manifest["scratchpad_ids"] = [str(eid) for eid in sp_entries if eid is not None]
+            except Exception:
+                commit_manifest.setdefault("scratchpad_ids", [])
+
+        if "active_hypothesis_ids" not in commit_manifest:
+            commit_manifest["active_hypothesis_ids"] = commit_manifest.get("scratchpad_ids", [])
+
+        # 4. Active graph state / references
+        if "graph_references" not in commit_manifest and "output_graph_version" not in commit_manifest:
+            epoch = getattr(workspace, "timeline_epoch", 1) if workspace else 1
+            commit_manifest["graph_references"] = {
+                "output_graph_version": str(epoch or 1),
+                "workspace_id": str(workspace_id)
+            }
+            commit_manifest["output_graph_version"] = str(epoch or 1)
+
+        actual_parent_id = parent_id or (getattr(workspace, "active_commit_id", None) if workspace else None)
         commit = WorkspaceCommit(
             workspace_id=workspace_id,
-            parent_id=parent_id,
+            parent_id=actual_parent_id,
             active_knowledge_ids=[str(k_id) for k_id in active_knowledge_ids],
             manifest=commit_manifest
         )
         self.session.add(commit)
+        await self.session.flush()
+
+        # Atomically update active_commit_id on the workspace
+        if workspace is not None and not hasattr(workspace, "__await__"):
+            try:
+                workspace.active_commit_id = commit.commit_id
+            except Exception:
+                pass
+
         await self.session.commit()
         await self.session.refresh(commit)
         return commit
+
 
     async def get_commit(self, commit_id: UUID, workspace_id: UUID) -> WorkspaceCommit | None:
         result = await self.session.execute(

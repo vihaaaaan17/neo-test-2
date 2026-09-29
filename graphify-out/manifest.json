@@ -60,9 +60,9 @@
     "semantic_hash": ""
   },
   "app/api/routes/workspaces.py": {
-    "mtime": 1790689170.9390883,
-    "seen": 1790689805.5191598,
-    "ast_hash": "dfff9ccd5b2695c915f239143e0194f8",
+    "mtime": 1790704836.947011,
+    "seen": 1790705097.3972144,
+    "ast_hash": "026494ce2c86ee14c8fb224edbd8b187",
     "semantic_hash": ""
   },
   "app/core/config.py": {
@@ -318,9 +318,9 @@
     "semantic_hash": ""
   },
   "app/repositories/workspace.py": {
-    "mtime": 1790663435.0153513,
-    "seen": 1790663568.7419364,
-    "ast_hash": "0cfdb8539fc2798014cca25a65560985",
+    "mtime": 1790704938.3739116,
+    "seen": 1790705097.3972144,
+    "ast_hash": "74506adb60d4e2da09e4b5a5641f88d2",
     "semantic_hash": ""
   },
   "app/schemas/block.py": {
@@ -618,9 +618,9 @@
     "semantic_hash": ""
   },
   "app/services/chat/context.py": {
-    "mtime": 1790696931.7991438,
-    "seen": 1790703233.9427543,
-    "ast_hash": "316e65030bf46de969931491d0dadc60",
+    "mtime": 1790704991.8982546,
+    "seen": 1790705097.3972144,
+    "ast_hash": "32fa1691ddad2641711c1d36c0e94ac4",
     "semantic_hash": ""
   },
   "app/services/memory/__init__.py": {
@@ -648,9 +648,9 @@
     "semantic_hash": ""
   },
   "app/repositories/scratchpad.py": {
-    "mtime": 1790614789.7865422,
-    "seen": 1790615607.6764681,
-    "ast_hash": "8821881f96b82d2923f01eaec3fd476d",
+    "mtime": 1790704802.7247827,
+    "seen": 1790705097.3972144,
+    "ast_hash": "f2581d84b7f9bed6687ac098f49bbc43",
     "semantic_hash": ""
   },
   "app/schemas/scratchpad.py": {

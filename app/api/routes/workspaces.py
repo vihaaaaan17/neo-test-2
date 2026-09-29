@@ -330,11 +330,16 @@ async def ask_ground_mode_stream(
         raise HTTPException(status_code=404, detail="Workspace not found")
 
     conv_repo = ConversationRepository(db)
-    conversation = await conv_repo.create_conversation(
-        workspace_id=workspace_id,
-        owner_id=current_user_id,
-        title=f"Ask Stream: {request.query[:50]}"
-    )
+    existing_convs, _ = await conv_repo.list_conversations(workspace_id, current_user_id, status="active", limit=1)
+    if existing_convs:
+        conversation = existing_convs[0]
+    else:
+        conversation = await conv_repo.create_conversation(
+            workspace_id=workspace_id,
+            owner_id=current_user_id,
+            title=f"Ask Stream: {request.query[:50]}"
+        )
+
 
     chat_service = ChatService(
         db=db,
@@ -605,24 +610,15 @@ async def start_research(
     engine = raw_engine if isinstance(raw_engine, str) and raw_engine else "open_deep_research"
 
     conv_repo = ConversationRepository(db)
-    conversation = None
-    try:
-        existing_convs, _ = await conv_repo.list_conversations(workspace_id, current_user_id, status="active", limit=1)
-        if existing_convs:
-            conversation = existing_convs[0]
-        else:
-            title = f"Research: {request.objective[:40]}..." if len(request.objective) > 40 else f"Research: {request.objective}"
-            conversation = await conv_repo.create_conversation(
-                workspace_id=workspace_id,
-                owner_id=current_user_id,
-                title=title
-            )
-    except Exception as db_err:
-        conversation = Conversation(
-            conversation_id=uuid.uuid4(),
+    existing_convs, _ = await conv_repo.list_conversations(workspace_id, current_user_id, status="active", limit=1)
+    if existing_convs:
+        conversation = existing_convs[0]
+    else:
+        title = f"Research: {request.objective[:40]}..." if len(request.objective) > 40 else f"Research: {request.objective}"
+        conversation = await conv_repo.create_conversation(
             workspace_id=workspace_id,
             owner_id=current_user_id,
-            title=f"Research: {request.objective[:40]}..."
+            title=title
         )
 
     chat_service = ChatService(
@@ -639,41 +635,12 @@ async def start_research(
         research_options={"engine": engine}
     )
 
-    try:
-        turn = await chat_service.submit_turn(
-            workspace_id=workspace_id,
-            conversation_id=conversation.conversation_id,
-            owner_id=current_user_id,
-            turn_create=turn_create
-        )
-    except Exception as e:
-        # Fallback to direct admission controller if DB dependencies are offline/mocked
-        admission_controller = ResearchAdmissionController(
-            quota_service=ResearchQuotaService(research_repo),
-            rate_limiter=ProviderRateLimiter(arq_redis),
-            repository=research_repo
-        )
-        run = await admission_controller.admit_research_run(
-            workspace_id=workspace_id,
-            owner_id=current_user_id,
-            objective=request.objective,
-            engine=engine,
-            conversation_id=conversation.conversation_id,
-        )
-        import uuid as _uuid
-        job_id = str(_uuid.uuid4())
-        await arq_redis.enqueue_job(
-            "run_research_agent_job",
-            workspace_id=str(workspace_id),
-            objective=request.objective,
-            run_id=str(run.run_id),
-            _job_id=job_id,
-            _queue_name="research-standard"
-        )
-        if response:
-            response.headers["Deprecation"] = "true"
-            response.headers["Link"] = f'</api/v1/workspaces/{workspace_id}/conversations/{conversation.conversation_id}/turns>; rel="successor-version"'
-        return {"job_id": job_id, "run_id": str(run.run_id), "turn_id": str(_uuid.uuid4()), "status": "accepted"}
+    turn = await chat_service.submit_turn(
+        workspace_id=workspace_id,
+        conversation_id=conversation.conversation_id,
+        owner_id=current_user_id,
+        turn_create=turn_create
+    )
 
     if response:
         response.headers["Deprecation"] = "true"

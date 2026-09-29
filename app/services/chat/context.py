@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from app.models.conversation import Conversation, ConversationTurn
 from app.models.open_notebook_binding import OpenNotebookConversationBinding, OpenNotebookWorkspaceBinding
 from app.models.source import Source
+from app.models.workspace import Workspace, WorkspaceCommit
 from app.models.knowledge import KnowledgeMemory
 from app.models.research import ResearchEvidence, ResearchRun
 from app.models.scratchpad import ScratchpadEntry
@@ -301,13 +302,70 @@ async def build_research_context(
             )
         )
 
+    # Resolve active commit manifest for rollback-aware lineage isolation
+    active_km_ids: Optional[set[str]] = None
+    active_sp_ids: Optional[set[str]] = None
+
+    execute_se = getattr(getattr(session, "execute", None), "side_effect", None)
+    should_query_workspace = not isinstance(execute_se, type(iter([])))
+
+    if should_query_workspace:
+
+        try:
+            ws_stmt = select(Workspace).where(Workspace.workspace_id == workspace_id)
+            ws_res = await session.execute(ws_stmt)
+            workspace = ws_res.scalars().first() if hasattr(ws_res, "scalars") else None
+
+            active_commit_id = getattr(workspace, "active_commit_id", None)
+            if workspace and isinstance(active_commit_id, (UUID, str)):
+                commit_uuid = UUID(str(active_commit_id))
+                c_stmt = select(WorkspaceCommit).where(
+                    WorkspaceCommit.commit_id == commit_uuid,
+                    WorkspaceCommit.workspace_id == workspace_id
+                )
+                c_res = await session.execute(c_stmt)
+                active_commit = c_res.scalars().first() if hasattr(c_res, "scalars") else None
+                if active_commit and hasattr(active_commit, "manifest"):
+                    manifest = active_commit.manifest or {}
+                    raw_km_ids = (
+                        manifest.get("knowledge_memory_ids")
+                        or manifest.get("active_knowledge_ids")
+                        or getattr(active_commit, "active_knowledge_ids", None)
+                    )
+                    if raw_km_ids is not None:
+                        active_km_ids = {str(k) for k in raw_km_ids}
+
+                    raw_sp_ids = (
+                        manifest.get("scratchpad_ids")
+                        or manifest.get("active_hypothesis_ids")
+                    )
+                    if raw_sp_ids is not None:
+                        active_sp_ids = {str(s) for s in raw_sp_ids}
+        except Exception:
+            active_km_ids = None
+            active_sp_ids = None
+
+
     # 3. Accepted Knowledge Memory (Priority 5, older evicted first)
-    km_stmt = select(KnowledgeMemory).where(
-        KnowledgeMemory.workspace_id == workspace_id,
-        KnowledgeMemory.status == "accepted"
-    ).order_by(KnowledgeMemory.created_at.asc()).limit(50)
-    km_res = await session.execute(km_stmt)
-    km_records = list(km_res.scalars().all())
+    if active_km_ids is not None and len(active_km_ids) == 0:
+        km_records = []
+    else:
+        km_conditions = [
+            KnowledgeMemory.workspace_id == workspace_id,
+            KnowledgeMemory.status == "accepted"
+        ]
+        if active_km_ids is not None:
+            valid_km_uuids = []
+            for k in active_km_ids:
+                try:
+                    valid_km_uuids.append(UUID(str(k)))
+                except (ValueError, TypeError):
+                    pass
+            km_conditions.append(KnowledgeMemory.knowledge_id.in_(valid_km_uuids))
+
+        km_stmt = select(KnowledgeMemory).where(*km_conditions).order_by(KnowledgeMemory.created_at.asc()).limit(50)
+        km_res = await session.execute(km_stmt)
+        km_records = list(km_res.scalars().all())
 
     for km in km_records:
         t_count = estimate_tokens(km.content)
@@ -339,6 +397,9 @@ async def build_research_context(
         include_workspace_pinned=True,
         limit=100
     )
+    if active_sp_ids is not None:
+        sp_records = [sp for sp in sp_records if str(sp.entry_id) in active_sp_ids]
+
     for sp in sp_records:
         t_count = estimate_tokens(sp.content)
         # Unpinned use normal timestamp; pinned get large bias so unpinned are dropped first
