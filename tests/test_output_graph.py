@@ -10,6 +10,7 @@ def repo():
 
 @pytest.mark.asyncio
 @pytest.mark.integration
+@pytest.mark.neo4j
 async def test_output_graph_projection_and_retrieval(repo):
     workspace_id = uuid4()
     

@@ -415,7 +415,8 @@ async def chat_ground_mode(
         db=db,
         conv_repo=conv_repo,
         workspace_repo=repo,
-        arq_redis=arq_redis
+        arq_redis=arq_redis,
+        ground_engine=ground_engine
     )
 
     turn_create = TurnCreate(mode="ground", message=request.message)

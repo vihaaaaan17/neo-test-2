@@ -70,6 +70,8 @@ async def test_partial_provenance_handling(setup_workspace, db_session: AsyncSes
          patch("app.integrations.open_notebook.ground_engine.map_citations", new_callable=AsyncMock) as mock_map:
 
         mock_client = mock_client_cls.return_value
+        mock_client.create_chat_session = AsyncMock(return_value="sess_123")
+        mock_client.chat_execute = AsyncMock(return_value={"answer": "Partial answer", "evidence": []})
         mock_client.get_default_models = AsyncMock(return_value={"default_chat_model": "test"})
         mock_client.search = AsyncMock(return_value=[{"id": "mapped-1"}, {"id": "unmapped-2"}])
         mock_client.ask_simple = AsyncMock(return_value={"answer": "Partial answer"})
@@ -109,6 +111,8 @@ async def test_session_state_lost_409(setup_workspace, db_session: AsyncSession)
 
     with patch("app.integrations.open_notebook.ground_engine.OpenNotebookClient") as mock_client_cls:
         mock_client = mock_client_cls.return_value
+        mock_client.create_chat_session = AsyncMock(return_value="sess_123")
+        mock_client.chat_execute = AsyncMock(side_effect=HTTPException(status_code=409, detail="session_state_lost"))
         mock_client.get_default_models = AsyncMock(return_value={"default_chat_model": "test"})
         mock_client.search = AsyncMock(return_value=[])
         # The wrapper maps 404 to 409 session_state_lost

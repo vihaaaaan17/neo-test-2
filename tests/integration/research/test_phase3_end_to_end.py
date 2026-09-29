@@ -17,7 +17,7 @@ from app.repositories.research import ResearchRepository
 from app.services.research.lifecycle import ResearchLifecycleService
 
 class MockODREngine(ResearchEngine):
-    async def astream_events(self, run_id: uuid.UUID, workspace_id: uuid.UUID, objective: str) -> AsyncGenerator[dict[str, Any], None]:
+    async def astream_events(self, run_id: uuid.UUID, workspace_id: uuid.UUID, objective: str, research_context: Any = None, **kwargs) -> AsyncGenerator[dict[str, Any], None]:
         yield {"status": "starting", "message": "starting"}
         
         # Simulate final report generation persistence

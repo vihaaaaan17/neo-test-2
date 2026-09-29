@@ -39,6 +39,19 @@ def _open_notebook_is_reachable() -> bool:
     except OSError:
         return False
 
+
+def _neo4j_is_reachable() -> bool:
+    """Quick TCP probe to check if Neo4j port is open."""
+    from app.core.config import settings
+    try:
+        parsed = urlparse(settings.NEO4J_URI.replace("bolt://", "http://"))
+        host = parsed.hostname or "localhost"
+        port = parsed.port or 7687
+        with socket.create_connection((host, port), timeout=1):
+            return True
+    except OSError:
+        return False
+
 # --------------------------------------------------------------------------- #
 # Auto-skip marker: @pytest.mark.integration
 # --------------------------------------------------------------------------- #
@@ -48,21 +61,30 @@ def pytest_configure(config):
         "integration: marks tests that require a live Postgres connection "
         "(auto-skipped when Postgres is not reachable)"
     )
+    config.addinivalue_line(
+        "markers",
+        "neo4j: marks tests that require a live Neo4j connection "
+        "(auto-skipped when Neo4j is not reachable)"
+    )
 
 
 def pytest_collection_modifyitems(config, items):
     """Skip integration tests if external dependencies are not reachable."""
     db_up = _postgres_is_reachable()
     on_up = _open_notebook_is_reachable()
+    neo_up = _neo4j_is_reachable()
     
     skip_no_db = pytest.mark.skip(reason="Postgres not reachable (start docker-compose)")
     skip_no_on = pytest.mark.skip(reason="Open Notebook not reachable on port 5055 (start docker-compose)")
+    skip_no_neo = pytest.mark.skip(reason="Neo4j not reachable on port 7687 (start docker-compose)")
     
     for item in items:
         if item.get_closest_marker("integration") and not db_up:
             item.add_marker(skip_no_db)
         if item.get_closest_marker("open_notebook") and not on_up:
             item.add_marker(skip_no_on)
+        if item.get_closest_marker("neo4j") and not neo_up:
+            item.add_marker(skip_no_neo)
 
 from app.core.database import async_session_maker
 

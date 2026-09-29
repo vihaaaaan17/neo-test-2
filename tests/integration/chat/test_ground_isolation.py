@@ -36,6 +36,7 @@ async def test_integration_critical_ground_isolation(db_session: AsyncSession):
     user_id = uuid.uuid4()
     ws = Workspace(workspace_id=uuid.uuid4(), owner_id=user_id, research_engine="open_deep_research")
     db_session.add(ws)
+    await db_session.flush()
 
     ws_binding = OpenNotebookWorkspaceBinding(
         workspace_id=ws.workspace_id,

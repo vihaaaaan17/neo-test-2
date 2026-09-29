@@ -35,17 +35,22 @@ def get_conversation_repository(db: AsyncSession = Depends(get_db)) -> Conversat
     return ConversationRepository(db)
 
 
+from app.services.ground.factory import get_ground_engine, GroundEngineProtocol
+
+
 def get_chat_service(
     db: AsyncSession = Depends(get_db),
     conv_repo: ConversationRepository = Depends(get_conversation_repository),
     workspace_repo: WorkspaceRepository = Depends(get_workspace_repository),
-    arq_redis: Optional[ArqRedis] = Depends(get_arq_redis)
+    arq_redis: Optional[ArqRedis] = Depends(get_arq_redis),
+    ground_engine: Optional[GroundEngineProtocol] = Depends(get_ground_engine)
 ) -> ChatService:
     return ChatService(
         db=db,
         conv_repo=conv_repo,
         workspace_repo=workspace_repo,
-        arq_redis=arq_redis
+        arq_redis=arq_redis,
+        ground_engine=ground_engine
     )
 
 

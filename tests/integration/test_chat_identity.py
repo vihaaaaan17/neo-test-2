@@ -44,33 +44,35 @@ async def test_chat_new_conversation(setup_workspace_with_on, db_session: AsyncS
     workspace, token_headers, user, ws_binding = setup_workspace_with_on
     workspace_id = workspace.workspace_id
     
-    with patch("app.integrations.open_notebook.client.OpenNotebookClient.create_chat_session", new_callable=AsyncMock) as mock_create:
-        with patch("app.integrations.open_notebook.client.OpenNotebookClient.chat_execute", new_callable=AsyncMock) as mock_execute:
-            mock_create.return_value = "session:456"
-            mock_execute.return_value = {"answer": "Hello from ON", "messages": []}
+    with patch("app.integrations.open_notebook.client.OpenNotebookClient.create_chat_session", new_callable=AsyncMock) as mock_create, \
+         patch("app.integrations.open_notebook.client.OpenNotebookClient.chat_execute", new_callable=AsyncMock) as mock_execute, \
+         patch("app.integrations.open_notebook.client.OpenNotebookClient.search", new_callable=AsyncMock) as mock_search:
+        mock_create.return_value = "session:456"
+        mock_execute.return_value = {"answer": "Hello from ON", "messages": []}
+        mock_search.return_value = []
+        
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                f"/workspaces/{workspace_id}/chat",
+                headers=token_headers,
+                json={"message": "Hello"}
+            )
             
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                response = await client.post(
-                    f"/workspaces/{workspace_id}/chat",
-                    headers=token_headers,
-                    json={"message": "Hello"}
-                )
-                
-                assert response.status_code == 200, response.text
-                data = response.json()
-                assert data["answer"] == "Hello from ON"
-                assert "conversation_id" in data
-                
-                # Verify DB records
-                conv_id = uuid.UUID(data["conversation_id"])
-                conv = await db_session.get(Conversation, conv_id)
-                assert conv is not None
-                assert conv.workspace_id == workspace_id
-                assert conv.owner_id == user.user_id
-                
-                binding = await db_session.get(OpenNotebookConversationBinding, conv_id)
-                assert binding is not None
-                assert binding.open_notebook_session_id == "session:456"
+            assert response.status_code == 200, response.text
+            data = response.json()
+            assert data["answer"] == "Hello from ON"
+            assert "conversation_id" in data
+            
+            # Verify DB records
+            conv_id = uuid.UUID(data["conversation_id"])
+            conv = await db_session.get(Conversation, conv_id)
+            assert conv is not None
+            assert conv.workspace_id == workspace_id
+            assert conv.owner_id == user.user_id
+            
+            binding = await db_session.get(OpenNotebookConversationBinding, conv_id)
+            assert binding is not None
+            assert binding.open_notebook_session_id == "session:456"
 
 async def test_chat_existing_conversation(setup_workspace_with_on, db_session: AsyncSession):
     workspace, token_headers, user, ws_binding = setup_workspace_with_on
@@ -92,8 +94,10 @@ async def test_chat_existing_conversation(setup_workspace_with_on, db_session: A
     db_session.add(binding)
     await db_session.commit()
     
-    with patch("app.integrations.open_notebook.client.OpenNotebookClient.chat_execute", new_callable=AsyncMock) as mock_execute:
+    with patch("app.integrations.open_notebook.client.OpenNotebookClient.chat_execute", new_callable=AsyncMock) as mock_execute, \
+         patch("app.integrations.open_notebook.client.OpenNotebookClient.search", new_callable=AsyncMock) as mock_search:
         mock_execute.return_value = {"answer": "Follow-up answer", "messages": []}
+        mock_search.return_value = []
         
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
@@ -135,9 +139,11 @@ async def test_chat_session_expired(setup_workspace_with_on, db_session: AsyncSe
     await db_session.commit()
     
     with patch("app.integrations.open_notebook.client.OpenNotebookClient.create_chat_session", new_callable=AsyncMock) as mock_create, \
-         patch("app.integrations.open_notebook.client.OpenNotebookClient.chat_execute", new_callable=AsyncMock) as mock_execute:
+         patch("app.integrations.open_notebook.client.OpenNotebookClient.chat_execute", new_callable=AsyncMock) as mock_execute, \
+         patch("app.integrations.open_notebook.client.OpenNotebookClient.search", new_callable=AsyncMock) as mock_search:
         mock_create.return_value = "session:rehydrated"
         mock_execute.side_effect = HTTPException(status_code=400, detail="conversation_session_expired")
+        mock_search.return_value = []
         
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(

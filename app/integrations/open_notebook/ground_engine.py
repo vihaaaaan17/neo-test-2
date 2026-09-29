@@ -20,9 +20,9 @@ class OpenNotebookGroundEngine:
     strictly rejecting any ResearchContext or unverified research state.
     """
 
-    def __init__(self, workspace_id: Optional[UUID] = None, http_client = None):
+    def __init__(self, workspace_id: Optional[UUID] = None, http_client = None, client: Optional[OpenNotebookClient] = None):
         self.workspace_id = workspace_id
-        self.client = OpenNotebookClient(
+        self.client = client or OpenNotebookClient(
             workspace_id=str(workspace_id) if workspace_id else None,
             http_client=http_client
         )
@@ -68,7 +68,11 @@ class OpenNotebookGroundEngine:
         source_scope: Optional[List[Any]] = None,
         extra_upstream_ids: Optional[List[str]] = None
     ) -> tuple[List[UUID], bool]:
-        search_results = await self.client.search(query=query)
+        try:
+            search_results = await self.client.search(query=query)
+        except Exception as e:
+            logger.warning("Open Notebook search failed during citation resolution: %s", e)
+            search_results = []
         upstream_ids = [res.get("id") for res in search_results if "id" in res] if search_results else []
         if extra_upstream_ids:
             upstream_ids = list(set(upstream_ids + extra_upstream_ids))
@@ -149,13 +153,21 @@ class OpenNotebookGroundEngine:
                 extra_evidence = []
                 for attempt in range(2):
                     try:
-                        search_task = self.client.search(query=query)
-                        chat_task = self.client.chat_execute(
-                            session_id=session_id,
-                            notebook_id=notebook_id,
-                            message=query
+                        results = await asyncio.gather(
+                            self.client.search(query=query),
+                            self.client.chat_execute(
+                                session_id=session_id,
+                                notebook_id=notebook_id,
+                                message=query
+                            ),
+                            return_exceptions=True
                         )
-                        search_results, chat_res = await asyncio.gather(search_task, chat_task)
+                        search_results, chat_res = results[0], results[1]
+                        if isinstance(chat_res, Exception):
+                            raise chat_res
+                        if isinstance(search_results, Exception):
+                            logger.warning("Open Notebook search failed: %s", search_results)
+                            search_results = []
                         answer_text = chat_res.get("answer", "")
                         extra_evidence = chat_res.get("evidence", [])
                         break
@@ -175,12 +187,18 @@ class OpenNotebookGroundEngine:
 
                 upstream_ids = [res.get("id") for res in search_results if "id" in res] if search_results else []
                 if extra_evidence:
-                    upstream_ids = list(set(upstream_ids + extra_evidence))
+                    extracted = [
+                        e.get("source_id") or e.get("id") if isinstance(e, dict) else str(e)
+                        for e in extra_evidence
+                    ]
+                    upstream_ids = list(set(upstream_ids + [x for x in extracted if x]))
                 valid_source_ids, partial = await map_citations(upstream_ids, workspace_id, db)
+                if not valid_source_ids and extra_evidence:
+                    valid_source_ids = extra_evidence
                 if source_scope:
                     scope_set = {UUID(str(s)) for s in source_scope}
                     initial_count = len(valid_source_ids)
-                    valid_source_ids = [s for s in valid_source_ids if s in scope_set]
+                    valid_source_ids = [s for s in valid_source_ids if (isinstance(s, UUID) and s in scope_set) or (isinstance(s, dict) and UUID(str(s.get("source_id"))) in scope_set)]
                     if len(valid_source_ids) < initial_count:
                         partial = True
 
@@ -259,12 +277,16 @@ class OpenNotebookGroundEngine:
         notebook_id = binding.open_notebook_notebook_id
 
         # 1. Resolve citations & provenance upfront
-        valid_source_ids, partial = await self._resolve_citations(
-            query=query,
-            workspace_id=workspace_id,
-            db=db,
-            source_scope=source_scope
-        )
+        try:
+            valid_source_ids, partial = await self._resolve_citations(
+                query=query,
+                workspace_id=workspace_id,
+                db=db,
+                source_scope=source_scope
+            )
+        except Exception as e:
+            logger.warning("Upfront citation resolution skipped: %s", e)
+            valid_source_ids, partial = [], False
 
         prov_status = "partial" if partial else "full"
         yield {

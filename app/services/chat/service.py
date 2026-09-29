@@ -388,7 +388,10 @@ class ChatService:
                 explicit_scope=None
             )
 
-            engine = self.ground_engine or OpenNotebookGroundEngine(workspace_id=workspace_id)
+            engine = self.ground_engine or OpenNotebookGroundEngine(
+                workspace_id=workspace_id,
+                client=self.open_notebook_client
+            )
 
             full_answer: List[str] = []
             evidence_refs: List[Any] = []
@@ -635,7 +638,10 @@ class ChatService:
         from app.core.config import settings
         from app.integrations.open_notebook.ground_engine import OpenNotebookGroundEngine
 
-        engine_to_run = self.ground_engine or OpenNotebookGroundEngine(workspace_id=workspace.workspace_id)
+        engine_to_run = self.ground_engine or OpenNotebookGroundEngine(
+            workspace_id=workspace.workspace_id,
+            client=self.open_notebook_client
+        )
         if not settings.OPEN_NOTEBOOK_ENABLED and self.ground_engine is None:
             from app.services.ground.factory import get_ground_engine
             engine_to_run = await get_ground_engine()
@@ -672,7 +678,15 @@ class ChatService:
 
             answer = state.get("answer", "")
             raw_ev = state.get("evidence", []) or [doc["id"] for doc in state.get("context_docs", []) if "id" in doc]
-            evidence_refs = [UUID(str(e)) if not isinstance(e, UUID) else e for e in raw_ev]
+            evidence_refs = []
+            for e in raw_ev:
+                if isinstance(e, dict):
+                    evidence_refs.append(e)
+                else:
+                    try:
+                        evidence_refs.append(UUID(str(e)))
+                    except Exception:
+                        evidence_refs.append(str(e))
             prov_status = state.get("provenance_status", "full")
 
             await self.event_service.record_and_publish(

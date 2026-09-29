@@ -9,6 +9,7 @@ from app.repositories.graph import graph_store
 
 @pytest.mark.asyncio
 @pytest.mark.integration
+@pytest.mark.neo4j
 async def test_sync_knowledge_to_graph_job():
     owner_id = uuid.uuid4()
     workspace_id = uuid.uuid4()

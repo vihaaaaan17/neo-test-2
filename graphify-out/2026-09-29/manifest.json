@@ -60,9 +60,9 @@
     "semantic_hash": ""
   },
   "app/api/routes/workspaces.py": {
-    "mtime": 1790663434.8188007,
-    "seen": 1790663568.7419364,
-    "ast_hash": "3a9516792ef1b385925093f39d398508",
+    "mtime": 1790684046.902354,
+    "seen": 1790684594.5865057,
+    "ast_hash": "3aca973ae8c03dd066b24ba6511189d9",
     "semantic_hash": ""
   },
   "app/core/config.py": {
@@ -270,9 +270,9 @@
     "semantic_hash": ""
   },
   "app/orchestration/research_mode.py": {
-    "mtime": 1790663434.9838455,
-    "seen": 1790663568.7419364,
-    "ast_hash": "9723cbdd6e3c8333acaa7466e610a408",
+    "mtime": 1790663874.9790387,
+    "seen": 1790684594.5865057,
+    "ast_hash": "25d4106d4558f0c43f58434c7a52b6a9",
     "semantic_hash": ""
   },
   "app/repositories/block.py": {
@@ -576,9 +576,9 @@
     "semantic_hash": ""
   },
   "app/api/routes/chat.py": {
-    "mtime": 1790657023.9777896,
-    "seen": 1790657959.1948469,
-    "ast_hash": "4042e44f00489e443fc3d3dcb7ea5bb1",
+    "mtime": 1790683990.960485,
+    "seen": 1790684594.5865057,
+    "ast_hash": "9f7360725df2c118ac759296f463dd7c",
     "semantic_hash": ""
   },
   "app/repositories/conversation.py": {
@@ -684,9 +684,9 @@
     "semantic_hash": ""
   },
   "app/services/research/promotion.py": {
-    "mtime": 1790663238.3582962,
-    "seen": 1790663568.7429445,
-    "ast_hash": "57fc2d375fad89b9f141a8bed87db048",
+    "mtime": 1790684426.9433627,
+    "seen": 1790684594.5865057,
+    "ast_hash": "f78b4e0510ba056c0e825fdbb0abda74",
     "semantic_hash": ""
   },
   "app/core/startup.py": {
