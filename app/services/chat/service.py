@@ -22,7 +22,18 @@ from app.services.research.quota import ResearchQuotaService
 from app.services.research.rate_limiter import ProviderRateLimiter
 from app.integrations.open_notebook.client import OpenNotebookClient
 from app.integrations.open_notebook.ground_engine import OpenNotebookGroundEngine
-from app.schemas.chat import TurnCreate
+from app.schemas.chat import (
+    TurnCreate,
+    ChatEventType,
+    EVENT_TURN_RESEARCH_STARTED,
+    EVENT_TURN_CANCELLED,
+    EVENT_STATUS_CHANGE,
+    EVENT_GROUND_ANSWER,
+    EVENT_TOKEN,
+    EVENT_CITATION,
+    EVENT_DONE,
+    EVENT_ERROR
+)
 from app.services.chat.events import (
     ChatEventRepository,
     ChatEventService,
@@ -77,6 +88,18 @@ class ChatService:
         Validates workspace ownership, allocates monotonic sequence under lock,
         and dispatches to the selected engine mode.
         """
+        # 0. Immediate validation before any DB row is created (Gate 1)
+        if not turn_create.mode or turn_create.mode not in ("ground", "research"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported turn mode: {turn_create.mode}"
+            )
+        if not turn_create.message or not turn_create.message.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Turn message cannot be empty"
+            )
+
         # 1. Validate workspace and conversation
         workspace = await self.workspace_repo.get_workspace(workspace_id, owner_id)
         if not workspace:
@@ -115,10 +138,21 @@ class ChatService:
                 )
                 return existing
 
-        # 3. Monotonic sequence allocation under row-level lock (FOR UPDATE)
+        # 3. Row-lock conversation and enforce one-running-turn invariant (Gate 2)
+        await self.conv_repo.lock_conversation(conversation_id)
+        active_turn = await self.conv_repo.get_active_turn(conversation_id)
+        if active_turn is not None:
+            status_val = getattr(active_turn, "status", None)
+            if isinstance(status_val, str) and status_val in ("pending", "running"):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="conversation_turn_in_progress"
+                )
+
+        # 4. Monotonic sequence allocation under row-level lock (FOR UPDATE)
         sequence = await self.conv_repo.allocate_turn_sequence(conversation_id)
 
-        # 4. Insert initial turn record
+        # 5. Insert initial turn record
         turn = await self.conv_repo.append_turn(
             workspace_id=workspace_id,
             conversation_id=conversation_id,
@@ -130,7 +164,7 @@ class ChatService:
             source_scope=turn_create.source_scope
         )
 
-        # 5. Dispatch by mode
+        # 6. Dispatch by mode
         if turn_create.mode == "ground":
             return await self._execute_ground_turn(workspace, conversation, turn, stream=stream)
         elif turn_create.mode == "research":
@@ -152,6 +186,18 @@ class ChatService:
         Submits a turn and returns an async generator streaming its events via SSE.
         Background tasks run independently of HTTP client disconnects.
         """
+        # 0. Immediate validation before any DB row is created (Gate 1)
+        if not turn_create.mode or turn_create.mode not in ("ground", "research"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported turn mode: {turn_create.mode}"
+            )
+        if not turn_create.message or not turn_create.message.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Turn message cannot be empty"
+            )
+
         # 1. Validate workspace and conversation
         workspace = await self.workspace_repo.get_workspace(workspace_id, owner_id)
         if not workspace:
@@ -186,10 +232,21 @@ class ChatService:
             if existing:
                 return self.stream_turn_events(existing.turn_id)
 
-        # 3. Monotonic sequence allocation under row-level lock (FOR UPDATE)
+        # 3. Row-lock conversation and enforce one-running-turn invariant (Gate 2)
+        await self.conv_repo.lock_conversation(conversation_id)
+        active_turn = await self.conv_repo.get_active_turn(conversation_id)
+        if active_turn is not None:
+            status_val = getattr(active_turn, "status", None)
+            if isinstance(status_val, str) and status_val in ("pending", "running"):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="conversation_turn_in_progress"
+                )
+
+        # 4. Monotonic sequence allocation under row-level lock (FOR UPDATE)
         sequence = await self.conv_repo.allocate_turn_sequence(conversation_id)
 
-        # 4. Insert initial turn record
+        # 5. Insert initial turn record
         turn = await self.conv_repo.append_turn(
             workspace_id=workspace_id,
             conversation_id=conversation_id,
@@ -201,7 +258,7 @@ class ChatService:
             source_scope=turn_create.source_scope
         )
 
-        # 5. Dispatch background execution and return stream generator
+        # 6. Dispatch background execution and return stream generator
         if turn_create.mode == "ground":
             bg_task = asyncio.create_task(
                 self._execute_ground_stream_background(
@@ -287,12 +344,8 @@ class ChatService:
                     _queue_name="research-standard"
                 )
 
-            asyncio.create_task(
-                self._bridge_research_events_background(
-                    turn_id=turn.turn_id,
-                    run_id=run.run_id
-                )
-            )
+            # NOTE (Gate 3): ARQ background worker is the sole creator of research ChatEvents.
+            # Do NOT launch duplicate _bridge_research_events_background task.
             return self.stream_turn_events(turn.turn_id)
         else:
             raise HTTPException(
@@ -507,66 +560,72 @@ class ChatService:
                     for e in evidence_refs
                 ]
 
-                await conv_repo.set_turn_status(
+                completed_turn = await conv_repo.set_turn_status(
                     turn_id=turn_id,
                     status="completed",
+                    expected_statuses=["pending", "running"],
                     assistant_message=final_answer_text,
                     ground_evidence_refs=formatted_evidence_refs,
                     context_version={"ground_context": ground_ctx.model_dump(mode="json")},
                     completed_at=datetime.now(timezone.utc)
                 )
-                await event_service.record_and_publish(
-                    turn_id=turn_id,
-                    event_type="done",
-                    payload={
-                        "status": "completed",
-                        "assistant_message": final_answer_text,
-                        "ground_evidence_refs": formatted_evidence_refs,
-                        "provenance_status": prov_status
-                    }
-                )
+                if completed_turn:
+                    await event_service.record_and_publish(
+                        turn_id=turn_id,
+                        event_type=EVENT_DONE,
+                        payload={
+                            "status": "completed",
+                            "assistant_message": final_answer_text,
+                            "ground_evidence_refs": formatted_evidence_refs,
+                            "provenance_status": prov_status
+                        }
+                    )
             except asyncio.CancelledError:
                 logger.info("Ground turn %s execution was cancelled.", turn_id)
                 raise
             except HTTPException as e:
                 error_detail = str(e.detail)
-                await conv_repo.set_turn_status(
+                failed_turn = await conv_repo.set_turn_status(
                     turn_id=turn_id,
                     status="failed",
+                    expected_statuses=["pending", "running"],
                     error_code="upstream_ground_failure",
                     error_message=error_detail,
                     completed_at=datetime.now(timezone.utc)
                 )
-                await event_service.record_and_publish(
-                    turn_id=turn_id,
-                    event_type="error",
-                    payload={"message": error_detail}
-                )
-                await event_service.record_and_publish(
-                    turn_id=turn_id,
-                    event_type="done",
-                    payload={"status": "failed", "error": error_detail}
-                )
+                if failed_turn:
+                    await event_service.record_and_publish(
+                        turn_id=turn_id,
+                        event_type=EVENT_ERROR,
+                        payload={"message": error_detail}
+                    )
+                    await event_service.record_and_publish(
+                        turn_id=turn_id,
+                        event_type=EVENT_DONE,
+                        payload={"status": "failed", "error": error_detail}
+                    )
             except Exception as e:
                 logger.error(f"Background ground execution failed: {e}", exc_info=True)
                 error_detail = str(e)
-                await conv_repo.set_turn_status(
+                failed_turn = await conv_repo.set_turn_status(
                     turn_id=turn_id,
                     status="failed",
+                    expected_statuses=["pending", "running"],
                     error_code="ground_execution_error",
                     error_message=error_detail,
                     completed_at=datetime.now(timezone.utc)
                 )
-                await event_service.record_and_publish(
-                    turn_id=turn_id,
-                    event_type="error",
-                    payload={"message": error_detail}
-                )
-                await event_service.record_and_publish(
-                    turn_id=turn_id,
-                    event_type="done",
-                    payload={"status": "failed", "error": error_detail}
-                )
+                if failed_turn:
+                    await event_service.record_and_publish(
+                        turn_id=turn_id,
+                        event_type=EVENT_ERROR,
+                        payload={"message": error_detail}
+                    )
+                    await event_service.record_and_publish(
+                        turn_id=turn_id,
+                        event_type=EVENT_DONE,
+                        payload={"status": "failed", "error": error_detail}
+                    )
 
     async def _bridge_research_events_background(
         self,
@@ -574,106 +633,11 @@ class ChatService:
         run_id: UUID
     ):
         """
-        Bridges Redis Pub/Sub research_events:{run_id} to turn_events:{turn_id} and chat_events table.
-        Runs independently in background, surviving client disconnect.
+        Deprecated in Chapter 4 Ticket 02.
+        ARQ background worker is the sole authoritative creator of research ChatEvents
+        and publisher to Redis turn_events:{turn_id}.
         """
-        async with async_session_maker() as session:
-            event_repo = ChatEventRepository(session)
-            event_service = ChatEventService(event_repo, self.arq_redis)
-            conv_repo = ConversationRepository(session)
-
-            # Record running status event
-            await event_service.record_and_publish(
-                turn_id=turn_id,
-                event_type="status_change",
-                payload={"status": "running", "research_run_id": str(run_id)}
-            )
-
-            # Subscribe to Redis pubsub if available
-            pubsub = None
-            if self.arq_redis and hasattr(self.arq_redis, "pubsub"):
-                try:
-                    pubsub = self.arq_redis.pubsub()
-                    await pubsub.subscribe(f"research_events:{run_id}")
-                except Exception as e:
-                    logger.warning(f"Failed to subscribe to Redis research_events:{run_id}: {e}")
-                    pubsub = None
-
-            # Also listen to in-process local queue for research_events:{run_id}
-            local_q = TurnEventBroker.subscribe_local(f"research_events:{run_id}")
-
-            try:
-                finished = False
-                while not finished:
-                    message_data = None
-                    if pubsub:
-                        try:
-                            msg = await asyncio.wait_for(
-                                pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0),
-                                timeout=1.0
-                            )
-                            if msg and msg.get("type") == "message":
-                                raw_data = msg.get("data")
-                                if isinstance(raw_data, bytes):
-                                    raw_data = raw_data.decode("utf-8")
-                                message_data = json.loads(raw_data) if isinstance(raw_data, str) else raw_data
-                        except asyncio.TimeoutError:
-                            pass
-
-                    if not message_data and not local_q.empty():
-                        message_data = await local_q.get()
-
-                    if not message_data:
-                        # Polling fallback: check ResearchRun in DB
-                        await asyncio.sleep(0.1)
-                        rr = await session.get(ResearchRun, run_id)
-                        if rr and rr.status in ["completed", "failed", "cancelled"]:
-                            message_data = {
-                                "event_type": "status_change",
-                                "payload": {"status": rr.status}
-                            }
-
-                    if message_data:
-                        raw_ev_type = message_data.get("event_type", "progress")
-                        payload = message_data.get("payload", {})
-
-                        if raw_ev_type in ["step", "phase_change", "log", "metric", "progress"]:
-                            mapped_type = "progress"
-                        elif raw_ev_type in ["token", "chunk"]:
-                            mapped_type = "token"
-                        elif raw_ev_type == "scratchpad_entry":
-                            mapped_type = "scratchpad_entry"
-                        elif raw_ev_type == "status_change":
-                            st = payload.get("status")
-                            if st in ["completed", "failed", "cancelled"]:
-                                mapped_type = "done"
-                                finished = True
-                            else:
-                                mapped_type = "status_change"
-                        elif raw_ev_type == "done":
-                            mapped_type = "done"
-                            finished = True
-                        else:
-                            mapped_type = "progress"
-
-                        await event_service.record_and_publish(turn_id, mapped_type, payload)
-
-                        if finished:
-                            final_status = payload.get("status", "completed")
-                            await conv_repo.set_turn_status(
-                                turn_id=turn_id,
-                                status=final_status,
-                                completed_at=datetime.now(timezone.utc)
-                            )
-                            break
-            finally:
-                TurnEventBroker.unsubscribe_local(f"research_events:{run_id}", local_q)
-                if pubsub:
-                    try:
-                        await pubsub.unsubscribe(f"research_events:{run_id}")
-                        await pubsub.close()
-                    except Exception:
-                        pass
+        pass
 
     async def _execute_ground_turn(
         self,
@@ -797,6 +761,7 @@ class ChatService:
             completed_turn = await self.conv_repo.set_turn_status(
                 turn_id=turn.turn_id,
                 status="completed",
+                expected_statuses=["pending", "running"],
                 assistant_message=answer,
                 ground_evidence_refs=formatted_evidence_refs,
                 context_version={"ground_context": ground_ctx.model_dump(mode="json")},
@@ -810,6 +775,7 @@ class ChatService:
             await self.conv_repo.set_turn_status(
                 turn_id=turn.turn_id,
                 status="failed",
+                expected_statuses=["pending", "running"],
                 error_code="ground_execution_error",
                 error_message=str(e),
                 completed_at=datetime.now(timezone.utc)
@@ -923,11 +889,6 @@ class ChatService:
             research_run_id=run.run_id,
             context_version=context_version_bundle,
             started_at=datetime.now(timezone.utc)
-        )
-        await self.event_service.record_and_publish(
-            turn_id=turn.turn_id,
-            event_type="status_change",
-            payload={"status": "running", "research_run_id": str(run.run_id)}
         )
 
         # 3. Enqueue ARQ job to queue research-standard
@@ -1089,22 +1050,31 @@ class ChatService:
                         except Exception as pub_err:
                             logger.warning("Failed to publish cancellation message to Redis: %s", pub_err)
 
-        # 3. Update ConversationTurn status to cancelled
+        # 3. Update ConversationTurn status to cancelled via atomic CAS
         cancelled_turn = await self.conv_repo.set_turn_status(
             turn_id=turn_id,
             status="cancelled",
+            expected_statuses=["pending", "running"],
             completed_at=datetime.now(timezone.utc)
         )
+        if not cancelled_turn:
+            current_turn = await self.conv_repo.get_turn(workspace_id, conversation_id, turn_id)
+            if current_turn and current_turn.status == "cancelled":
+                return current_turn
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot cancel turn with status '{current_turn.status if current_turn else 'terminal'}'"
+            )
 
         # 4. Synchronously record and publish turn.cancelled and done
         await self.event_service.record_and_publish(
             turn_id=turn_id,
-            event_type="turn.cancelled",
+            event_type=EVENT_TURN_CANCELLED,
             payload={"status": "cancelled", "reason": "Cancelled by user"}
         )
         await self.event_service.record_and_publish(
             turn_id=turn_id,
-            event_type="done",
+            event_type=EVENT_DONE,
             payload={"status": "cancelled", "reason": "Cancelled by user"}
         )
 

@@ -40,6 +40,18 @@ from app.repositories.knowledge import KnowledgeRepository
 from app.repositories.graph import graph_store
 from app.schemas.episodic import EpisodicMemoryCreate
 from app.schemas.working_memory import WorkingMemoryState
+from app.schemas.chat import (
+    EVENT_TURN_RESEARCH_STARTED,
+    EVENT_TURN_RESEARCH_PLANNING,
+    EVENT_TURN_RESEARCHING,
+    EVENT_TURN_SYNTHESIZING,
+    EVENT_TURN_PROMOTION_AVAILABLE,
+    EVENT_TURN_COMPLETED,
+    EVENT_TURN_CANCELLED,
+    EVENT_TURN_FAILED,
+    EVENT_SCRATCHPAD_ENTRY,
+    EVENT_DONE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -409,7 +421,7 @@ async def run_research_agent_job(
     if run.turn_id:
         await _bridge_chat_event(
             run.turn_id,
-            "turn.research_started",
+            EVENT_TURN_RESEARCH_STARTED,
             {"run_id": str(actual_run_id), "status": "started", "engine": engine_flag}
         )
 
@@ -462,19 +474,19 @@ async def run_research_agent_job(
                 if status == "planning":
                     await _bridge_chat_event(
                         run.turn_id,
-                        "turn.research_planning",
+                        EVENT_TURN_RESEARCH_PLANNING,
                         {"run_id": str(actual_run_id), "message": event.get("message", "Planning research")}
                     )
                 elif status in ("executing", "researching"):
                     await _bridge_chat_event(
                         run.turn_id,
-                        "turn.researching",
+                        EVENT_TURN_RESEARCHING,
                         {"run_id": str(actual_run_id), "message": event.get("message", "Conducting research")}
                     )
                 elif status == "synthesizing":
                     await _bridge_chat_event(
                         run.turn_id,
-                        "turn.synthesizing",
+                        EVENT_TURN_SYNTHESIZING,
                         {"run_id": str(actual_run_id), "message": event.get("message", "Synthesizing research results")}
                     )
 
@@ -518,7 +530,7 @@ async def run_research_agent_job(
                             if run.turn_id:
                                 await redis.publish(f"turn_events:{run.turn_id}", sp_json)
                         if run.turn_id:
-                            await _bridge_chat_event(run.turn_id, "scratchpad_entry", sp_payload)
+                            await _bridge_chat_event(run.turn_id, EVENT_SCRATCHPAD_ENTRY, sp_payload)
 
             if status in ("failed", "partial", "cancelled"):
                 final_status = status
@@ -564,24 +576,26 @@ async def run_research_agent_job(
                 if run and run.turn_id:
                     from app.repositories.conversation import ConversationRepository
                     conv_repo = ConversationRepository(session)
-                    await conv_repo.set_turn_status(
+                    cancelled_turn = await conv_repo.set_turn_status(
                         turn_id=run.turn_id,
                         status="cancelled",
+                        expected_statuses=["pending", "running"],
                         error_code="timeline_fence_aborted",
                         error_message=fence_reason,
                         research_run_id=actual_run_id,
                         completed_at=datetime.now(timezone.utc)
                     )
-                    await _bridge_chat_event(
-                        run.turn_id,
-                        "turn.cancelled",
-                        {"status": "cancelled", "reason": fence_reason}
-                    )
-                    await _bridge_chat_event(
-                        run.turn_id,
-                        "done",
-                        {"status": "cancelled", "reason": fence_reason}
-                    )
+                    if cancelled_turn:
+                        await _bridge_chat_event(
+                            run.turn_id,
+                            EVENT_TURN_CANCELLED,
+                            {"status": "cancelled", "reason": fence_reason}
+                        )
+                        await _bridge_chat_event(
+                            run.turn_id,
+                            EVENT_DONE,
+                            {"status": "cancelled", "reason": fence_reason}
+                        )
 
                 if redis:
                     fence_event = {
@@ -670,37 +684,41 @@ async def run_research_agent_job(
                 except Exception as rep_err:
                     logger.debug("Could not retrieve research report for turn summary: %s", rep_err)
 
+                completed_turn = None
                 try:
                     from app.repositories.conversation import ConversationRepository
                     conv_repo = ConversationRepository(session)
-                    await conv_repo.set_turn_status(
+                    completed_turn = await conv_repo.set_turn_status(
                         turn_id=run.turn_id,
                         status=final_status,
+                        expected_statuses=["pending", "running"],
                         assistant_message=report_content,
                         research_run_id=actual_run_id,
                         completed_at=datetime.now(timezone.utc)
                     )
                 except Exception as status_err:
                     logger.warning("Could not set turn status on research completion: %s", status_err)
-                turn_comp_event = "turn.completed" if final_status == "completed" else f"turn.{final_status}"
-                await _bridge_chat_event(
-                    run.turn_id,
-                    turn_comp_event,
-                    {
-                        "status": final_status,
-                        "assistant_message": report_content,
-                        "research_run_id": str(actual_run_id)
-                    }
-                )
-                await _bridge_chat_event(
-                    run.turn_id,
-                    "done",
-                    {
-                        "status": final_status,
-                        "assistant_message": report_content,
-                        "research_run_id": str(actual_run_id)
-                    }
-                )
+
+                if completed_turn:
+                    turn_comp_event = EVENT_TURN_COMPLETED if final_status == "completed" else f"turn.{final_status}"
+                    await _bridge_chat_event(
+                        run.turn_id,
+                        turn_comp_event,
+                        {
+                            "status": final_status,
+                            "assistant_message": report_content,
+                            "research_run_id": str(actual_run_id)
+                        }
+                    )
+                    await _bridge_chat_event(
+                        run.turn_id,
+                        EVENT_DONE,
+                        {
+                            "status": final_status,
+                            "assistant_message": report_content,
+                            "research_run_id": str(actual_run_id)
+                        }
+                    )
 
         await publish_event({"status": final_status, "message": f"Research {final_status}"})
         if redis and final_status == "completed":
@@ -716,7 +734,7 @@ async def run_research_agent_job(
         if run and run.turn_id and final_status == "completed":
             await _bridge_chat_event(
                 run.turn_id,
-                "turn.promotion_available",
+                EVENT_TURN_PROMOTION_AVAILABLE,
                 {"workspace_id": workspace_id, "run_id": str(actual_run_id)}
             )
             
@@ -757,27 +775,30 @@ async def run_research_agent_job(
 
         if 'run' in locals() and run and getattr(run, "turn_id", None):
             try:
+                failed_turn = None
                 async with async_session_maker() as err_session:
                     from app.repositories.conversation import ConversationRepository
                     c_repo = ConversationRepository(err_session)
-                    await c_repo.set_turn_status(
+                    failed_turn = await c_repo.set_turn_status(
                         turn_id=run.turn_id,
                         status="failed",
+                        expected_statuses=["pending", "running"],
                         error_code="research_job_failed",
                         error_message=str(exc),
                         research_run_id=actual_run_id if 'actual_run_id' in locals() else None,
                         completed_at=datetime.now(timezone.utc)
                     )
-                await _bridge_chat_event(
-                    run.turn_id,
-                    "turn.failed",
-                    {"status": "failed", "error": str(exc)}
-                )
-                await _bridge_chat_event(
-                    run.turn_id,
-                    "done",
-                    {"status": "failed", "error": str(exc)}
-                )
+                if failed_turn:
+                    await _bridge_chat_event(
+                        run.turn_id,
+                        EVENT_TURN_FAILED,
+                        {"status": "failed", "error": str(exc)}
+                    )
+                    await _bridge_chat_event(
+                        run.turn_id,
+                        EVENT_DONE,
+                        {"status": "failed", "error": str(exc)}
+                    )
             except Exception as turn_exc:
                 logger.warning("Failed to record turn failure: %s", turn_exc)
             

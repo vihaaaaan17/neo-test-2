@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, Dict, Any, List
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, Field, AliasChoices
+from pydantic import BaseModel, ConfigDict, Field, AliasChoices, field_validator
 
 
 class ChatEventType(str, Enum):
@@ -19,6 +19,7 @@ class ChatEventType(str, Enum):
     STATUS_CHANGE = "status_change"
     TOKEN = "token"
     CITATION = "citation"
+    GROUND_ANSWER = "ground_answer"
     DONE = "done"
     ERROR = "error"
 
@@ -37,6 +38,7 @@ EVENT_SCRATCHPAD_ENTRY = ChatEventType.SCRATCHPAD_ENTRY.value
 EVENT_STATUS_CHANGE = ChatEventType.STATUS_CHANGE.value
 EVENT_TOKEN = ChatEventType.TOKEN.value
 EVENT_CITATION = ChatEventType.CITATION.value
+EVENT_GROUND_ANSWER = ChatEventType.GROUND_ANSWER.value
 EVENT_DONE = ChatEventType.DONE.value
 EVENT_ERROR = ChatEventType.ERROR.value
 
@@ -78,6 +80,20 @@ class TurnCreate(BaseModel):
     source_scope: Optional[List[UUID]] = Field(None, description="Optional explicit source IDs for Ground mode")
     selected_source_ids: Optional[List[UUID]] = Field(None, description="Alias for source_scope or explicit selected sources")
     research_options: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Optional execution parameters for research mode")
+
+    @field_validator("mode")
+    @classmethod
+    def validate_mode(cls, v: str) -> str:
+        if v not in ("ground", "research"):
+            raise ValueError(f"Invalid turn mode: '{v}'. Must be 'ground' or 'research'")
+        return v
+
+    @field_validator("message")
+    @classmethod
+    def validate_message(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Turn message cannot be empty")
+        return v
 
 
 class TurnResponse(BaseModel):

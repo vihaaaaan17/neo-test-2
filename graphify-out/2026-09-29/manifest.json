@@ -60,9 +60,9 @@
     "semantic_hash": ""
   },
   "app/api/routes/workspaces.py": {
-    "mtime": 1790687979.5240226,
-    "seen": 1790688249.6732955,
-    "ast_hash": "104358091cce023c51459543d48515d6",
+    "mtime": 1790689170.9390883,
+    "seen": 1790689805.5191598,
+    "ast_hash": "dfff9ccd5b2695c915f239143e0194f8",
     "semantic_hash": ""
   },
   "app/core/config.py": {
@@ -114,9 +114,9 @@
     "semantic_hash": ""
   },
   "app/integrations/open_notebook/ground_engine.py": {
-    "mtime": 1790687935.5202904,
-    "seen": 1790688249.6732955,
-    "ast_hash": "01dccaca8cc4ac0df966b887983fd896",
+    "mtime": 1790689081.982524,
+    "seen": 1790689805.5191598,
+    "ast_hash": "dc862982c1a9568bd1846b553fcfd5b6",
     "semantic_hash": ""
   },
   "app/integrations/open_notebook/health.py": {
@@ -582,9 +582,9 @@
     "semantic_hash": ""
   },
   "app/repositories/conversation.py": {
-    "mtime": 1790613860.8624918,
-    "seen": 1790614252.3422954,
-    "ast_hash": "0c99b84066066ce920feae185f124188",
+    "mtime": 1790690381.6421213,
+    "seen": 1790690490.8479002,
+    "ast_hash": "0e0ba1bd00989102cadca778916dd236",
     "semantic_hash": ""
   },
   "app/schemas/chat.py": {
@@ -600,9 +600,9 @@
     "semantic_hash": ""
   },
   "app/services/chat/service.py": {
-    "mtime": 1790687967.020868,
-    "seen": 1790688249.6732955,
-    "ast_hash": "08e468f50cea5df7a798642963bb1836",
+    "mtime": 1790690375.6498158,
+    "seen": 1790690490.8479002,
+    "ast_hash": "9f763eaf8dcaa494df615a6230705e42",
     "semantic_hash": ""
   },
   "app/services/chat/events.py": {

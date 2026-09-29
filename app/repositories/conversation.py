@@ -94,6 +94,33 @@ class ConversationRepository:
         await self.session.refresh(conversation)
         return conversation
 
+    async def lock_conversation(self, conversation_id: UUID) -> Optional[Conversation]:
+        """
+        Row-locks the conversation using SELECT ... FOR UPDATE to serialize turn submissions.
+        """
+        stmt = (
+            select(Conversation)
+            .where(Conversation.conversation_id == conversation_id)
+            .with_for_update()
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def get_active_turn(self, conversation_id: UUID) -> Optional[ConversationTurn]:
+        """
+        Returns any active turn in 'pending' or 'running' state for the conversation.
+        """
+        stmt = (
+            select(ConversationTurn)
+            .where(
+                ConversationTurn.conversation_id == conversation_id,
+                ConversationTurn.status.in_(["pending", "running"])
+            )
+            .order_by(ConversationTurn.sequence.desc())
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
     async def allocate_turn_sequence(self, conversation_id: UUID) -> int:
         """
         Atomically increments and returns the next turn sequence number
@@ -199,6 +226,7 @@ class ConversationRepository:
         self,
         turn_id: UUID,
         status: str,
+        expected_statuses: Optional[List[str]] = None,
         assistant_message: Optional[str] = None,
         ground_evidence_refs: Optional[List[Any]] = None,
         research_run_id: Optional[UUID] = None,
@@ -208,33 +236,62 @@ class ConversationRepository:
         started_at: Optional[datetime] = None,
         completed_at: Optional[datetime] = None
     ) -> Optional[ConversationTurn]:
-        stmt = select(ConversationTurn).where(ConversationTurn.turn_id == turn_id)
+        """
+        Atomically updates turn status and attributes.
+        When expected_statuses is provided, uses atomic Compare-And-Swap (CAS):
+        UPDATE conversation_turns SET ... WHERE turn_id = :id AND status IN (:expected_statuses)
+        """
+        where_clauses = [ConversationTurn.turn_id == turn_id]
+        if expected_statuses is not None:
+            where_clauses.append(ConversationTurn.status.in_(expected_statuses))
+
+        values: Dict[str, Any] = {"status": status}
+        if assistant_message is not None:
+            values["assistant_message"] = assistant_message
+        if ground_evidence_refs is not None:
+            values["ground_evidence_refs"] = ground_evidence_refs
+        if research_run_id is not None:
+            values["research_run_id"] = research_run_id
+        if context_version is not None:
+            values["context_version"] = context_version
+        if error_code is not None:
+            values["error_code"] = error_code
+        if error_message is not None:
+            values["error_message"] = error_message
+        if started_at is not None:
+            values["started_at"] = started_at
+        if completed_at is not None:
+            values["completed_at"] = completed_at
+
+        stmt = (
+            update(ConversationTurn)
+            .where(*where_clauses)
+            .values(**values)
+            .returning(ConversationTurn)
+        )
         result = await self.session.execute(stmt)
         turn = result.scalars().first()
-        if not turn:
-            return None
-
-        turn.status = status
-        if assistant_message is not None:
-            turn.assistant_message = assistant_message
-        if ground_evidence_refs is not None:
-            turn.ground_evidence_refs = ground_evidence_refs
-        if research_run_id is not None:
-            turn.research_run_id = research_run_id
-        if context_version is not None:
-            turn.context_version = context_version
-        if error_code is not None:
-            turn.error_code = error_code
-        if error_message is not None:
-            turn.error_message = error_message
-        if started_at is not None:
-            turn.started_at = started_at
-        if completed_at is not None:
-            turn.completed_at = completed_at
-
         await self.session.commit()
-        await self.session.refresh(turn)
         return turn
+
+    async def set_turn_status_cas(
+        self,
+        turn_id: UUID,
+        status: str,
+        expected_statuses: Optional[List[str]] = None,
+        **kwargs
+    ) -> Optional[ConversationTurn]:
+        """
+        Atomic Compare-And-Swap (CAS) update helper:
+        UPDATE conversation_turns SET status = :status WHERE turn_id = :turn_id AND status IN (:expected_statuses)
+        """
+        allowed = expected_statuses if expected_statuses is not None else ["pending", "running"]
+        return await self.set_turn_status(
+            turn_id=turn_id,
+            status=status,
+            expected_statuses=allowed,
+            **kwargs
+        )
 
     async def append_event(
         self,

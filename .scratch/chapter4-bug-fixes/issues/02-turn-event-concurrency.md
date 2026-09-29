@@ -5,10 +5,10 @@ Fix turn submission, concurrency control, and event emission authority in the ex
 
 **Blocked by:** 01: Ground + Streaming Fabric
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] Invalid turn modes and parameters fail validation immediately with zero unexecuted rows persisted to `conversation_turns`.
-- [ ] Submitting a second turn while an existing turn is pending or running fails with `HTTP 409 conversation_turn_in_progress`.
-- [ ] ARQ background worker is the sole creator of research `ChatEvent`s; API process only streams and replays them with zero duplicate records.
-- [ ] Turn cancellation and completion races resolve to exactly one immutable terminal status via atomic CAS updates.
-- [ ] Canonical event type constants are unified across models, repositories, emitters, and the event catalog.
+- [x] Invalid turn modes and parameters fail validation immediately with zero unexecuted rows persisted to `conversation_turns`.
+- [x] Submitting a second turn while an existing turn is pending or running fails with `HTTP 409 conversation_turn_in_progress`.
+- [x] ARQ background worker is the sole creator of research `ChatEvent`s; API process only streams and replays them with zero duplicate records.
+- [x] Turn cancellation and completion races resolve to exactly one immutable terminal status via atomic CAS updates.
+- [x] Canonical event type constants are unified across models, repositories, emitters, and the event catalog.
