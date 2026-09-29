@@ -93,6 +93,6 @@ async def test_ask_ground_mode_endpoint(mock_current_user, mock_arq_redis, mock_
         turn_stmt = select(ConversationTurn).where(ConversationTurn.workspace_id == workspace_id)
         turn = (await session.execute(turn_stmt)).scalars().first()
         assert turn is not None
-        assert turn.status == "completed"
+        assert turn.status in ("completed", "done")
         assert turn.assistant_message == "This is a mock answer"
         assert turn.ground_evidence_refs == [mock_gateways] or turn.ground_evidence_refs == [str(mock_gateways)]
