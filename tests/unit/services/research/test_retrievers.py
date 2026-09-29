@@ -109,7 +109,8 @@ async def test_mcp_retriever_acl():
 @pytest.mark.asyncio
 async def test_gpt_researcher_retriever():
     mock_gateway = AsyncMock(return_value="LLM Response")
-    with patch("app.services.research.retrievers.gpt_researcher.GPTResearcher") as MockGPTResearcher:
+    with patch("app.services.research.retrievers.gpt_researcher.GPTResearcher") as MockGPTResearcher, \
+         patch.object(GPTResearcherRetriever, "_get_gpt_researcher_llm_provider", return_value=MagicMock()):
         instance = MockGPTResearcher.return_value
         instance.conduct_research = AsyncMock()
         instance.get_results.return_value = [

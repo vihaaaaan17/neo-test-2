@@ -34,10 +34,11 @@ async def test_rollback_to_legacy_engine():
 
             # Create a run
             run = await repo.create_run(workspace.workspace_id, uuid.uuid4(), "Test rollback", "legacy")
-            # Transition to planning
+            # Transition through full lifecycle
             await lifecycle.transition_run(workspace.workspace_id, run.run_id, "planning")
-            # Transition to researching
             await lifecycle.transition_run(workspace.workspace_id, run.run_id, "researching")
+            await lifecycle.transition_run(workspace.workspace_id, run.run_id, "synthesizing")
+            await lifecycle.transition_run(workspace.workspace_id, run.run_id, "finalizing")
             # Transition to completed
             completed_run = await lifecycle.transition_run(workspace.workspace_id, run.run_id, "completed")
 

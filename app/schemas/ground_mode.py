@@ -8,5 +8,7 @@ class AskRequest(BaseModel):
 class AskResponse(BaseModel):
     answer: str
     evidence: List[UUID]
-    knowledge_id: UUID
+    knowledge_id: UUID | None = None
     provenance_status: str | None = None
+    turn_id: UUID | None = None
+    conversation_id: UUID | None = None

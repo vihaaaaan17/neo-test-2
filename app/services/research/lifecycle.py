@@ -16,11 +16,11 @@ class ResearchLifecycleService:
     """
 
     RUN_TRANSITIONS = {
-        "pending": ["planning", "failed", "cancelled"],
-        "planning": ["researching", "failed", "cancelled", "partial"],
-        "researching": ["synthesizing", "failed", "cancelled", "partial"],
-        "synthesizing": ["finalizing", "failed", "cancelled", "partial"],
-        "finalizing": ["completed", "partial", "failed", "cancelled"],
+        "pending": ["planning", "failed", "cancelled", "aborted_by_timeline_fence"],
+        "planning": ["researching", "failed", "cancelled", "partial", "aborted_by_timeline_fence"],
+        "researching": ["synthesizing", "failed", "cancelled", "partial", "aborted_by_timeline_fence"],
+        "synthesizing": ["finalizing", "failed", "cancelled", "partial", "aborted_by_timeline_fence"],
+        "finalizing": ["completed", "partial", "failed", "cancelled", "aborted_by_timeline_fence"],
     }
 
     TASK_TRANSITIONS = {
@@ -28,7 +28,7 @@ class ResearchLifecycleService:
         "running": ["completed", "partial", "failed", "cancelled", "skipped"],
     }
 
-    TERMINAL_STATES = {"completed", "partial", "failed", "cancelled", "skipped"}
+    TERMINAL_STATES = {"completed", "partial", "failed", "cancelled", "skipped", "aborted_by_timeline_fence"}
 
     def __init__(self, repository: ResearchRepository):
         self.repository = repository

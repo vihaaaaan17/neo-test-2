@@ -1,0 +1,81 @@
+Phase 1 Chapter 4 — Issues / Deviations from Plan
+====================================================
+
+Date: 2026-09-26
+Audit: Read-only assessment of implementation vs. CHAPTER_4_IMPLEMENTATION_PHASE_PLAN.md Phase 1 (P1.1–P1.7)
+
+---
+
+ACTUAL ISSUES FOUND
+-------------------
+
+1. File Structure Deviations (Cosmetic / Plan Granularity)
+----------------------------------------------------------
+- ChatEvent model lives in app/models/conversation.py, not separate app/models/chat_event.py
+- ChatEventRepository lives in app/services/chat/events.py, not app/repositories/chat_events.py
+- Both work correctly; plan specified separate files.
+
+2. Missing Repository Functions
+-------------------------------
+- get_latest_sequence() on ChatEventRepository — not implemented (derivable from list_events_after(0))
+- set_turn_result() — not implemented as separate function (set_turn_status() handles assistant_message + ground_evidence_refs)
+- get_recent_turns() — not implemented (only list_turns() with pagination exists)
+
+3. Missing Standalone Service Functions (Plan P1.4)
+----------------------------------------------------
+- emit_turn_event() — exists inline in ChatEventService.record_and_publish()
+- publish_live_event() — exists inline in ChatEventService.record_and_publish()
+- replay_events() — exists inline in ChatEventService.get_turn_events()
+- Logic is correct; just not exposed as independently callable functions.
+
+4. TurnCreate Schema Missing Optional Fields (Plan P1.2)
+---------------------------------------------------------
+- selected_source_ids: Optional[List[UUID]] — MISSING
+- research_options: Optional[dict] — MISSING
+- Only source_scope: Optional[List[UUID]] exists.
+
+5. Missing Schema Model
+-----------------------
+- TurnStatusResponse — listed in plan P1.2, not implemented (TurnResponse includes status field)
+
+6. Legacy /research Endpoint Bypasses ChatService (Behavioral)
+---------------------------------------------------------------
+- app/api/routes/research.py:18-65 creates ResearchRun directly via ResearchAdmissionController
+- Does NOT delegate to ChatService.submit_turn(mode="research")
+- Creates a split backend path contrary to P1.6 ("legacy /research creates a canonical Research turn")
+- This is the only HIGH-severity finding in Phase 1.
+
+---
+
+WHAT IS CORRECT AND WORKING (No Issues)
+---------------------------------------
+✓ Monotonic sequence allocation under FOR UPDATE row lock
+✓ Idempotency via client_request_id (unique constraint + pre-check)
+✓ SSE streaming: event: <type>\ndata: <json>\n\n format
+✓ Historical replay via GET /turns/{id}/events?after_sequence=N
+✓ 409 transparent Open Notebook session rehydration (1 retry, sync + streaming)
+✓ Ground answers persist ONLY to ConversationTurn — no KnowledgeMemory, no sync_knowledge_to_graph_job
+✓ Tenant isolation: workspace + owner checks on every repository read/write
+✓ Deprecation headers on legacy routes (Deprecation: true, Link: rel="successor-version")
+✓ Conversation, ConversationTurn, ChatEvent models with correct indexes/constraints
+✓ OpenNotebookConversationBinding migrated to canonical Conversation (migration d5e6f7a8b9c0)
+✓ All 36 Phase 1 gates passed (GATES_TICKET_01 through GATES_TICKET_04)
+
+---
+
+SEVERITY SUMMARY
+----------------
+- HIGH: 1 (legacy /research bypass)
+- MEDIUM: 2 (set_turn_result, TurnCreate missing fields)
+- LOW: 6 (file structure, missing standalone functions, missing schema, missing repo helpers)
+
+---
+
+VERDICT
+-------
+Phase 1 is functionally complete and correct. The issues are almost entirely about:
+- File organization being less granular than the plan specified
+- A few optional schema fields not added
+- One behavioral deviation (legacy /research not delegating to ChatService)
+
+No functional bugs in the core conversation/turn/event fabric.

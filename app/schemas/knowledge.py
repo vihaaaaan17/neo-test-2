@@ -1,11 +1,12 @@
 from pydantic import BaseModel, ConfigDict, Field
 from uuid import UUID
 from datetime import datetime
-from typing import Optional, Any, Literal
+from typing import Optional, Any, Literal, Dict
 
 class Provenance(BaseModel):
     source_refs: list[UUID] = Field(default_factory=list, description="IDs of source chunks or snapshots")
     source_mode: Literal["ground", "research"] = Field(..., description="Mode that generated this knowledge (e.g. 'ground' or 'research')")
+    typed_refs: Optional[list[Dict[str, Any]]] = Field(default_factory=list, description="Optional typed provenance references")
 
 class KnowledgeMemoryCreate(BaseModel):
     knowledge_type: str

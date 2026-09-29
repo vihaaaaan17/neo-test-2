@@ -17,13 +17,18 @@ from app.workers.tasks import (
     process_deletion_tombstone_job, reconcile_deletion_tombstones_job
 )
 from arq.cron import cron
-from arq.worker import WorkerSettings as BaseWorkerSettings
 
 logger = logging.getLogger(__name__)
+
 
 async def startup(ctx: dict) -> None:
     """Runs once when the worker process starts. Populate shared resources."""
     logger.info("NeosisLM worker starting up")
+
+    # Validate checkpointer configuration (fail fast in production)
+    from app.services.working_memory import validate_checkpointer
+    validate_checkpointer()
+
     # llm_call will be wired to LiteLLM in Phase 3.
     # For now it is None; compress_episodic_job raises a clear error if called
     # without it, which makes the missing dependency explicit rather than silent.
@@ -47,7 +52,7 @@ async def shutdown(ctx: dict) -> None:
         await ctx["s3_context"].__aexit__(None, None, None)
 
 
-class WorkerSettings(BaseWorkerSettings):
+class WorkerSettings:
     """
 arq worker settings class. Discovered by: python -m arq app.workers.settings.WorkerSettings
     """

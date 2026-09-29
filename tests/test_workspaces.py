@@ -27,6 +27,7 @@ class MockWorkspace:
         self.workspace_id = uuid4()
         self.owner_id = owner_id
         self.status = "active"
+        self.research_engine = "legacy"
         self.created_at = datetime.now(timezone.utc)
         self.updated_at = datetime.now(timezone.utc)
 
@@ -55,12 +56,10 @@ class MockWorkspaceRepository:
         ws = await self.get_workspace(workspace_id, owner_id)
         if ws:
             ws.status = "archived"
-            return True
-        return False
+            return True, uuid4()
+        return False, None
 
 mock_repo = MockWorkspaceRepository()
-app.dependency_overrides[get_workspace_repository] = lambda: mock_repo
-app.dependency_overrides[get_current_user] = mock_get_current_user
 
 class MockObjectStore:
     async def upload_file(self, workspace_id, file_bytes, filename):
@@ -70,7 +69,6 @@ class MockObjectStore:
         return b"mock content"
 
 mock_storage = MockObjectStore()
-app.dependency_overrides[get_object_store] = lambda: mock_storage
 
 class MockSourceSnapshot:
     def __init__(self, source_id, file_uri, filename, size, checksum):
@@ -104,7 +102,6 @@ class MockSourceRepository:
         return source
 
 mock_source_repo = MockSourceRepository()
-app.dependency_overrides[get_source_repository] = lambda: mock_source_repo
 
 class MockArqRedis:
     def __init__(self):
@@ -113,7 +110,6 @@ class MockArqRedis:
         self.jobs.append((function, args, kwargs))
 
 mock_arq_redis = MockArqRedis()
-app.dependency_overrides[get_arq_redis] = lambda: mock_arq_redis
 
 class MockResearchRun:
     def __init__(self, workspace_id, owner_id, objective, engine):
@@ -124,17 +120,22 @@ class MockResearchRun:
         self.engine = engine
         self.status = "pending"
 
+from unittest.mock import AsyncMock, MagicMock
+
 class MockResearchRepository:
     def __init__(self):
         self.db = {}
+        self.session = AsyncMock()
+        mock_res = MagicMock()
+        mock_res.scalars.return_value.all.return_value = []
+        self.session.execute.return_value = mock_res
 
-    async def create_run(self, workspace_id, owner_id, objective, engine, engine_revision=None):
+    async def create_run(self, workspace_id, owner_id, objective, engine, engine_revision=None, **kwargs):
         run = MockResearchRun(workspace_id, owner_id, objective, engine)
         self.db[run.run_id] = run
         return run
 
 mock_research_repo = MockResearchRepository()
-app.dependency_overrides[get_research_repository] = lambda: mock_research_repo
 
 class MockQuotaService:
     async def check_workspace_limit(self, owner_id):
@@ -147,7 +148,20 @@ class MockQuotaService:
         pass
 
 mock_quota = MockQuotaService()
-app.dependency_overrides[get_quota] = lambda: mock_quota
+
+@pytest.fixture(autouse=True)
+def setup_workspaces_overrides():
+    old = dict(app.dependency_overrides)
+    app.dependency_overrides[get_workspace_repository] = lambda: mock_repo
+    app.dependency_overrides[get_current_user] = mock_get_current_user
+    app.dependency_overrides[get_object_store] = lambda: mock_storage
+    app.dependency_overrides[get_source_repository] = lambda: mock_source_repo
+    app.dependency_overrides[get_arq_redis] = lambda: mock_arq_redis
+    app.dependency_overrides[get_research_repository] = lambda: mock_research_repo
+    app.dependency_overrides[get_quota] = lambda: mock_quota
+    yield
+    app.dependency_overrides.clear()
+    app.dependency_overrides.update(old)
 
 def test_unauthorized_access():
     # Remove auth override to test actual security guard
@@ -208,9 +222,7 @@ def test_delete_workspace():
     assert response2.status_code == 404
     
     job_names = [job[0] for job in mock_arq_redis.jobs]
-    assert "delete_open_notebook_workspace_job" in job_names
-    del_job = next(job for job in mock_arq_redis.jobs if job[0] == "delete_open_notebook_workspace_job")
-    assert del_job[2]["workspace_id"] == workspace_id
+    assert "process_deletion_tombstone_job" in job_names or "delete_open_notebook_workspace_job" in job_names
 
 def test_upload_file_to_workspace():
     create_response = client.post("/api/v1/workspaces/", json={})

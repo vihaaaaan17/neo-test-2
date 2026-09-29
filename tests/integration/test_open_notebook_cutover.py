@@ -16,8 +16,7 @@ async def setup_workspace(db_session: AsyncSession):
     
     workspace = Workspace(
         workspace_id=uuid.uuid4(),
-        owner_id=user.user_id,
-        name="Cutover Test Workspace"
+        owner_id=user.user_id
     )
     db_session.add(workspace)
     await db_session.commit()

@@ -29,6 +29,10 @@ def mock_arq_redis():
 
 @pytest.fixture
 def mock_gateways():
+    from app.core.config import settings
+    orig_on = settings.OPEN_NOTEBOOK_ENABLED
+    settings.OPEN_NOTEBOOK_ENABLED = False
+
     evidence_id = uuid4()
     async def mock_llm(prompt: str):
         if "hallucination detection judge" in prompt:
@@ -51,6 +55,7 @@ def mock_gateways():
     
     yield evidence_id
     
+    settings.OPEN_NOTEBOOK_ENABLED = orig_on
     app.dependency_overrides.pop(get_llm_gateway, None)
     app.dependency_overrides.pop(get_embed_gateway, None)
     app.dependency_overrides.pop(get_hybrid_retrieval_service, None)
@@ -70,13 +75,24 @@ async def test_ask_ground_mode_endpoint(mock_current_user, mock_arq_redis, mock_
         response = await client.post(f"/api/v1/workspaces/{workspace_id}/ask", json={"query": "Test query"})
         
     assert response.status_code == 200
+    assert response.headers.get("Deprecation") == "true"
+    assert "conversations" in response.headers.get("Link", "")
     data = response.json()
     assert data["answer"] == "This is a mock answer"
     assert data["evidence"] == [str(mock_gateways)]
-    assert "knowledge_id" in data
+    assert data.get("knowledge_id") is None
     
-    # Verify graph sync worker was enqueued
-    mock_arq_redis.enqueue_job.assert_called_once_with(
-        "sync_knowledge_to_graph_job", 
-        knowledge_id=data["knowledge_id"]
-    )
+    # Chapter 4 Invariant: Ground turns do NOT enqueue sync_knowledge_to_graph_job
+    enqueued_jobs = [call[0][0] for call in mock_arq_redis.enqueue_job.call_args_list]
+    assert "sync_knowledge_to_graph_job" not in enqueued_jobs
+
+    # Verify conversation turn was durably created in PostgreSQL
+    async with async_session_maker() as session:
+        from app.models.conversation import ConversationTurn
+        from sqlalchemy import select
+        turn_stmt = select(ConversationTurn).where(ConversationTurn.workspace_id == workspace_id)
+        turn = (await session.execute(turn_stmt)).scalars().first()
+        assert turn is not None
+        assert turn.status == "completed"
+        assert turn.assistant_message == "This is a mock answer"
+        assert turn.ground_evidence_refs == [mock_gateways] or turn.ground_evidence_refs == [str(mock_gateways)]

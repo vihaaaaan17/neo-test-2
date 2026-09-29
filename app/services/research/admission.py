@@ -30,7 +30,10 @@ class ResearchAdmissionController:
         owner_id: UUID,
         objective: str,
         engine: str,
-        engine_revision: Optional[str] = None
+        engine_revision: Optional[str] = None,
+        conversation_id: Optional[UUID] = None,
+        turn_id: Optional[UUID] = None,
+        base_commit_id: Optional[UUID] = None
     ) -> ResearchRun:
         """
         Admits a new research run after checking quotas and rate limits.
@@ -75,7 +78,10 @@ class ResearchAdmissionController:
             owner_id=owner_id,
             objective=objective,
             engine=engine,
-            engine_revision=engine_revision
+            engine_revision=engine_revision,
+            conversation_id=conversation_id,
+            turn_id=turn_id,
+            base_commit_id=base_commit_id
         )
 
     async def get_queue_status(self) -> Dict[str, Any]:

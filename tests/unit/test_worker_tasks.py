@@ -4,13 +4,12 @@ from unittest.mock import patch, MagicMock, AsyncMock
 import sys
 
 # Mock external dependencies missing from local env before importing models
-sys.modules['pgvector'] = MagicMock()
-sys.modules['pgvector.sqlalchemy'] = MagicMock()
-sys.modules['aioboto3'] = MagicMock()
-sys.modules['docling'] = MagicMock()
-sys.modules['docling.document_converter'] = MagicMock()
-sys.modules['litellm'] = MagicMock()
-sys.modules['neo4j'] = MagicMock()
+for _mod in ['pgvector', 'pgvector.sqlalchemy', 'aioboto3', 'docling', 'docling.document_converter', 'litellm', 'neo4j']:
+    if _mod not in sys.modules:
+        try:
+            __import__(_mod)
+        except ImportError:
+            sys.modules[_mod] = MagicMock()
 
 from app.workers.tasks import project_to_open_notebook_job
 from arq.worker import Retry

@@ -12,10 +12,14 @@ def test_health_check():
     mock_graph = AsyncMock()
 
     with patch("app.main.engine", mock_engine), \
-         patch("app.main.graph_store", mock_graph):
+         patch("app.main.graph_store", mock_graph), \
+         patch("app.main.check_open_notebook_health", return_value=True):
         response = client.get("/health")
         assert response.status_code == 200
-        assert response.json() == {"status": "ok", "postgres": "ok", "neo4j": "ok"}
+        data = response.json()
+        assert data["status"] == "ok"
+        assert data["postgres"] == "ok"
+        assert data["neo4j"] == "ok"
         mock_conn.execute.assert_called_once()
         mock_graph.execute_query.assert_called_once_with("RETURN 1")
         
@@ -23,5 +27,8 @@ def test_health_check():
         mock_graph.execute_query.side_effect = Exception("Neo4j down")
         response = client.get("/api/v1/health")
         assert response.status_code == 200
-        assert response.json() == {"status": "degraded", "postgres": "failed", "neo4j": "failed"}
+        data = response.json()
+        assert data["status"] == "degraded"
+        assert data["postgres"] == "failed"
+        assert data["neo4j"] == "failed"
 

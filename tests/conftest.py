@@ -59,7 +59,27 @@ def pytest_collection_modifyitems(config, items):
     skip_no_on = pytest.mark.skip(reason="Open Notebook not reachable on port 5055 (start docker-compose)")
     
     for item in items:
-        if "integration" in item.keywords and not db_up:
+        if item.get_closest_marker("integration") and not db_up:
             item.add_marker(skip_no_db)
-        if "open_notebook" in item.keywords and not on_up:
+        if item.get_closest_marker("open_notebook") and not on_up:
             item.add_marker(skip_no_on)
+
+from app.core.database import async_session_maker
+
+@pytest.fixture
+async def db_session():
+    async with async_session_maker() as session:
+        yield session
+
+@pytest.fixture(autouse=True)
+def reset_global_state():
+    from app.integrations.open_notebook.client import circuit_breaker, CircuitState
+    with circuit_breaker._lock:
+        circuit_breaker.state = CircuitState.CLOSED
+        circuit_breaker.failure_count = 0
+        circuit_breaker.last_failure_time = 0.0
+    yield
+    with circuit_breaker._lock:
+        circuit_breaker.state = CircuitState.CLOSED
+        circuit_breaker.failure_count = 0
+        circuit_breaker.last_failure_time = 0.0

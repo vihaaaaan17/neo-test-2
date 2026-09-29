@@ -15,6 +15,7 @@ class Workspace(Base):
     active_commit_id = Column(UUID(as_uuid=True), nullable=True)
     ground_version = Column(Integer, default=1, nullable=False)
     research_engine = Column(String, default="legacy", nullable=False)
+    timeline_epoch = Column(Integer, default=1, nullable=False)
 
 class WorkspaceCommit(Base):
     __tablename__ = "workspace_commits"
@@ -23,4 +24,5 @@ class WorkspaceCommit(Base):
     parent_id = Column(UUID(as_uuid=True), nullable=True)
     workspace_id = Column(UUID(as_uuid=True), ForeignKey("workspaces.workspace_id", ondelete="CASCADE"), nullable=False, index=True)
     active_knowledge_ids = Column(JSONB, default=list, nullable=False)
+    manifest = Column(JSONB, default=dict, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)

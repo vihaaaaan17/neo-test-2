@@ -3,7 +3,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 from app.main import app
 from app.api.deps.auth import get_current_user
-from app.api.routes.workspaces import get_workspace_repository, get_knowledge_repository
+from app.api.routes.workspaces import get_workspace_repository, get_knowledge_repository, get_quota
 import datetime
 
 client = TestClient(app)
@@ -17,6 +17,7 @@ class MockWorkspace:
         self.owner_id = owner_id
         self.status = "active"
         self.active_commit_id = None
+        self.timeline_epoch = 1
         self.created_at = datetime.datetime.now()
         self.updated_at = datetime.datetime.now()
 
@@ -54,21 +55,34 @@ class MockWorkspaceRepo:
     async def get_commit(self, commit_id, workspace_id):
         return self.commits.get(commit_id)
 
+    async def rollback_workspace_atomic(self, workspace_id, commit_id, owner_id):
+        ws = self.workspaces.get(workspace_id)
+        if ws:
+            ws.active_commit_id = commit_id
+            ws.timeline_epoch = (getattr(ws, "timeline_epoch", 0) or 0) + 1
+        return ws, getattr(ws, "timeline_epoch", 1) if ws else 1
+
 class MockKnowledgeRepo:
     async def list_workspace_knowledge(self, workspace_id, owner_id, allowed_ids=None):
         return []
 
-app.dependency_overrides[get_current_user] = mock_get_current_user
-mock_workspace_repo = MockWorkspaceRepo()
-app.dependency_overrides[get_workspace_repository] = lambda: mock_workspace_repo
-mock_knowledge_repo = MockKnowledgeRepo()
-app.dependency_overrides[get_knowledge_repository] = lambda: mock_knowledge_repo
-
-# Mock other required deps for workspace creation
-from app.api.routes.workspaces import get_quota
-class MockQuotaService:
-    async def check_workspace_limit(self, owner_id): pass
-app.dependency_overrides[get_quota] = lambda: MockQuotaService()
+@pytest.fixture(autouse=True)
+def setup_versioning_overrides():
+    from unittest.mock import AsyncMock
+    from app.api.deps.arq import get_arq_redis
+    old_overrides = dict(app.dependency_overrides)
+    app.dependency_overrides[get_current_user] = mock_get_current_user
+    mock_workspace_repo = MockWorkspaceRepo()
+    app.dependency_overrides[get_workspace_repository] = lambda: mock_workspace_repo
+    mock_knowledge_repo = MockKnowledgeRepo()
+    app.dependency_overrides[get_knowledge_repository] = lambda: mock_knowledge_repo
+    app.dependency_overrides[get_arq_redis] = lambda: AsyncMock()
+    class MockQuotaService:
+        async def check_workspace_limit(self, owner_id): pass
+    app.dependency_overrides[get_quota] = lambda: MockQuotaService()
+    yield
+    app.dependency_overrides.clear()
+    app.dependency_overrides.update(old_overrides)
 
 def test_versioning():
     # 1. Create workspace

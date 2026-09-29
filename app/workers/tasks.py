@@ -15,6 +15,10 @@ Design rules:
 """
 import logging
 import os
+import time
+import json
+import asyncio
+from datetime import datetime, timezone
 from uuid import UUID
 from typing import Any
 
@@ -318,6 +322,7 @@ async def run_research_agent_job(
     workspace_id: str,
     objective: str,
     run_id: str | None = None,
+    research_context: dict | None = None,
 ) -> dict[str, Any]:
     """
     Background job: Runs the ResearchEngine and streams events to Redis.
@@ -342,7 +347,9 @@ async def run_research_agent_job(
     
     async def publish_event(event_data: dict):
         if redis:
-            await redis.publish(channel_name, json.dumps(event_data))
+            payload_str = json.dumps(event_data)
+            await redis.publish(channel_name, payload_str)
+            await redis.publish(f"research_events:{run_id}", payload_str)
 
     await publish_event({"status": "starting", "message": "Initializing research agent..."})
 
@@ -360,12 +367,13 @@ async def run_research_agent_job(
     # We must retrieve the Workspace and ResearchRun
     async with async_session_maker() as session:
         from app.models.workspace import Workspace
-        from app.models.research import ResearchRun
+        from app.models.research import ResearchRun, ResearchArtifact, ResearchReport
         from sqlalchemy.future import select
         
         workspace = (await session.execute(
             select(Workspace).where(Workspace.workspace_id == UUID(workspace_id))
         )).scalars().first()
+        expected_epoch = workspace.timeline_epoch if workspace and isinstance(getattr(workspace, "timeline_epoch", None), int) else 1
         
         run = (await session.execute(
             select(ResearchRun).where(ResearchRun.run_id == UUID(run_id))
@@ -378,6 +386,32 @@ async def run_research_agent_job(
         owner_id = run.owner_id
         engine_flag = run.engine
         actual_run_id = UUID(run_id)
+
+    async def _bridge_chat_event(t_id: UUID | None, ev_type: str, payload: dict):
+        if not t_id:
+            return
+        from app.services.chat.events import ChatEventRepository, ChatEventService
+        try:
+            payload.setdefault("workspace_id", str(workspace_id))
+            payload.setdefault("run_id", str(actual_run_id))
+            if getattr(run, "conversation_id", None):
+                payload.setdefault("conversation_id", str(run.conversation_id))
+            payload.setdefault("turn_id", str(t_id))
+            payload.setdefault("timeline_epoch", expected_epoch)
+
+            async with async_session_maker() as ev_session:
+                c_repo = ChatEventRepository(ev_session)
+                c_service = ChatEventService(c_repo, redis)
+                await c_service.record_and_publish(t_id, ev_type, payload)
+        except Exception as bridge_err:
+            logger.warning("Failed to bridge chat event %s for turn %s: %s", ev_type, t_id, bridge_err)
+
+    if run.turn_id:
+        await _bridge_chat_event(
+            run.turn_id,
+            "turn.research_started",
+            {"run_id": str(actual_run_id), "status": "started", "engine": engine_flag}
+        )
 
     logger.info(json.dumps({
         "event": "research_run_started",
@@ -393,20 +427,103 @@ async def run_research_agent_job(
         search_tool=WebSearchTool(),
         redis_client=redis
     )
-    
+
+    cancel_task = None
+    if redis and hasattr(redis, "pubsub"):
+        async def _listen_for_cancellation():
+            try:
+                ps = redis.pubsub()
+                await ps.subscribe(f"research_cancellation:{actual_run_id}")
+                async for msg in ps.listen():
+                    if msg and msg.get("type") == "message":
+                        logger.info("Received cancellation signal via Redis for run %s", actual_run_id)
+                        if hasattr(engine, "cancel"):
+                            await engine.cancel()
+                        break
+            except Exception as e:
+                logger.debug("Cancellation listener ended for run %s: %s", actual_run_id, e)
+        cancel_task = asyncio.create_task(_listen_for_cancellation())
+
     try:
         final_graph = None
         final_status = "completed"
         final_reason = "Engine finished normally"
         
-        async for event in engine.astream_events(run_id=actual_run_id, workspace_id=UUID(workspace_id), objective=objective):
+        async for event in engine.astream_events(
+            run_id=actual_run_id,
+            workspace_id=UUID(workspace_id),
+            objective=objective,
+            research_context=research_context,
+        ):
             await publish_event(event)
             status = event.get("status")
-            
+
+            if run.turn_id:
+                if status == "planning":
+                    await _bridge_chat_event(
+                        run.turn_id,
+                        "turn.research_planning",
+                        {"run_id": str(actual_run_id), "message": event.get("message", "Planning research")}
+                    )
+                elif status in ("executing", "researching"):
+                    await _bridge_chat_event(
+                        run.turn_id,
+                        "turn.researching",
+                        {"run_id": str(actual_run_id), "message": event.get("message", "Conducting research")}
+                    )
+                elif status == "synthesizing":
+                    await _bridge_chat_event(
+                        run.turn_id,
+                        "turn.synthesizing",
+                        {"run_id": str(actual_run_id), "message": event.get("message", "Synthesizing research results")}
+                    )
+
+            # Structured scratchpad persistence and real-time streaming
+            sp_data = event.get("scratchpad_entry")
+            if sp_data and isinstance(sp_data, dict):
+                from app.services.chat.context import sanitize_scratchpad_content
+                from app.repositories.scratchpad import ScratchpadRepository
+
+                entry_type = sp_data.get("entry_type", "observation")
+                raw_content = sp_data.get("content", "")
+                sanitized = sanitize_scratchpad_content(raw_content)
+                if sanitized and entry_type in ["note", "observation", "hypothesis", "investigation", "finding"]:
+                    async with async_session_maker() as sp_session:
+                        sp_repo = ScratchpadRepository(sp_session)
+                        sp_entry = await sp_repo.create_entry(
+                            workspace_id=UUID(workspace_id),
+                            conversation_id=run.conversation_id,
+                            turn_id=run.turn_id,
+                            run_id=actual_run_id,
+                            entry_type=entry_type,
+                            content=sanitized,
+                            is_pinned_to_workspace=bool(sp_data.get("is_pinned_to_workspace", False)),
+                            metadata=sp_data.get("metadata") or {}
+                        )
+                        sp_payload = {
+                            "entry_id": str(sp_entry.entry_id),
+                            "entry_type": sp_entry.entry_type,
+                            "content": sp_entry.content,
+                            "is_pinned": sp_entry.is_pinned_to_workspace,
+                            "lifecycle": sp_entry.lifecycle,
+                            "metadata": sp_entry.metadata_ or {}
+                        }
+                        sp_event = {
+                            "event_type": "scratchpad_entry",
+                            "payload": sp_payload
+                        }
+                        if redis:
+                            sp_json = json.dumps(sp_event)
+                            await redis.publish(f"research_events:{actual_run_id}", sp_json)
+                            if run.turn_id:
+                                await redis.publish(f"turn_events:{run.turn_id}", sp_json)
+                        if run.turn_id:
+                            await _bridge_chat_event(run.turn_id, "scratchpad_entry", sp_payload)
+
             if status in ("failed", "partial", "cancelled"):
                 final_status = status
                 final_reason = event.get("message", f"Engine returned {status}")
-                
+
             if status == "synthesizing" and "final_graph" in event:
                 final_graph = event["final_graph"]
 
@@ -423,30 +540,184 @@ async def run_research_agent_job(
             repo = ResearchRepository(session)
             lifecycle = ResearchLifecycleService(repo)
             
+            # ---------------------------------------------------------
+            # Concurrency Fence: Check timeline_epoch
+            # If workspace was rolled back during research execution,
+            # epoch will have incremented. Fence out in-flight worker.
+            # ---------------------------------------------------------
+            ws_current = (await session.execute(
+                select(Workspace).where(Workspace.workspace_id == UUID(workspace_id))
+            )).scalars().first()
+            current_epoch = ws_current.timeline_epoch if ws_current and isinstance(getattr(ws_current, "timeline_epoch", None), int) else expected_epoch
+
+            if current_epoch != expected_epoch:
+                fence_reason = f"Aborted by timeline fence: workspace epoch advanced from {expected_epoch} to {current_epoch} due to rollback."
+                logger.warning("Timeline epoch fence triggered for workspace %s: %s", workspace_id, fence_reason)
+                try:
+                    await lifecycle.transition_run(UUID(workspace_id), actual_run_id, "aborted_by_timeline_fence", {"reason": fence_reason})
+                except Exception:
+                    current_run = await repo.get_run(UUID(workspace_id), actual_run_id)
+                    if current_run:
+                        current_run.status = "aborted_by_timeline_fence"
+                        await session.commit()
+
+                if run and run.turn_id:
+                    from app.repositories.conversation import ConversationRepository
+                    conv_repo = ConversationRepository(session)
+                    await conv_repo.set_turn_status(
+                        turn_id=run.turn_id,
+                        status="cancelled",
+                        error_code="timeline_fence_aborted",
+                        error_message=fence_reason,
+                        research_run_id=actual_run_id,
+                        completed_at=datetime.now(timezone.utc)
+                    )
+                    await _bridge_chat_event(
+                        run.turn_id,
+                        "turn.cancelled",
+                        {"status": "cancelled", "reason": fence_reason}
+                    )
+                    await _bridge_chat_event(
+                        run.turn_id,
+                        "done",
+                        {"status": "cancelled", "reason": fence_reason}
+                    )
+
+                if redis:
+                    fence_event = {
+                        "event_type": "workspace.rollback.fence_triggered",
+                        "workspace_id": workspace_id,
+                        "run_id": str(actual_run_id),
+                        "expected_epoch": expected_epoch,
+                        "current_epoch": current_epoch,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                    await redis.publish(f"workspace_events:{workspace_id}", json.dumps(fence_event))
+                    await redis.publish(f"research_events:{actual_run_id}", json.dumps(fence_event))
+
+                await publish_event({"status": "aborted_by_timeline_fence", "error": fence_reason})
+                return {"status": "aborted_by_timeline_fence", "reason": fence_reason}
+
             # Transition state to final_status
+            if final_status == "completed":
+                current_run = await repo.get_run(UUID(workspace_id), actual_run_id)
+                current_status = current_run.status.lower() if current_run else "pending"
+                stages = ["planning", "researching", "synthesizing", "finalizing"]
+                if current_status in stages or current_status == "pending":
+                    start_idx = -1 if current_status == "pending" else stages.index(current_status)
+                    for next_stage in stages[start_idx + 1:]:
+                        await lifecycle.transition_run(UUID(workspace_id), actual_run_id, next_stage, {"auto": True})
             await lifecycle.transition_run(UUID(workspace_id), actual_run_id, final_status, {"reason": final_reason})
             await session.commit()
             
-            # Run final promotion only if completed
+            # ---------------------------------------------------------
+            # In Phase 3: Finalize candidate artifacts in pending_review status
+            # Research completion NEVER automatically promotes KnowledgeMemory or projects Output KG.
+            # ---------------------------------------------------------
             if final_status == "completed":
-                mem_router = MemoryRouter(
-                    episodic_repo=__import__("app.repositories.episodic", fromlist=["EpisodicRepository"]).EpisodicRepository(session),
-                    knowledge_repo=__import__("app.repositories.knowledge", fromlist=["KnowledgeRepository"]).KnowledgeRepository(session),
-                    llm_gateway=llm_gateway
+                from app.services.research.derivation import DerivationService
+                derivation_svc = DerivationService(session)
+                candidates = await repo.list_candidates_by_status(UUID(workspace_id), run_id=actual_run_id)
+                for cand in candidates:
+                    if cand.promotion_status == "pending_review":
+                        cand_dict = {
+                            "payload": cand.payload,
+                            "verification_status": cand.verification_status,
+                            "verification_reason": cand.verification_reason,
+                            "verification_metadata": cand.verification_metadata,
+                        }
+                        try:
+                            normalized = await derivation_svc.normalize_derivation(UUID(workspace_id), cand_dict)
+                            cand.payload = normalized.get("payload", cand.payload)
+                            cand.verification_status = normalized.get("verification_status", cand.verification_status)
+                            cand.verification_reason = normalized.get("verification_reason", cand.verification_reason)
+                            cand.verification_metadata = normalized.get("verification_metadata", cand.verification_metadata)
+                        except Exception as exc:
+                            logger.warning("Failed to normalize derivation for candidate %s: %s", cand.artifact_id, exc)
+
+                # If synthesis produced final_graph, ensure it is stored as graph_candidate (pending_review)
+                # rather than directly projecting into Neo4j
+                if final_graph:
+                    stmt = select(ResearchArtifact).where(
+                        ResearchArtifact.run_id == actual_run_id,
+                        ResearchArtifact.type == "graph_candidate"
+                    )
+                    existing_gc = (await session.execute(stmt)).scalars().first()
+                    if not existing_gc:
+                        await repo.create_artifact(
+                            workspace_id=UUID(workspace_id),
+                            run_id=actual_run_id,
+                            artifact_type="graph_candidate",
+                            payload=final_graph,
+                            promotion_status="pending_review",
+                        )
+                await session.commit()
+
+            # Retrieve final research report content if available to attach as assistant summary
+            # Finalize ConversationTurn status, assistant message, and research_run_id
+            if run and getattr(run, "turn_id", None):
+                report_content = None
+                try:
+                    rep_stmt = (
+                        select(ResearchReport)
+                        .where(ResearchReport.run_id == actual_run_id)
+                        .order_by(ResearchReport.created_at.desc())
+                    )
+                    rep_res = await session.execute(rep_stmt)
+                    rep = rep_res.scalars().first() if rep_res else None
+                    if rep and hasattr(rep, "content"):
+                        report_content = rep.content
+                except Exception as rep_err:
+                    logger.debug("Could not retrieve research report for turn summary: %s", rep_err)
+
+                try:
+                    from app.repositories.conversation import ConversationRepository
+                    conv_repo = ConversationRepository(session)
+                    await conv_repo.set_turn_status(
+                        turn_id=run.turn_id,
+                        status=final_status,
+                        assistant_message=report_content,
+                        research_run_id=actual_run_id,
+                        completed_at=datetime.now(timezone.utc)
+                    )
+                except Exception as status_err:
+                    logger.warning("Could not set turn status on research completion: %s", status_err)
+                turn_comp_event = "turn.completed" if final_status == "completed" else f"turn.{final_status}"
+                await _bridge_chat_event(
+                    run.turn_id,
+                    turn_comp_event,
+                    {
+                        "status": final_status,
+                        "assistant_message": report_content,
+                        "research_run_id": str(actual_run_id)
+                    }
                 )
-                graph_repo = GraphRepository(graph_store)
-                research_service = ResearchService(repo, mem_router, graph_repo)
-                
-                if owner_id:
-                    await research_service.promote_memory_candidates(UUID(workspace_id), actual_run_id, owner_id)
-                await research_service.promote_graph_candidates(UUID(workspace_id), actual_run_id)
+                await _bridge_chat_event(
+                    run.turn_id,
+                    "done",
+                    {
+                        "status": final_status,
+                        "assistant_message": report_content,
+                        "research_run_id": str(actual_run_id)
+                    }
+                )
 
         await publish_event({"status": final_status, "message": f"Research {final_status}"})
-        if final_graph and redis and final_status == "completed":
-            await redis.enqueue_job(
-                "project_output_graph_job",
-                workspace_id=workspace_id,
-                graph_dict=final_graph
+        if redis and final_status == "completed":
+            prom_event = {
+                "event_type": "promotion.available",
+                "workspace_id": workspace_id,
+                "run_id": str(actual_run_id),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            await redis.publish(f"workspace_events:{workspace_id}", json.dumps(prom_event))
+            await redis.publish(f"research_events:{actual_run_id}", json.dumps(prom_event))
+
+        if run and run.turn_id and final_status == "completed":
+            await _bridge_chat_event(
+                run.turn_id,
+                "turn.promotion_available",
+                {"workspace_id": workspace_id, "run_id": str(actual_run_id)}
             )
             
         duration_ms = int((time.time() - start_time) * 1000)
@@ -483,8 +754,37 @@ async def run_research_agent_job(
                 await session.commit()
         except Exception as transition_exc:
             logger.warning(f"Could not transition run to failed (might already be terminal): {transition_exc}")
+
+        if 'run' in locals() and run and getattr(run, "turn_id", None):
+            try:
+                async with async_session_maker() as err_session:
+                    from app.repositories.conversation import ConversationRepository
+                    c_repo = ConversationRepository(err_session)
+                    await c_repo.set_turn_status(
+                        turn_id=run.turn_id,
+                        status="failed",
+                        error_code="research_job_failed",
+                        error_message=str(exc),
+                        research_run_id=actual_run_id if 'actual_run_id' in locals() else None,
+                        completed_at=datetime.now(timezone.utc)
+                    )
+                await _bridge_chat_event(
+                    run.turn_id,
+                    "turn.failed",
+                    {"status": "failed", "error": str(exc)}
+                )
+                await _bridge_chat_event(
+                    run.turn_id,
+                    "done",
+                    {"status": "failed", "error": str(exc)}
+                )
+            except Exception as turn_exc:
+                logger.warning("Failed to record turn failure: %s", turn_exc)
             
         return {"status": "failed", "workspace_id": workspace_id, "error": str(exc)}
+    finally:
+        if cancel_task and not cancel_task.done():
+            cancel_task.cancel()
 
 # --------------------------------------------------------------------------- #
 # project_output_graph_job
@@ -569,6 +869,7 @@ async def export_workspace_job(
 
     except Exception as exc:
         logger.exception("export_workspace_job: failed for workspace %s: %s", workspace_id, exc)
+        await publish_event({"status": "failed", "error": str(exc)})
         return {"status": "failed", "workspace_id": workspace_id, "error": str(exc)}
 
 # --------------------------------------------------------------------------- #
@@ -760,3 +1061,30 @@ async def reconcile_deletion_tombstones_job(ctx: dict) -> dict[str, Any]:
             enqueued_count += 1
             
         return {"status": "completed", "enqueued": enqueued_count}
+
+
+async def delete_open_notebook_source_job(ctx: dict, *, source_id: str, snapshot_id: str) -> dict[str, Any]:
+    """Compatibility job: deletes open notebook source binding if present."""
+    from app.models.open_notebook_binding import OpenNotebookSourceBinding
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(OpenNotebookSourceBinding).where(OpenNotebookSourceBinding.source_id == UUID(source_id))
+        )
+        binding = result.scalars().first()
+        if not binding:
+            return {"status": "skipped", "reason": "no_binding"}
+        return {"status": "completed"}
+
+
+async def delete_open_notebook_workspace_job(ctx: dict, *, workspace_id: str) -> dict[str, Any]:
+    """Compatibility job: deletes open notebook workspace binding if present."""
+    from app.models.open_notebook_binding import OpenNotebookWorkspaceBinding
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(OpenNotebookWorkspaceBinding).where(OpenNotebookWorkspaceBinding.workspace_id == UUID(workspace_id))
+        )
+        binding = result.scalars().first()
+        if not binding:
+            return {"status": "skipped", "reason": "no_binding"}
+        return {"status": "completed"}
+

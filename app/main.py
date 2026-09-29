@@ -50,7 +50,11 @@ async def lifespan(app: FastAPI):
     
     # Connect to internal KG
     await graph_store.connect()
-    
+
+    # Validate startup configuration and infrastructure (fail fast in production)
+    from app.core.startup import validate_production_startup
+    await validate_production_startup()
+
     yield
     
     # Shutdown
@@ -132,6 +136,11 @@ async def set_neosis_run_id(request: Request, call_next):
 app.add_middleware(BaseHTTPMiddleware, dispatch=set_neosis_run_id)
 
 
+# FastAPI >= 0.115 compatibility with OpenTelemetry FastAPIInstrumentor
+import fastapi.routing
+if hasattr(fastapi.routing, "_IncludedRouter") and not hasattr(fastapi.routing._IncludedRouter, "path"):
+    fastapi.routing._IncludedRouter.path = property(lambda self: getattr(self.include_context, "prefix", ""))
+
 # Instrument the FastAPI app with OpenTelemetry
 FastAPIInstrumentor.instrument_app(app)
 
@@ -168,6 +177,10 @@ async def health_check():
     return status
 
 from app.api.routes.workspaces import router as workspaces_router
+from app.api.routes.chat import router as chat_router
+from app.api.routes.scratchpad import router as scratchpad_router
+from app.api.routes.promotions import router as promotions_router
+from app.api.routes.research import router as research_router
 from app.api.routes.jobs import router as jobs_router
 from app.api.routes.quota import router as quota_router
 from app.api.routes.rate_limiter import router as rate_limiter_router
@@ -175,7 +188,17 @@ from app.api.routes.worker import router as worker_router
 from app.api.routes.metrics import router as metrics_router
 
 # Limit the workspace router routes explicitly if needed, but slowapi works automatically
+# Primary API v1 routes
 app.include_router(workspaces_router, prefix="/api/v1")
+app.include_router(chat_router, prefix="/api/v1")
+app.include_router(scratchpad_router, prefix="/api/v1")
+app.include_router(promotions_router, prefix="/api/v1")
+app.include_router(research_router, prefix="/api/v1")
+
+# Legacy compatibility un-prefixed routes
+app.include_router(workspaces_router)
+app.include_router(chat_router)
+app.include_router(promotions_router)
 app.include_router(jobs_router, prefix="/api/v1")
 app.include_router(quota_router, prefix="/api/v1")
 app.include_router(rate_limiter_router, prefix="/api/v1")

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import json
 import uuid
 from uuid import UUID
@@ -44,7 +45,17 @@ class ResearchRepository:
     # ==========================
     # ResearchRun
     # ==========================
-    async def create_run(self, workspace_id: UUID, owner_id: UUID, objective: str, engine: str, engine_revision: Optional[str] = None) -> ResearchRun:
+    async def create_run(
+        self,
+        workspace_id: UUID,
+        owner_id: UUID,
+        objective: str,
+        engine: str,
+        engine_revision: Optional[str] = None,
+        conversation_id: Optional[UUID] = None,
+        turn_id: Optional[UUID] = None,
+        base_commit_id: Optional[UUID] = None
+    ) -> ResearchRun:
         attempt_id = uuid.uuid4()
         run = ResearchRun(
             workspace_id=workspace_id,
@@ -52,6 +63,9 @@ class ResearchRepository:
             objective=objective,
             engine=engine,
             engine_revision=engine_revision,
+            conversation_id=conversation_id,
+            turn_id=turn_id,
+            base_commit_id=base_commit_id,
             status="pending",
             current_attempt_id=attempt_id
         )
@@ -216,16 +230,32 @@ class ResearchRepository:
         return result.scalars().all()
 
     # ==========================
-    # ResearchArtifact
+    # ResearchArtifact & Promotion Candidates
     # ==========================
-    async def create_artifact(self, workspace_id: UUID, run_id: UUID, artifact_type: str, payload: dict, task_id: Optional[UUID] = None, tags: Optional[List[str]] = None) -> ResearchArtifact:
+    async def create_artifact(
+        self,
+        workspace_id: UUID,
+        run_id: UUID,
+        artifact_type: str,
+        payload: dict,
+        task_id: Optional[UUID] = None,
+        tags: Optional[List[str]] = None,
+        promotion_status: str = "pending_review",
+        verification_status: Optional[str] = None,
+        verification_reason: Optional[dict] = None,
+        verification_metadata: Optional[dict] = None
+    ) -> ResearchArtifact:
         await self._verify_run_workspace(run_id, workspace_id)
         artifact = ResearchArtifact(
             run_id=run_id,
             task_id=task_id,
             type=artifact_type,
             tags=tags or [],
-            payload=payload
+            payload=payload,
+            promotion_status=promotion_status,
+            verification_status=verification_status,
+            verification_reason=verification_reason,
+            verification_metadata=verification_metadata
         )
         self.session.add(artifact)
         await self.session.commit()
@@ -237,6 +267,90 @@ class ResearchRepository:
         stmt = select(ResearchArtifact).where(ResearchArtifact.artifact_id == artifact_id, ResearchArtifact.run_id == run_id)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def list_candidates_by_status(
+        self,
+        workspace_id: UUID,
+        status: Optional[str] = None,
+        run_id: Optional[UUID] = None
+    ) -> List[ResearchArtifact]:
+        stmt = (
+            select(ResearchArtifact)
+            .join(ResearchRun, ResearchArtifact.run_id == ResearchRun.run_id)
+            .where(ResearchRun.workspace_id == workspace_id)
+        )
+        if status is not None:
+            stmt = stmt.where(ResearchArtifact.promotion_status == status)
+        if run_id is not None:
+            stmt = stmt.where(ResearchArtifact.run_id == run_id)
+        stmt = stmt.order_by(ResearchArtifact.created_at.desc())
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_candidate_for_review(self, workspace_id: UUID, artifact_id: UUID) -> Optional[ResearchArtifact]:
+        stmt = (
+            select(ResearchArtifact)
+            .join(ResearchRun, ResearchArtifact.run_id == ResearchRun.run_id)
+            .where(
+                ResearchArtifact.artifact_id == artifact_id,
+                ResearchRun.workspace_id == workspace_id
+            )
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def set_candidate_decision(
+        self,
+        workspace_id: UUID,
+        artifact_id: UUID,
+        status: str,
+        reviewed_by: UUID,
+        review_reason: Optional[str] = None
+    ) -> Optional[ResearchArtifact]:
+        artifact = await self.get_candidate_for_review(workspace_id, artifact_id)
+        if not artifact:
+            return None
+        artifact.promotion_status = status
+        artifact.reviewed_by = reviewed_by
+        artifact.reviewed_at = datetime.now(timezone.utc)
+        artifact.review_reason = review_reason
+        await self.session.commit()
+        await self.session.refresh(artifact)
+        return artifact
+
+    async def link_candidate_target(
+        self,
+        workspace_id: UUID,
+        artifact_id: UUID,
+        target_type: str,
+        target_id: UUID
+    ) -> Optional[ResearchArtifact]:
+        artifact = await self.get_candidate_for_review(workspace_id, artifact_id)
+        if not artifact:
+            return None
+        artifact.promoted_target_type = target_type
+        artifact.promoted_target_id = target_id
+        await self.session.commit()
+        await self.session.refresh(artifact)
+        return artifact
+
+    async def set_candidate_verification(
+        self,
+        workspace_id: UUID,
+        artifact_id: UUID,
+        status: str,
+        reason: Optional[dict] = None,
+        metadata: Optional[dict] = None
+    ) -> Optional[ResearchArtifact]:
+        artifact = await self.get_candidate_for_review(workspace_id, artifact_id)
+        if not artifact:
+            return None
+        artifact.verification_status = status
+        artifact.verification_reason = reason
+        artifact.verification_metadata = metadata
+        await self.session.commit()
+        await self.session.refresh(artifact)
+        return artifact
 
     # ==========================
     # ResearchReport

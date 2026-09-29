@@ -66,10 +66,11 @@ async def test_engine_zero_evidence_rejection():
     engine = OpenNotebookGroundEngine()
     
     # Mock db and binding check
-    db = AsyncMock()
-    
+    db = MagicMock()
+    mock_result = MagicMock()
     mock_binding = MagicMock()
-    db.execute.return_value.scalars.return_value.first.return_value = mock_binding
+    mock_result.scalars.return_value.first.return_value = mock_binding
+    db.execute = AsyncMock(return_value=mock_result)
     
     # Mock client methods
     engine.client.get_default_models = AsyncMock(return_value={"default_chat_model": "test-model"})

@@ -2,9 +2,13 @@ import pytest
 import sys
 from unittest.mock import patch, MagicMock
 
-# Mock pgvector before any app imports to avoid ModuleNotFoundError
-sys.modules['pgvector'] = MagicMock()
-sys.modules['pgvector.sqlalchemy'] = MagicMock()
+# Mock pgvector before any app imports to avoid ModuleNotFoundError if missing
+for _mod in ['pgvector', 'pgvector.sqlalchemy']:
+    if _mod not in sys.modules:
+        try:
+            __import__(_mod)
+        except ImportError:
+            sys.modules[_mod] = MagicMock()
 
 from app.services.ground.factory import get_ground_engine
 from app.integrations.open_notebook.ground_engine import OpenNotebookGroundEngine

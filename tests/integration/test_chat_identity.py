@@ -3,7 +3,7 @@ from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.core.config import settings
 from app.models.workspace import Workspace
-from app.models.conversation import GroundConversation
+from app.models.conversation import Conversation
 from app.models.open_notebook_binding import OpenNotebookConversationBinding, OpenNotebookWorkspaceBinding
 from sqlalchemy.ext.asyncio import AsyncSession
 from tests.utils import create_test_user, get_user_token_headers
@@ -19,23 +19,29 @@ async def setup_workspace_with_on(db_session: AsyncSession):
     
     workspace = Workspace(
         workspace_id=uuid.uuid4(),
-        owner_id=user.user_id,
-        name="Chat Test Workspace"
+        owner_id=user.user_id
     )
     db_session.add(workspace)
+    await db_session.flush()
     
     ws_binding = OpenNotebookWorkspaceBinding(
         workspace_id=workspace.workspace_id,
-        open_notebook_notebook_id="notebook:123",
+        open_notebook_notebook_id=f"notebook:{uuid.uuid4()}",
         status="ACTIVE"
     )
     db_session.add(ws_binding)
     await db_session.commit()
     
-    return workspace, token_headers, user
+    yield workspace, token_headers, user, ws_binding
+
+    from sqlalchemy import text
+    from app.core.database import async_session_maker
+    async with async_session_maker() as cleanup_session:
+        await cleanup_session.execute(text("DELETE FROM workspaces WHERE workspace_id = :ws_id"), {"ws_id": workspace.workspace_id})
+        await cleanup_session.commit()
 
 async def test_chat_new_conversation(setup_workspace_with_on, db_session: AsyncSession):
-    workspace, token_headers, user = setup_workspace_with_on
+    workspace, token_headers, user, ws_binding = setup_workspace_with_on
     workspace_id = workspace.workspace_id
     
     with patch("app.integrations.open_notebook.client.OpenNotebookClient.create_chat_session", new_callable=AsyncMock) as mock_create:
@@ -57,7 +63,7 @@ async def test_chat_new_conversation(setup_workspace_with_on, db_session: AsyncS
                 
                 # Verify DB records
                 conv_id = uuid.UUID(data["conversation_id"])
-                conv = await db_session.get(GroundConversation, conv_id)
+                conv = await db_session.get(Conversation, conv_id)
                 assert conv is not None
                 assert conv.workspace_id == workspace_id
                 assert conv.owner_id == user.user_id
@@ -67,14 +73,15 @@ async def test_chat_new_conversation(setup_workspace_with_on, db_session: AsyncS
                 assert binding.open_notebook_session_id == "session:456"
 
 async def test_chat_existing_conversation(setup_workspace_with_on, db_session: AsyncSession):
-    workspace, token_headers, user = setup_workspace_with_on
+    workspace, token_headers, user, ws_binding = setup_workspace_with_on
     workspace_id = workspace.workspace_id
     
     conv_id = uuid.uuid4()
-    conv = GroundConversation(
+    conv = Conversation(
         conversation_id=conv_id,
         workspace_id=workspace_id,
-        owner_id=user.user_id
+        owner_id=user.user_id,
+        title="Existing Conv"
     )
     db_session.add(conv)
     
@@ -102,20 +109,21 @@ async def test_chat_existing_conversation(setup_workspace_with_on, db_session: A
             
             mock_execute.assert_called_once_with(
                 session_id="session:789",
-                notebook_id="notebook:123",
+                notebook_id=ws_binding.open_notebook_notebook_id,
                 message="Next part"
             )
 
 async def test_chat_session_expired(setup_workspace_with_on, db_session: AsyncSession):
     from fastapi import HTTPException
-    workspace, token_headers, user = setup_workspace_with_on
+    workspace, token_headers, user, ws_binding = setup_workspace_with_on
     workspace_id = workspace.workspace_id
     
     conv_id = uuid.uuid4()
-    conv = GroundConversation(
+    conv = Conversation(
         conversation_id=conv_id,
         workspace_id=workspace_id,
-        owner_id=user.user_id
+        owner_id=user.user_id,
+        title="Expired Conv"
     )
     db_session.add(conv)
     
@@ -126,7 +134,9 @@ async def test_chat_session_expired(setup_workspace_with_on, db_session: AsyncSe
     db_session.add(binding)
     await db_session.commit()
     
-    with patch("app.integrations.open_notebook.client.OpenNotebookClient.chat_execute", new_callable=AsyncMock) as mock_execute:
+    with patch("app.integrations.open_notebook.client.OpenNotebookClient.create_chat_session", new_callable=AsyncMock) as mock_create, \
+         patch("app.integrations.open_notebook.client.OpenNotebookClient.chat_execute", new_callable=AsyncMock) as mock_execute:
+        mock_create.return_value = "session:rehydrated"
         mock_execute.side_effect = HTTPException(status_code=400, detail="conversation_session_expired")
         
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -137,4 +147,4 @@ async def test_chat_session_expired(setup_workspace_with_on, db_session: AsyncSe
             )
             
             assert response.status_code == 400
-            assert response.json()["detail"] == "conversation_session_expired"
+            assert "conversation_session_expired" in response.json()["detail"]

@@ -15,6 +15,7 @@ class WorkspaceResponse(BaseModel):
     status: str
     active_commit_id: UUID | None = None
     ground_version: int = 1
+    timeline_epoch: int = 1
     created_at: datetime
     updated_at: datetime
 
@@ -25,6 +26,7 @@ class WorkspaceCommitResponse(BaseModel):
     parent_id: UUID | None = None
     workspace_id: UUID
     active_knowledge_ids: List[UUID]
+    manifest: dict = {}
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -48,11 +48,14 @@ class ResearchService:
             # We assume artifact.payload holds the memory text or payload
             content_str = artifact.payload.get("text", "") if isinstance(artifact.payload, dict) else str(artifact.payload)
             
+            domain_val = artifact.payload.get("domain", "deep_research") if isinstance(artifact.payload, dict) else "deep_research"
+            
             # Map artifact fields to KnowledgeMemoryCreate
             # According to schema, source_mode should be 'research' for research outputs.
             memory_data = KnowledgeMemoryCreate(
                 knowledge_type="research_memory",
                 content=content_str,
+                domain=domain_val,
                 status="active",
                 provenance=Provenance(
                     source_mode="research",

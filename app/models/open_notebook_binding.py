@@ -43,11 +43,17 @@ class OpenNotebookSourceBinding(Base):
 class OpenNotebookConversationBinding(Base):
     __tablename__ = "open_notebook_conversation_bindings"
 
-    conversation_id = Column(UUID(as_uuid=True), ForeignKey("ground_conversations.conversation_id", ondelete="CASCADE"), primary_key=True)
+    conversation_id = Column(
+        UUID(as_uuid=True), 
+        ForeignKey("conversations.conversation_id", ondelete="CASCADE"), 
+        primary_key=True
+    )
     open_notebook_session_id = Column(String, nullable=False, unique=True)
     
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    conversation = relationship("Conversation", back_populates="open_notebook_binding")
 
 class DeletionTombstone(Base):
     __tablename__ = "deletion_tombstones"

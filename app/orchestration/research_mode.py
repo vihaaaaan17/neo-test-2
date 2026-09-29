@@ -23,6 +23,7 @@ class ResearchState(TypedDict):
     summary: str | None
 
 from typing_extensions import deprecated
+import warnings
 
 @deprecated("This legacy research orchestrator is deprecated. Use OpenDeepResearchEngine instead.")
 class ResearchModeOrchestrator:
@@ -32,11 +33,18 @@ class ResearchModeOrchestrator:
         search_tool: WebSearchTool,
         memory_router: Any = None
     ):
+        warnings.warn(
+            "ResearchModeOrchestrator is deprecated and will be removed in Phase 5. "
+            "Use OpenDeepResearchEngine instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         from app.services.memory_router import MemoryRouterService
         self.llm_gateway = llm_gateway
         self.search_tool = search_tool
         self.memory_router = memory_router or MemoryRouterService()
         self.graph = self._build_graph()
+
         
     def _build_graph(self):
         workflow = StateGraph(ResearchState)
@@ -215,4 +223,11 @@ class ResearchModeOrchestrator:
         with tracing_v2_enabled(project_name="NeosisLM-ResearchMode"):
             final_state = await self.graph.ainvoke(initial_state)
             
+        if "context" in final_state and final_state["context"]:
+            ctx = final_state["context"]
+            if hasattr(ctx, "plan"):
+                final_state["plan"] = ctx.plan
+            if hasattr(ctx, "gathered_evidence"):
+                final_state["gathered_evidence"] = ctx.gathered_evidence
+
         return final_state

@@ -4,6 +4,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env")
 
+    ENVIRONMENT: str = "development"  # "development", "test", "production"
+    NEOSIS_ENV: str | None = None
+
     # Default to local docker-compose postgres
     DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/neosislm"
     SUPABASE_JWT_SECRET: str = "super-secret-jwt-token-for-supabase-local-dev-only"

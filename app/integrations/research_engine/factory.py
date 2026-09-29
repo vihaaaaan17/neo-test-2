@@ -4,7 +4,6 @@ from typing import Callable, Awaitable, Any
 from app.integrations.research_engine.engine import ResearchEngine
 from app.integrations.research_engine.legacy import LegacyResearchEngine
 from app.integrations.research_engine.exceptions import ResearchEngineSetupError
-# OpenDeepResearchEngine will be imported when implemented in Ticket 02
 
 logger = logging.getLogger(__name__)
 

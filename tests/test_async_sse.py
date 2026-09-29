@@ -8,7 +8,38 @@ from unittest.mock import AsyncMock, MagicMock
 from app.main import app
 from app.api.deps.auth import get_current_user
 from app.api.deps.arq import get_arq_redis
-from app.api.routes.workspaces import get_workspace_repository
+from app.api.routes.workspaces import get_workspace_repository, get_research_repository
+
+class MockResearchRun:
+    def __init__(self, workspace_id, owner_id, objective, engine):
+        self.run_id = uuid4()
+        self.workspace_id = workspace_id
+        self.owner_id = owner_id
+        self.objective = objective
+        self.engine = engine
+        self.status = "pending"
+
+class MockResearchRepository:
+    def __init__(self):
+        self.db = {}
+        self.session = MagicMock()
+        mock_res = MagicMock()
+        mock_res.scalar.return_value = 0
+        self.session.execute = AsyncMock(return_value=mock_res)
+
+    async def create_run(self, workspace_id, owner_id, objective, engine, engine_revision=None, **kwargs):
+        run = MockResearchRun(workspace_id, owner_id, objective, engine)
+        self.db[run.run_id] = run
+        return run
+
+    async def count_active_runs_by_owner(self, owner_id):
+        return 0
+
+    async def count_active_runs_by_workspace(self, workspace_id):
+        return 0
+
+    async def count_active_runs(self):
+        return 0
 
 @pytest.fixture
 def mock_user_id():
@@ -52,9 +83,13 @@ async def test_async_sse_research_flow(mock_user_id, mock_workspace_id):
             
     app.dependency_overrides[get_arq_redis] = lambda: MockArqRedis()
     
+    mock_workspace = MagicMock()
+    mock_workspace.research_engine = "legacy"
     mock_repo = MagicMock()
-    mock_repo.get_workspace = AsyncMock(return_value=MagicMock())
+    mock_repo.get_workspace = AsyncMock(return_value=mock_workspace)
     app.dependency_overrides[get_workspace_repository] = lambda: mock_repo
+    app.dependency_overrides[get_research_repository] = lambda: MockResearchRepository()
+
     
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         # 1. Enqueue job
@@ -75,3 +110,8 @@ async def test_async_sse_research_flow(mock_user_id, mock_workspace_id):
             assert chunks[0]["status"] == "starting"
             assert chunks[1]["status"] == "planning"
             assert chunks[2]["status"] == "completed"
+
+    app.dependency_overrides.pop(get_arq_redis, None)
+    app.dependency_overrides.pop(get_workspace_repository, None)
+    app.dependency_overrides.pop(get_research_repository, None)
+    app.dependency_overrides.pop(get_current_user, None)

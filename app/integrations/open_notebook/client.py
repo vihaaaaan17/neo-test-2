@@ -380,3 +380,68 @@ class OpenNotebookClient:
                 circuit_breaker.record_failure()
                 logger.error(f"Open Notebook chat RequestError: {str(e)}")
                 raise HTTPException(status_code=503, detail="ground_dependency_unavailable")
+
+    async def chat_stream(
+        self,
+        session_id: str,
+        notebook_id: str,
+        message: str
+    ):
+        """
+        Streams chat events and incremental tokens for a conversation session.
+        Yields dictionaries with 'event' and 'data'.
+        Traps 404s/409s for session invalidation.
+        """
+        if not circuit_breaker.check_state():
+            raise HTTPException(status_code=503, detail="ground_dependency_unavailable")
+
+        async with self._get_client(custom_timeout=120.0) as client:
+            try:
+                # 1. Fetch context
+                context_res = await client.post(
+                    f"{self.base_url}/api/chat/context",
+                    json={"notebook_id": notebook_id, "context_config": {}},
+                    headers=self._get_headers()
+                )
+                context_res.raise_for_status()
+                context_data = context_res.json().get("context", {})
+
+                # 2. Execute chat
+                exec_res = await client.post(
+                    f"{self.base_url}/api/chat/execute",
+                    json={
+                        "session_id": session_id,
+                        "message": message,
+                        "context": context_data
+                    },
+                    headers=self._get_headers()
+                )
+                exec_res.raise_for_status()
+                circuit_breaker.record_success()
+
+                result = exec_res.json()
+                messages = result.get("messages", [])
+                answer = ""
+                for msg in reversed(messages):
+                    if msg.get("type") == "ai":
+                        answer = msg.get("content", "")
+                        break
+
+                yield {"event": "token", "data": {"token": answer}}
+                yield {"event": "done", "data": {"answer": answer, "evidence": result.get("evidence", [])}}
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code >= 500:
+                    circuit_breaker.record_failure()
+                logger.error(f"Open Notebook chat_stream HTTPStatusError: {e.response.status_code} - {e.response.text}")
+                if e.response.status_code == 404:
+                    raise HTTPException(status_code=400, detail="conversation_session_expired")
+                elif e.response.status_code in [400, 422]:
+                    raise HTTPException(status_code=400, detail="ground_validation_error")
+                elif e.response.status_code >= 500:
+                    raise HTTPException(status_code=502, detail="ground_execution_failed")
+                raise HTTPException(status_code=502, detail="ground_execution_failed")
+            except httpx.RequestError as e:
+                circuit_breaker.record_failure()
+                logger.error(f"Open Notebook chat_stream RequestError: {str(e)}")
+                raise HTTPException(status_code=503, detail="ground_dependency_unavailable")
+

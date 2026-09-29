@@ -15,6 +15,9 @@ class ResearchRun(Base):
     engine = Column(String, nullable=False)
     engine_revision = Column(String, nullable=True)
     current_attempt_id = Column(UUID(as_uuid=True), nullable=True)
+    conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.conversation_id", ondelete="SET NULL"), nullable=True, index=True)
+    turn_id = Column(UUID(as_uuid=True), ForeignKey("conversation_turns.turn_id", ondelete="SET NULL"), nullable=True, index=True)
+    base_commit_id = Column(UUID(as_uuid=True), ForeignKey("workspace_commits.commit_id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
@@ -59,6 +62,15 @@ class ResearchArtifact(Base):
     type = Column(String, nullable=False)
     tags = Column(ARRAY(String), default=list, nullable=False)
     payload = Column(JSONB, nullable=False)
+    promotion_status = Column(String, default="pending_review", nullable=False, index=True)
+    reviewed_by = Column(UUID(as_uuid=True), nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    review_reason = Column(String, nullable=True)
+    promoted_target_type = Column(String, nullable=True)
+    promoted_target_id = Column(UUID(as_uuid=True), nullable=True)
+    verification_status = Column(String, nullable=True)
+    verification_reason = Column(JSONB, nullable=True)
+    verification_metadata = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
 

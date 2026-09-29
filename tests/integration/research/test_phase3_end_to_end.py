@@ -40,7 +40,7 @@ def mock_engine_factory(monkeypatch):
     monkeypatch.setattr(ResearchEngineFactory, "get_engine", mock_get_engine)
 
 @pytest.mark.asyncio
-async def test_phase3_end_to_end_flow(setup_test_db, mock_engine_factory, pg_session: AsyncSession):
+async def test_phase3_end_to_end_flow(mock_engine_factory, db_session: AsyncSession):
     """
     Tests the End-to-End flow of Phase 3 Research Engine.
     Worker -> ODR Adapter (Mock) -> Postgres -> Memory Promotion.
@@ -50,12 +50,13 @@ async def test_phase3_end_to_end_flow(setup_test_db, mock_engine_factory, pg_ses
     owner_id = uuid.uuid4()
     run_id = uuid.uuid4()
     
-    workspace = Workspace(workspace_id=workspace_id, owner_id=owner_id, name="Test WS")
-    pg_session.add(workspace)
+    workspace = Workspace(workspace_id=workspace_id, owner_id=owner_id)
+    db_session.add(workspace)
+    await db_session.flush()
     
     run = ResearchRun(run_id=run_id, workspace_id=workspace_id, owner_id=owner_id, objective="Test Objective", engine="odr", status="pending")
-    pg_session.add(run)
-    await pg_session.commit()
+    db_session.add(run)
+    await db_session.commit()
     
     # 2. Run the Worker Job
     ctx = {
@@ -70,25 +71,24 @@ async def test_phase3_end_to_end_flow(setup_test_db, mock_engine_factory, pg_ses
     assert result["status"] == "completed"
     
     # Check DB transitions
-    await pg_session.refresh(run)
+    await db_session.refresh(run)
     assert run.status == "completed", "ResearchRun should be transitioned to completed by the worker task"
     
     # Check artifacts and reports
-    report_result = await pg_session.execute(select(ResearchReport).where(ResearchReport.run_id == run_id))
+    report_result = await db_session.execute(select(ResearchReport).where(ResearchReport.run_id == run_id))
     report = report_result.scalar_one_or_none()
     assert report is not None
     assert report.content == "Mock final report"
     
-    artifact_result = await pg_session.execute(select(ResearchArtifact).where(ResearchArtifact.run_id == run_id))
+    artifact_result = await db_session.execute(select(ResearchArtifact).where(ResearchArtifact.run_id == run_id))
     artifacts = artifact_result.scalars().all()
     assert len(artifacts) == 1
     assert artifacts[0].type == "memory_candidate"
     
     # Check memory promotion
-    mem_result = await pg_session.execute(select(KnowledgeMemory).where(KnowledgeMemory.workspace_id == workspace_id))
+    mem_result = await db_session.execute(select(KnowledgeMemory).where(KnowledgeMemory.workspace_id == workspace_id))
     memories = mem_result.scalars().all()
     assert len(memories) >= 1
     
     memory = memories[-1]
     assert memory.domain == "deep_research"
-    # payload text mapping depends on the memory router, typically it uses artifact.payload["text"]

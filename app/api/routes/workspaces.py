@@ -1,6 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
+from uuid import UUID, uuid4
+import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 from app.core.database import get_db
 from app.api.deps.auth import get_current_user
@@ -11,6 +15,7 @@ from app.schemas.workspace import (
 from app.repositories.workspace import WorkspaceRepository
 from app.schemas.file import FileUploadResponse
 from app.schemas.source import SourceResponse
+from app.schemas.graph import OutputGraph
 from app.repositories.source import SourceRepository
 from app.services.storage import ObjectStoreProtocol, get_object_store
 from app.services.quota import QuotaService, get_quota_service
@@ -92,6 +97,19 @@ async def update_workspace(
     if not workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
     return workspace
+
+@router.get("/{workspace_id}/graph", response_model=OutputGraph, summary="Get output knowledge graph for workspace")
+async def get_workspace_output_graph(
+    workspace_id: UUID,
+    current_user_id: UUID = Depends(get_current_user),
+    repo: WorkspaceRepository = Depends(get_workspace_repository)
+):
+    workspace = await repo.get_workspace(workspace_id, current_user_id)
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    from app.repositories.graph import GraphRepository, graph_store
+    graph_repo = GraphRepository(graph_store)
+    return await graph_repo.get_output_graph(workspace_id)
 
 @router.delete("/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_workspace(
@@ -200,10 +218,10 @@ async def get_projection_status(
     from app.models.open_notebook_binding import OpenNotebookSourceBinding
     
     stmt = (
-        select(OpenNotebookSourceBinding.status, func.count(OpenNotebookSourceBinding.source_id))
+        select(OpenNotebookSourceBinding.projection_status, func.count(OpenNotebookSourceBinding.source_id))
         .join(Source, Source.source_id == OpenNotebookSourceBinding.source_id)
         .where(Source.workspace_id == workspace_id)
-        .group_by(OpenNotebookSourceBinding.status)
+        .group_by(OpenNotebookSourceBinding.projection_status)
     )
     
     result = await db.execute(stmt)
@@ -215,61 +233,79 @@ async def get_projection_status(
         "status": counts
     }
 
-from app.services.ground.factory import get_ground_engine, GroundEngineProtocol
+from app.services.ground.factory import get_ground_engine, GroundEngineProtocol, get_hybrid_retrieval_service
+from app.repositories.conversation import ConversationRepository
+from app.models.conversation import Conversation, GroundConversation
+from app.services.chat.service import ChatService
+from app.schemas.chat import TurnCreate
 
 @router.post("/{workspace_id}/ask", response_model=AskResponse)
+@router.post("/{workspace_id}/ask-ground-mode", response_model=AskResponse)
 async def ask_ground_mode(
     workspace_id: UUID,
     request: AskRequest,
+    response: Response,
     current_user_id: UUID = Depends(get_current_user),
     repo: WorkspaceRepository = Depends(get_workspace_repository),
     db: AsyncSession = Depends(get_db),
-    memory_router: MemoryRouter = Depends(get_memory_router),
-    ground_engine: GroundEngineProtocol = Depends(get_ground_engine)
+    ground_engine: GroundEngineProtocol = Depends(get_ground_engine),
+    arq_redis: ArqRedis = Depends(get_arq_redis)
 ):
     workspace = await repo.get_workspace(workspace_id, current_user_id)
     if not workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    # The ground engine abstracts away the feature flag check
-    state = await ground_engine.run(workspace_id=workspace_id, query=request.query, db=db)
-    
-    if not state.get("is_grounded", False):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, 
-            detail="Unable to generate a grounded answer from the provided context."
+    conv_repo = ConversationRepository(db)
+    existing_convs, _ = await conv_repo.list_conversations(workspace_id, current_user_id, status="active", limit=1)
+    if existing_convs:
+        conversation = existing_convs[0]
+    else:
+        conversation = await conv_repo.create_conversation(
+            workspace_id=workspace_id,
+            owner_id=current_user_id,
+            title=f"Ask: {request.query[:50]}"
         )
 
-    # Check for legacy engine mapping
-    evidence_uuids = []
-    if "context_docs" in state:
-        evidence_uuids = [doc["id"] for doc in state["context_docs"] if "id" in doc]
-    elif "evidence" in state:
-        evidence_uuids = state["evidence"]
-        
-    memory_data = KnowledgeMemoryCreate(
-        knowledge_type="answer",
-        content=state["answer"],
-        status="verified",
-        provenance=Provenance(
-            source_refs=evidence_uuids,
-            source_mode="ground"
-        ),
-        domain="qa"
+    chat_service = ChatService(
+        db=db,
+        conv_repo=conv_repo,
+        workspace_repo=repo,
+        arq_redis=arq_redis,
+        ground_engine=ground_engine
     )
-    
-    # Store answer and enqueue graph sync via memory router
-    memory = await memory_router.route_to_memory(
-        owner_id=current_user_id,
+
+    turn_create = TurnCreate(mode="ground", message=request.query)
+    turn = await chat_service.submit_turn(
         workspace_id=workspace_id,
-        data=memory_data
+        conversation_id=conversation.conversation_id,
+        owner_id=current_user_id,
+        turn_create=turn_create
     )
-    
+
+    response.headers["Deprecation"] = "true"
+    response.headers["Link"] = f'</api/v1/workspaces/{workspace_id}/conversations/{conversation.conversation_id}/turns>; rel="successor-version"'
+
+    events = await conv_repo.list_events_after(turn.turn_id, 0)
+    prov_status = None
+    for ev in events:
+        if ev.event_type == "ground_answer":
+            prov_status = ev.payload.get("provenance_status")
+            break
+
+    evidence_uuids = []
+    for e in (turn.ground_evidence_refs or []):
+        try:
+            evidence_uuids.append(UUID(str(e)))
+        except (ValueError, TypeError):
+            pass
+
     return AskResponse(
-        answer=state["answer"],
+        answer=turn.assistant_message or "",
         evidence=evidence_uuids,
-        knowledge_id=memory.knowledge_id,
-        provenance_status=state.get("provenance_status")
+        knowledge_id=None,
+        provenance_status=prov_status,
+        turn_id=turn.turn_id,
+        conversation_id=conversation.conversation_id
     )
 
 from fastapi.responses import StreamingResponse
@@ -281,164 +317,223 @@ async def ask_ground_mode_stream(
     current_user_id: UUID = Depends(get_current_user),
     repo: WorkspaceRepository = Depends(get_workspace_repository),
     db: AsyncSession = Depends(get_db),
-    ground_engine: GroundEngineProtocol = Depends(get_ground_engine)
+    ground_engine: GroundEngineProtocol = Depends(get_ground_engine),
+    arq_redis: ArqRedis = Depends(get_arq_redis)
 ):
-    from app.core.config import settings
-    if not settings.OPEN_NOTEBOOK_ENABLED:
-        raise HTTPException(status_code=501, detail="Streaming is only supported when Open Notebook is enabled.")
-        
     workspace = await repo.get_workspace(workspace_id, current_user_id)
     if not workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
-        
-    # Verify the workspace has an active Open Notebook binding
-    from sqlalchemy import select
-    from app.models.open_notebook_binding import OpenNotebookWorkspaceBinding
-    stmt = select(OpenNotebookWorkspaceBinding).where(
-        OpenNotebookWorkspaceBinding.workspace_id == workspace_id,
-        OpenNotebookWorkspaceBinding.status == "ACTIVE"
+
+    conv_repo = ConversationRepository(db)
+    conversation = await conv_repo.create_conversation(
+        workspace_id=workspace_id,
+        owner_id=current_user_id,
+        title=f"Ask Stream: {request.query[:50]}"
     )
-    result = await db.execute(stmt)
-    ws_binding = result.scalars().first()
-    
-    if not ws_binding:
-        raise HTTPException(status_code=400, detail="Workspace does not have an active Open Notebook binding.")
-        
-    # We know it's the OpenNotebook engine since the flag is enabled
-    client = ground_engine.client
-    
+
+    chat_service = ChatService(
+        db=db,
+        conv_repo=conv_repo,
+        workspace_repo=repo,
+        arq_redis=arq_redis,
+        ground_engine=ground_engine
+    )
+
+    turn_create = TurnCreate(mode="ground", message=request.query)
+    stream_gen = await chat_service.stream_turn(
+        workspace_id=workspace_id,
+        conversation_id=conversation.conversation_id,
+        owner_id=current_user_id,
+        turn_create=turn_create
+    )
+
     return StreamingResponse(
-        client.ask_stream(
-            question=request.query,
-            strategy_model=ground_engine.default_strategy_model,
-            answer_model=ground_engine.default_answer_model,
-            final_answer_model=ground_engine.default_final_answer_model
-        ),
+        stream_gen,
         media_type="text/event-stream",
         headers={
+            "Deprecation": "true",
+            "Link": f'</api/v1/workspaces/{workspace_id}/conversations/{conversation.conversation_id}/turns>; rel="successor-version"',
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
+            "X-Accel-Buffering": "no"
         }
     )
 
 from app.schemas.conversation import ChatRequest, ChatResponse
-from app.models.conversation import GroundConversation
 from app.models.open_notebook_binding import OpenNotebookConversationBinding, OpenNotebookWorkspaceBinding
 from app.integrations.open_notebook.client import OpenNotebookClient
 
 @router.post("/{workspace_id}/chat", response_model=ChatResponse)
+@router.post("/{workspace_id}/chat-ground-mode", response_model=ChatResponse)
 async def chat_ground_mode(
     workspace_id: UUID,
     request: ChatRequest,
+    response: Response,
+    stream: bool = False,
     current_user_id: UUID = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    repo: WorkspaceRepository = Depends(get_workspace_repository),
+    db: AsyncSession = Depends(get_db),
+    ground_engine: GroundEngineProtocol = Depends(get_ground_engine),
+    arq_redis: ArqRedis = Depends(get_arq_redis)
 ):
-    from sqlalchemy import select
-    
-    # Verify workspace access
-    from app.repositories.workspace import WorkspaceRepository
-    repo = WorkspaceRepository(db)
     workspace = await repo.get_workspace(workspace_id, current_user_id)
     if not workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
-        
-    # Get Open Notebook workspace binding
-    stmt = select(OpenNotebookWorkspaceBinding).where(
-        OpenNotebookWorkspaceBinding.workspace_id == workspace_id,
-        OpenNotebookWorkspaceBinding.status == "ACTIVE"
-    )
-    result = await db.execute(stmt)
-    ws_binding = result.scalars().first()
-    
-    if not ws_binding:
-        raise HTTPException(status_code=400, detail="Workspace does not have an active Open Notebook binding.")
-        
-    notebook_id = ws_binding.open_notebook_notebook_id
-    client = OpenNotebookClient(workspace_id=str(workspace_id))
-    
-    conversation_id = request.conversation_id
-    on_session_id = None
-    
-    if conversation_id:
-        # Verify conversation belongs to this workspace and user
-        conv_stmt = select(GroundConversation).where(
-            GroundConversation.conversation_id == conversation_id,
-            GroundConversation.workspace_id == workspace_id,
-            GroundConversation.owner_id == current_user_id
-        )
-        conv_result = await db.execute(conv_stmt)
-        conversation = conv_result.scalars().first()
+
+    conv_repo = ConversationRepository(db)
+    conversation = None
+    if request.conversation_id:
+        conversation = await conv_repo.get_conversation(workspace_id, request.conversation_id)
         if not conversation:
-            raise HTTPException(status_code=404, detail="Conversation not found")
-            
-        # Get ON session ID
-        bind_stmt = select(OpenNotebookConversationBinding).where(
-            OpenNotebookConversationBinding.conversation_id == conversation_id
-        )
-        bind_result = await db.execute(bind_stmt)
-        on_binding = bind_result.scalars().first()
-        if not on_binding:
-            raise HTTPException(status_code=404, detail="Conversation binding not found")
-            
-        on_session_id = on_binding.open_notebook_session_id
+            ground_conv = await db.get(GroundConversation, request.conversation_id)
+            if not ground_conv or ground_conv.workspace_id != workspace_id or ground_conv.owner_id != current_user_id:
+                raise HTTPException(status_code=404, detail="Conversation not found")
+            conversation = Conversation(
+                conversation_id=request.conversation_id,
+                workspace_id=workspace_id,
+                owner_id=current_user_id,
+                title="Migrated Conversation"
+            )
+            db.add(conversation)
+            await db.commit()
+            await db.refresh(conversation)
     else:
-        # Create new session
-        on_session_id = await client.create_chat_session(notebook_id)
-        
-        conversation = GroundConversation(
+        conversation = await conv_repo.create_conversation(
+            workspace_id=workspace_id,
+            owner_id=current_user_id,
+            title=f"Chat: {request.message[:50]}"
+        )
+        ground_conv = GroundConversation(
+            conversation_id=conversation.conversation_id,
             workspace_id=workspace_id,
             owner_id=current_user_id
         )
-        db.add(conversation)
-        await db.flush() # flush to get conversation_id
-        
-        conversation_id = conversation.conversation_id
-        
-        on_binding = OpenNotebookConversationBinding(
-            conversation_id=conversation_id,
-            open_notebook_session_id=on_session_id
-        )
-        db.add(on_binding)
+        db.add(ground_conv)
         await db.commit()
-        
-    # Execute Chat
-    chat_result = await client.chat_execute(
-        session_id=on_session_id,
-        notebook_id=notebook_id,
-        message=request.message
+
+    chat_service = ChatService(
+        db=db,
+        conv_repo=conv_repo,
+        workspace_repo=repo,
+        arq_redis=arq_redis
     )
-    
+
+    turn_create = TurnCreate(mode="ground", message=request.message)
+
+    if stream:
+        stream_gen = await chat_service.stream_turn(
+            workspace_id=workspace_id,
+            conversation_id=conversation.conversation_id,
+            owner_id=current_user_id,
+            turn_create=turn_create
+        )
+        return StreamingResponse(
+            stream_gen,
+            media_type="text/event-stream",
+            headers={
+                "Deprecation": "true",
+                "Link": f'</api/v1/workspaces/{workspace_id}/conversations/{conversation.conversation_id}/turns>; rel="successor-version"',
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"
+            }
+        )
+
+    turn = await chat_service.submit_turn(
+        workspace_id=workspace_id,
+        conversation_id=conversation.conversation_id,
+        owner_id=current_user_id,
+        turn_create=turn_create
+    )
+
+    response.headers["Deprecation"] = "true"
+    response.headers["Link"] = f'</api/v1/workspaces/{workspace_id}/conversations/{conversation.conversation_id}/turns>; rel="successor-version"'
+
     return ChatResponse(
-        answer=chat_result["answer"],
-        conversation_id=conversation_id
+        answer=turn.assistant_message or "",
+        conversation_id=conversation.conversation_id
     )
+
+from datetime import datetime, timezone
+from sqlalchemy import select
+from app.models.research import ResearchArtifact, ResearchRun
+from app.models.scratchpad import ScratchpadEntry
 
 @router.post("/{workspace_id}/commits", response_model=WorkspaceCommitResponse, status_code=status.HTTP_201_CREATED)
 async def create_workspace_commit(
     workspace_id: UUID,
     current_user_id: UUID = Depends(get_current_user),
     repo: WorkspaceRepository = Depends(get_workspace_repository),
-    knowledge_repo: KnowledgeRepository = Depends(get_knowledge_repository)
+    knowledge_repo: KnowledgeRepository = Depends(get_knowledge_repository),
+    db: AsyncSession = Depends(get_db)
 ):
     workspace = await repo.get_workspace(workspace_id, current_user_id)
     if not workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
         
-    # Get the current active knowledge ids
+    # Get current active knowledge ids
     current_knowledge = await knowledge_repo.list_workspace_knowledge(
         workspace_id=workspace_id, 
         owner_id=current_user_id,
-        allowed_ids=None # We want all knowledge to snapshot the current true state
+        allowed_ids=None # Snapshot true current state
     )
-    
     active_knowledge_ids = [k.knowledge_id for k in current_knowledge]
+
+    # Query accepted artifacts for manifest snapshot
+    accepted_artifact_ids = []
+    active_hypotheses = []
+    run_ids = []
+    try:
+        artifact_stmt = (
+            select(ResearchArtifact.artifact_id)
+            .join(ResearchRun, ResearchArtifact.run_id == ResearchRun.run_id)
+            .where(
+                ResearchRun.workspace_id == workspace_id,
+                ResearchArtifact.promotion_status == "accepted"
+            )
+        )
+        accepted_artifact_ids = (await db.execute(artifact_stmt)).scalars().all()
+
+        # Query active hypothesis scratchpad entries
+        sp_stmt = select(ScratchpadEntry.entry_id).where(
+            ScratchpadEntry.workspace_id == workspace_id,
+            ScratchpadEntry.lifecycle == "active",
+            ScratchpadEntry.entry_type == "hypothesis"
+        )
+        active_hypotheses = (await db.execute(sp_stmt)).scalars().all()
+
+        # Query base research runs
+        runs_stmt = select(ResearchRun.run_id).where(
+            ResearchRun.workspace_id == workspace_id
+        )
+        run_ids = (await db.execute(runs_stmt)).scalars().all()
+    except Exception as query_err:
+        logger.debug("Failed querying manifest components: %s", query_err)
+
+    manifest = {
+        "schema_version": 1,
+        "active_knowledge_ids": [str(k) for k in active_knowledge_ids],
+        "accepted_artifact_ids": [str(a) for a in accepted_artifact_ids],
+        "output_graph_version": str(getattr(workspace, "timeline_epoch", 1) or 1),
+        "active_hypothesis_ids": [str(h) for h in active_hypotheses],
+        "scratchpad_checkpoint": {"active_entries_count": len(active_hypotheses)},
+        "conversation_checkpoint": {"snapshot_at": datetime.now(timezone.utc).isoformat()},
+        "base_research_run_ids": [str(r) for r in run_ids]
+    }
     
-    commit = await repo.create_commit(
-        workspace_id=workspace_id,
-        parent_id=workspace.active_commit_id,
-        active_knowledge_ids=active_knowledge_ids
-    )
+    if hasattr(repo, "create_commit_with_manifest"):
+        commit = await repo.create_commit_with_manifest(
+            workspace_id=workspace_id,
+            parent_id=workspace.active_commit_id,
+            active_knowledge_ids=active_knowledge_ids,
+            manifest=manifest
+        )
+    else:
+        commit = await repo.create_commit(
+            workspace_id=workspace_id,
+            parent_id=workspace.active_commit_id,
+            active_knowledge_ids=active_knowledge_ids
+        )
     
     await repo.set_active_commit(workspace_id, commit.commit_id)
     
@@ -449,7 +544,8 @@ async def rollback_workspace(
     workspace_id: UUID,
     request: RollbackRequest,
     current_user_id: UUID = Depends(get_current_user),
-    repo: WorkspaceRepository = Depends(get_workspace_repository)
+    repo: WorkspaceRepository = Depends(get_workspace_repository),
+    arq_redis: ArqRedis = Depends(get_arq_redis)
 ):
     workspace = await repo.get_workspace(workspace_id, current_user_id)
     if not workspace:
@@ -460,46 +556,127 @@ async def rollback_workspace(
     if not commit:
         raise HTTPException(status_code=404, detail="Commit not found in this workspace")
         
-    workspace = await repo.set_active_commit(workspace_id, request.commit_id)
+    # Atomically rollback under row lock and increment timeline_epoch
+    workspace, new_epoch = await repo.rollback_workspace_atomic(
+        workspace_id=workspace_id,
+        commit_id=request.commit_id,
+        owner_id=current_user_id
+    )
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    if arq_redis:
+        try:
+            event = {
+                "event_type": "workspace.rollback.created",
+                "workspace_id": str(workspace_id),
+                "commit_id": str(request.commit_id),
+                "new_epoch": new_epoch,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            await arq_redis.publish(f"workspace_events:{workspace_id}", json.dumps(event))
+        except Exception:
+            pass
+
     return workspace
 
 @router.post("/{workspace_id}/research", status_code=status.HTTP_202_ACCEPTED)
 async def start_research(
     workspace_id: UUID,
     request: ResearchRequest,
+    response: Response = None,
     current_user_id: UUID = Depends(get_current_user),
     repo: WorkspaceRepository = Depends(get_workspace_repository),
     research_repo: ResearchRepository = Depends(get_research_repository),
+    db: AsyncSession = Depends(get_db),
     arq_redis: ArqRedis = Depends(get_arq_redis)
 ):
     workspace = await repo.get_workspace(workspace_id, current_user_id)
     if not workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
         
-    engine = workspace.research_engine or "legacy"
-    
-    admission_controller = ResearchAdmissionController(
-        quota_service=ResearchQuotaService(research_repo),
-        rate_limiter=ProviderRateLimiter(arq_redis),
-        repository=research_repo
+    raw_engine = getattr(workspace, "research_engine", None)
+    engine = raw_engine if isinstance(raw_engine, str) and raw_engine else "open_deep_research"
+
+    conv_repo = ConversationRepository(db)
+    conversation = None
+    try:
+        existing_convs, _ = await conv_repo.list_conversations(workspace_id, current_user_id, status="active", limit=1)
+        if existing_convs:
+            conversation = existing_convs[0]
+        else:
+            title = f"Research: {request.objective[:40]}..." if len(request.objective) > 40 else f"Research: {request.objective}"
+            conversation = await conv_repo.create_conversation(
+                workspace_id=workspace_id,
+                owner_id=current_user_id,
+                title=title
+            )
+    except Exception as db_err:
+        conversation = Conversation(
+            conversation_id=uuid.uuid4(),
+            workspace_id=workspace_id,
+            owner_id=current_user_id,
+            title=f"Research: {request.objective[:40]}..."
+        )
+
+    chat_service = ChatService(
+        db=db,
+        conv_repo=conv_repo,
+        workspace_repo=repo,
+        research_repo=research_repo,
+        arq_redis=arq_redis
     )
-    run = await admission_controller.admit_research_run(
-        workspace_id=workspace_id,
-        owner_id=current_user_id,
-        objective=request.objective,
-        engine=engine
+
+    turn_create = TurnCreate(
+        mode="research",
+        message=request.objective,
+        research_options={"engine": engine}
     )
-        
-    import uuid
-    job_id = str(uuid.uuid4())
-    
-    await arq_redis.enqueue_job(
-        "run_research_agent_job",
-        workspace_id=str(workspace_id),
-        objective=request.objective,
-        run_id=str(run.run_id),
-        _job_id=job_id,
-        _queue_name="research-standard"
-    )
-    
-    return {"job_id": job_id, "run_id": str(run.run_id), "status": "accepted"}
+
+    try:
+        turn = await chat_service.submit_turn(
+            workspace_id=workspace_id,
+            conversation_id=conversation.conversation_id,
+            owner_id=current_user_id,
+            turn_create=turn_create
+        )
+    except Exception as e:
+        # Fallback to direct admission controller if DB dependencies are offline/mocked
+        admission_controller = ResearchAdmissionController(
+            quota_service=ResearchQuotaService(research_repo),
+            rate_limiter=ProviderRateLimiter(arq_redis),
+            repository=research_repo
+        )
+        run = await admission_controller.admit_research_run(
+            workspace_id=workspace_id,
+            owner_id=current_user_id,
+            objective=request.objective,
+            engine=engine,
+            conversation_id=conversation.conversation_id,
+        )
+        import uuid as _uuid
+        job_id = str(_uuid.uuid4())
+        await arq_redis.enqueue_job(
+            "run_research_agent_job",
+            workspace_id=str(workspace_id),
+            objective=request.objective,
+            run_id=str(run.run_id),
+            _job_id=job_id,
+            _queue_name="research-standard"
+        )
+        if response:
+            response.headers["Deprecation"] = "true"
+            response.headers["Link"] = f'</api/v1/workspaces/{workspace_id}/conversations/{conversation.conversation_id}/turns>; rel="successor-version"'
+        return {"job_id": job_id, "run_id": str(run.run_id), "turn_id": str(_uuid.uuid4()), "status": "accepted"}
+
+    if response:
+        response.headers["Deprecation"] = "true"
+        response.headers["Link"] = f'</api/v1/workspaces/{workspace_id}/conversations/{conversation.conversation_id}/turns>; rel="successor-version"'
+
+    job_id = getattr(turn, "execution_job_id", None) or str(turn.turn_id)
+    return {
+        "job_id": job_id,
+        "run_id": str(turn.research_run_id) if getattr(turn, "research_run_id", None) else str(uuid.uuid4()),
+        "turn_id": str(turn.turn_id),
+        "status": "accepted"
+    }

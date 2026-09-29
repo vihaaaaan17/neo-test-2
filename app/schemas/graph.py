@@ -1,11 +1,28 @@
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Literal
 from uuid import UUID
 
+ProvenanceRefType = Literal[
+    "source",
+    "source_snapshot",
+    "block",
+    "research_evidence",
+    "research_artifact",
+    "knowledge_memory",
+    "conversation_turn",
+]
+
+class ProvenanceRef(BaseModel):
+    ref_type: ProvenanceRefType = Field(..., description="Target entity type for this provenance reference.")
+    ref_id: UUID = Field(..., description="UUID of the referenced entity.")
+    locator: Optional[str] = Field(default=None, description="Optional block, line, or page locator within the referenced source/evidence.")
+
 class ProvenanceBundle(BaseModel):
-    derived_from_refs: List[UUID] = Field(default_factory=list, description="References to internal KnowledgeMemory or chunk IDs.")
+    derived_from: List[ProvenanceRef] = Field(default_factory=list, description="Typed references to source entities.")
+    derived_from_refs: List[UUID] = Field(default_factory=list, description="Legacy references to internal KnowledgeMemory or chunk IDs.")
     calculation: Optional[str] = Field(default=None, description="The mathematical calculation performed, if any.")
-    verification_status: Optional[str] = Field(default=None, description="The verification status of this claim (e.g., 'Mathematically verified', 'Source grounded').")
+    verification_status: Optional[str] = Field(default=None, description="The verification status of this claim (e.g., 'verified', 'unverified', 'failed').")
+    verification_details: Optional[Dict[str, Any]] = Field(default=None, description="Structured mathematical or semantic verification output.")
 
 class OutputGraphNode(BaseModel):
     id: str = Field(..., description="Unique identifier for the node within this graph output.")
