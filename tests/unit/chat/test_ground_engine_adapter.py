@@ -133,7 +133,7 @@ async def test_ground_engine_astream_success():
     # Mock search and streaming chunks
     engine.client.search = AsyncMock(return_value=[{"id": "upstream-1"}])
 
-    async def mock_chat_stream(session_id, notebook_id, message):
+    async def mock_chat_stream(session_id, notebook_id, message, context_config=None):
         yield {"event": "token", "data": {"token": "Paris "}}
         yield {"event": "token", "data": {"token": "is "}}
         yield {"event": "token", "data": {"token": "France."}}
