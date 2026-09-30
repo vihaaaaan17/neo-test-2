@@ -8,10 +8,17 @@ import contextlib
 import requests
 import streamlit as st
 
-# Ensure repository root is on sys.path
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Prevent ui/app.py from shadowing the top-level 'app' package
+current_dir = os.path.dirname(os.path.abspath(__file__))
+while current_dir in sys.path:
+    sys.path.remove(current_dir)
+
+REPO_ROOT = os.path.dirname(current_dir)
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
+
+if "app" in sys.modules and not hasattr(sys.modules["app"], "__path__"):
+    del sys.modules["app"]
 
 # Suppress LangChain tracing network errors in UI
 import langchain_core.tracers.context
@@ -22,7 +29,14 @@ langchain_core.tracers.context.tracing_v2_enabled = _no_op_tracing
 
 # Import NeosisLM Core & Orchestration Components (Chapters 1 - 4)
 from sqlalchemy import select, text
-from app.core.database import async_session_maker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.pool import NullPool
+from app.core.config import settings
+
+# Use NullPool for Streamlit UI so connections do not leak across distinct asyncio.run loops
+ui_engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
+ui_session_maker = async_sessionmaker(ui_engine, expire_on_commit=False)
+
 from app.models.workspace import Workspace
 from app.models.source import Source, SourceSnapshot
 from app.models.block import DocumentBlock
@@ -161,7 +175,7 @@ with st.sidebar:
     # Helper to fetch active workspaces
     async def get_workspaces():
         try:
-            async with async_session_maker() as session:
+            async with ui_session_maker() as session:
                 res = await session.execute(select(Workspace).order_by(Workspace.created_at.desc()).limit(15))
                 return res.scalars().all()
         except Exception as e:
@@ -179,7 +193,7 @@ with st.sidebar:
 
     if st.button("➕ Create New Workspace in DB", use_container_width=True):
         async def create_ws():
-            async with async_session_maker() as session:
+            async with ui_session_maker() as session:
                 new_ws = Workspace(owner_id=uuid.uuid4(), status="active")
                 session.add(new_ws)
                 await session.commit()
@@ -378,13 +392,13 @@ if is_ground_mode:
     else:
         # Fetch current sources and blocks in this workspace
         async def fetch_workspace_sources(ws_id):
-            async with async_session_maker() as session:
+            async with ui_session_maker() as session:
                 q = (
                     select(DocumentBlock, Source, SourceSnapshot)
                     .join(Source, DocumentBlock.source_id == Source.source_id)
                     .join(SourceSnapshot, DocumentBlock.snapshot_id == SourceSnapshot.snapshot_id)
                     .where(Source.workspace_id == ws_id)
-                    .order_by(DocumentBlock.created_at.desc())
+                    .order_by(Source.created_at.desc())
                     .limit(20)
                 )
                 res = await session.execute(q)
@@ -423,7 +437,7 @@ if is_ground_mode:
 
             if st.button("📥 Ingest Document into PostgreSQL (Vector + Text Indexes)"):
                 async def ingest_doc(ws_id, title, content):
-                    async with async_session_maker() as session:
+                    async with ui_session_maker() as session:
                         # 1. Source
                         ws = await session.get(Workspace, ws_id)
                         owner_id = ws.owner_id if ws else uuid.uuid4()
