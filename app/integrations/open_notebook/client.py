@@ -15,6 +15,36 @@ from opentelemetry import propagate, trace
 
 logger = logging.getLogger(__name__)
 
+class _TimeoutOverride:
+    """Wraps a shared httpx client so each request uses a longer per-call timeout."""
+
+    def __init__(self, client, timeout: float):
+        self._client = client
+        self._timeout = timeout
+
+    def __getattr__(self, name):
+        return getattr(self._client, name)
+
+    def _with_timeout(self, method, *args, **kwargs):
+        kwargs.setdefault("timeout", self._timeout)
+        return method(*args, **kwargs)
+
+    def get(self, *a, **kw):
+        return self._with_timeout(self._client.get, *a, **kw)
+
+    def post(self, *a, **kw):
+        return self._with_timeout(self._client.post, *a, **kw)
+
+    def put(self, *a, **kw):
+        return self._with_timeout(self._client.put, *a, **kw)
+
+    def delete(self, *a, **kw):
+        return self._with_timeout(self._client.delete, *a, **kw)
+
+    def stream(self, *a, **kw):
+        return self._with_timeout(self._client.stream, *a, **kw)
+
+
 class CircuitState(Enum):
     CLOSED = 1
     OPEN = 2
@@ -100,7 +130,8 @@ class OpenNotebookClient:
     @asynccontextmanager
     async def _get_client(self, custom_timeout: float = None):
         if self.http_client:
-            yield self.http_client
+            # The shared client has a fixed default timeout; apply per-call overrides per request.
+            yield _TimeoutOverride(self.http_client, custom_timeout) if custom_timeout else self.http_client
         else:
             limits = httpx.Limits(max_connections=50, max_keepalive_connections=20)
             async with httpx.AsyncClient(timeout=custom_timeout or self.timeout, limits=limits) as client:
@@ -166,7 +197,7 @@ class OpenNotebookClient:
         
         notebooks_json = json.dumps([notebook_id])
         data = {
-            "type": "file",
+            "type": "upload",
             "notebooks": notebooks_json,
             "title": title
         }
@@ -211,7 +242,7 @@ class OpenNotebookClient:
     @with_error_translation
     async def get_default_models(self) -> dict[str, Any]:
         async with self._get_client() as client:
-            response = await client.get(f"{self.base_url}/api/models/default", headers=self._get_headers())
+            response = await client.get(f"{self.base_url}/api/models/defaults", headers=self._get_headers())
             response.raise_for_status()
             return response.json()
 

@@ -19,7 +19,14 @@ class LegacyResearchEngine(ResearchEngine):
             search_tool=search_tool
         )
 
-    async def astream_events(self, run_id: UUID, workspace_id: UUID, objective: str) -> AsyncGenerator[dict[str, Any], None]:
+    async def astream_events(
+        self,
+        run_id: UUID,
+        workspace_id: UUID,
+        objective: str,
+        research_context: Any = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[dict[str, Any], None]:
         """
         Stream events from the legacy orchestrator. The legacy orchestrator doesn't
         natively take run_id, so we just pass workspace_id and objective.

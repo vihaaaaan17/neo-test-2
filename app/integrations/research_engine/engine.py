@@ -8,7 +8,14 @@ class ResearchEngine(abc.ABC):
     """
 
     @abc.abstractmethod
-    async def astream_events(self, run_id: UUID, workspace_id: UUID, objective: str) -> AsyncGenerator[dict[str, Any], None]:
+    async def astream_events(
+        self,
+        run_id: UUID,
+        workspace_id: UUID,
+        objective: str,
+        research_context: Any = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[dict[str, Any], None]:
         """
         Stream execution events from the research engine.
         

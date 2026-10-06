@@ -13,7 +13,11 @@ Design rules:
   additional shared resources (DB session factory, object store) in the worker
   startup context via WorkerSettings.on_startup.
 """
+from dotenv import load_dotenv
+load_dotenv(".env")
+
 import logging
+from app.core.config import settings
 import os
 import time
 import json
@@ -128,7 +132,12 @@ async def parse_and_chunk_job(
 
     # ---- Do the heavy work OUTSIDE the session (may take 30-120s) ---- #
     try:
-        storage = get_object_store()
+        s3_client = ctx.get("s3_client")
+        if s3_client:
+            from app.services.storage import S3ObjectStore
+            storage = S3ObjectStore(s3_client)
+        else:
+            storage = get_object_store()
         parser = DocumentParser(storage)
         chunking = ChunkingService()
 
@@ -137,11 +146,27 @@ async def parse_and_chunk_job(
 
         async with async_session_maker() as session:
             block_repo = BlockRepository(session)
-            await block_repo.bulk_create_blocks(
+            created_blocks = await block_repo.bulk_create_blocks(
                 source_id=source_uuid,
                 snapshot_id=snapshot.snapshot_id,
                 blocks=blocks_in
             )
+            # Legacy Ground retrieval is vector+keyword; without embeddings only keyword search works.
+            if not settings.OPEN_NOTEBOOK_ENABLED:
+                try:
+                    import asyncio
+                    from app.api.deps.llm import embed_call
+                    sem = asyncio.Semaphore(settings.MAX_CONCURRENT_LLM_CALLS)
+
+                    async def _embed(block):
+                        async with sem:
+                            block.embedding = await embed_call(block.text_or_ref)
+
+                    await asyncio.gather(*[_embed(b) for b in created_blocks if b.text_or_ref])
+                    await session.commit()
+                except Exception as embed_exc:
+                    await session.rollback()
+                    logger.warning("parse_and_chunk_job: embedding failed for source %s: %s", source_id, embed_exc)
             # ---- Mark completed ---- #
             result = await session.execute(
                 select(Source).where(Source.source_id == source_uuid)
@@ -702,11 +727,12 @@ async def run_research_agent_job(
                 try:
                     from app.repositories.conversation import ConversationRepository
                     conv_repo = ConversationRepository(session)
+                    fail_msg = report_content or (f"Research run failed: {final_reason}" if final_status == "failed" else None)
                     completed_turn = await conv_repo.set_turn_status(
                         turn_id=run.turn_id,
                         status=final_status,
                         expected_statuses=["pending", "running"],
-                        assistant_message=report_content,
+                        assistant_message=fail_msg,
                         research_run_id=actual_run_id,
                         completed_at=datetime.now(timezone.utc)
                     )
@@ -715,12 +741,14 @@ async def run_research_agent_job(
 
                 if completed_turn:
                     turn_comp_event = EVENT_TURN_COMPLETED if final_status == "completed" else f"turn.{final_status}"
+                    fail_msg = report_content or (f"Research run failed: {final_reason}" if final_status == "failed" else None)
                     await _bridge_chat_event(
                         run.turn_id,
                         turn_comp_event,
                         {
                             "status": final_status,
-                            "assistant_message": report_content,
+                            "assistant_message": fail_msg,
+                            "error": final_reason if final_status == "failed" else None,
                             "research_run_id": str(actual_run_id)
                         }
                     )
@@ -729,7 +757,8 @@ async def run_research_agent_job(
                         EVENT_DONE,
                         {
                             "status": final_status,
-                            "assistant_message": report_content,
+                            "assistant_message": fail_msg,
+                            "error": final_reason if final_status == "failed" else None,
                             "research_run_id": str(actual_run_id)
                         }
                     )
@@ -1078,10 +1107,11 @@ async def project_to_open_notebook_job(
             
         try:
             # 4. Upload to ON
+            source_name = snapshot.filename if snapshot else f"source_{source_id}"
             on_src_id = await on_client.upload_source(
                 workspace_binding.open_notebook_notebook_id, 
                 tmp_path, 
-                source.name
+                source_name
             )
             await repo.update_projection_status(
                 source_id=source_uuid,

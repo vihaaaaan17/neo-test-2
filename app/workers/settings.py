@@ -5,8 +5,10 @@ Run the worker with:
     python -m arq app.workers.settings.WorkerSettings
 
 The worker connects to Redis and processes jobs enqueued by the FastAPI API.
-ctx["llm_call"] is populated in on_startup for use by compress_episodic_job.
 """
+from dotenv import load_dotenv
+load_dotenv(".env")
+
 import logging
 from arq.connections import RedisSettings
 from app.core.config import settings
@@ -29,10 +31,28 @@ async def startup(ctx: dict) -> None:
     from app.services.working_memory import validate_checkpointer
     validate_checkpointer()
 
-    # llm_call will be wired to LiteLLM in Phase 3.
-    # For now it is None; compress_episodic_job raises a clear error if called
-    # without it, which makes the missing dependency explicit rather than silent.
-    ctx["llm_call"] = None
+    import os
+    async def _real_llm_call(prompt: str, model: str = None, provider: str = None) -> str:
+        provider_setting = (os.environ.get("LLM_PROVIDER") or provider or "openai").lower()
+        if provider_setting == "nvidia" or (not os.environ.get("OPENAI_API_KEY") and os.environ.get("NVIDIA_API_KEY")):
+            api_key = os.environ.get("NVIDIA_API_KEY") or os.environ.get("OPENAI_API_KEY")
+            base_url = os.environ.get("NVIDIA_BASE_URL") or os.environ.get("NVIDIA_INVOKE_URL") or os.environ.get("OPENAI_BASE_URL") or "https://integrate.api.nvidia.com/v1"
+            model_to_use = os.environ.get("NVIDIA_MODEL") or os.environ.get("OPENAI_MODEL") or "deepseek-ai/deepseek-v4.1-flash"
+        else:
+            api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("NVIDIA_API_KEY")
+            base_url = os.environ.get("OPENAI_BASE_URL")
+            model_to_use = os.environ.get("OPENAI_MODEL") or model or "gpt-4o"
+
+        if api_key:
+            from langchain_openai import ChatOpenAI
+            if base_url and base_url.endswith("/chat/completions"):
+                base_url = base_url.replace("/chat/completions", "")
+            llm = ChatOpenAI(model=model_to_use, api_key=api_key, base_url=base_url)
+            res = await llm.ainvoke(prompt)
+            return res.content
+        raise RuntimeError("Neither OPENAI_API_KEY nor NVIDIA_API_KEY is configured.")
+
+    ctx["llm_call"] = _real_llm_call
 
     import aioboto3
     session = aioboto3.Session(
@@ -110,7 +130,7 @@ arq worker settings class. Discovered by: python -m arq app.workers.settings.Wor
     # max_tries=1 here because tenacity handles retries *within* the job itself
     # for transient errors; arq retries handle process-level crashes.
     max_tries = 3
-    job_timeout = 300  # 5 minutes max per job
+    job_timeout = 1800  # 30 minutes max per job for deep autonomous research
 
     def get_queue_config(self, queue_name):
         """

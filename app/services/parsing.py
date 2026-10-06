@@ -21,7 +21,9 @@ class DocumentParser:
         file_bytes = await self.storage.download_file(file_uri)
         
         # 2. Write to secure temporary file
-        fd, temp_path = tempfile.mkstemp(suffix=".pdf")
+        # Preserve the real extension so Docling picks the right backend (and plain text is detected).
+        suffix = os.path.splitext(file_uri.split("?", 1)[0])[1].lower() or ".pdf"
+        fd, temp_path = tempfile.mkstemp(suffix=suffix)
         try:
             with os.fdopen(fd, 'wb') as f:
                 f.write(file_bytes)
@@ -33,7 +35,15 @@ class DocumentParser:
             # 4. Clean up
             os.remove(temp_path)
 
+    PLAIN_TEXT_SUFFIXES = (".txt", ".text", ".log")
+
     def _run_docling(self, file_path: str) -> dict[str, Any]:
+        if DocumentConverter is None or file_path.lower().endswith(self.PLAIN_TEXT_SUFFIXES):
+            try:
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                    return {"text": f.read()}
+            except Exception:
+                return {"text": ""}
         converter = DocumentConverter()
         result = converter.convert(file_path)
         return result.document.export_to_dict()

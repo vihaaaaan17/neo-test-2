@@ -59,6 +59,8 @@ class S3ObjectStore:
         )
         return url
 
-def get_object_store(request: Request) -> ObjectStoreProtocol:
+def get_object_store(request: Request = None) -> ObjectStoreProtocol:
     """Dependency to provide shared S3ObjectStore from app state."""
-    return S3ObjectStore(request.app.state.s3_client)
+    if request is not None and hasattr(request, "app") and hasattr(request.app.state, "s3_client"):
+        return S3ObjectStore(request.app.state.s3_client)
+    raise RuntimeError("Cannot resolve S3ObjectStore without active request app.state.s3_client")

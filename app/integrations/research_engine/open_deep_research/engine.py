@@ -64,11 +64,13 @@ class OpenDeepResearchEngine(ResearchEngine):
 
             objective_text = objective
             if previous_evidence:
-                logger.info(f"Run {run_id} is a retry. Injecting {len(previous_evidence)} prior evidence items as context.")
+                logger.info(f"Run {run_id} is a retry. Injecting up to 10 prior evidence items as bounded context.")
                 evidence_texts = []
-                for ev in previous_evidence:
+                for ev in previous_evidence[-10:]:
                     source = ev.locator or 'Unknown Source'
-                    evidence_texts.append(f"Source: {source}\n{ev.content}")
+                    content_str = ev.content or ''
+                    snippet = (content_str[:1500] + "...") if len(content_str) > 1500 else content_str
+                    evidence_texts.append(f"Source: {source}\n{snippet}")
                 prior_context = "PREVIOUS RESEARCH FINDINGS (Do not duplicate this work):\n\n" + "\n\n---\n\n".join(evidence_texts)
                 objective_text = f"{objective}\n\n{prior_context}"
 
@@ -99,6 +101,31 @@ class OpenDeepResearchEngine(ResearchEngine):
                 "messages": [{"role": "user", "content": objective_text}]
             }
             
+            from app.core.config import settings
+            import os
+
+            is_nvidia = (settings.LLM_PROVIDER or "").lower() == "nvidia" or (not settings.OPENAI_API_KEY and settings.NVIDIA_API_KEY)
+            if is_nvidia:
+                active_key = settings.NVIDIA_API_KEY or os.environ.get("NVIDIA_API_KEY", "")
+                active_base = settings.NVIDIA_BASE_URL or os.environ.get("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
+                active_model = settings.NVIDIA_MODEL or os.environ.get("NVIDIA_MODEL", "deepseek-ai/deepseek-v4.1-flash")
+            else:
+                active_key = settings.OPENAI_API_KEY or os.environ.get("OPENAI_API_KEY", "")
+                active_base = settings.OPENAI_BASE_URL or os.environ.get("OPENAI_BASE_URL")
+                active_model = settings.OPENAI_MODEL or os.environ.get("OPENAI_MODEL", "gpt-4o")
+
+            if active_key:
+                os.environ["OPENAI_API_KEY"] = active_key
+                os.environ["NVIDIA_API_KEY"] = active_key
+            if active_base:
+                os.environ["OPENAI_BASE_URL"] = active_base
+                os.environ["OPENAI_API_BASE"] = active_base
+            tavily_key = settings.TAVILY_API_KEY or os.environ.get("TAVILY_API_KEY", "")
+            if tavily_key:
+                os.environ["TAVILY_API_KEY"] = tavily_key
+
+            model_id = f"openai:{active_model}" if not active_model.startswith("openai:") else active_model
+
             tracker = UsageTracker()
             budget_callback = BudgetEnforcingCallbackHandler(tracker)
             
@@ -109,7 +136,15 @@ class OpenDeepResearchEngine(ResearchEngine):
                     "search_api": "tavily", # Future: abstract this based on Neosis tools
 
                     "allow_clarification": False,
-                    "research_model": "gpt-4o",
+                    "research_model": model_id,
+                    "summarization_model": model_id,
+                    "final_report_model": model_id,
+                    "compression_model": model_id,
+                    "apiKeys": {
+                        "OPENAI_API_KEY": active_key,
+                        "NVIDIA_API_KEY": active_key,
+                        "TAVILY_API_KEY": tavily_key,
+                    },
                     "usage_tracker": tracker, # Inject tracker for custom tools
                     "max_concurrent_research_units": 3,
                     "max_researcher_iterations": 2,
@@ -122,12 +157,14 @@ class OpenDeepResearchEngine(ResearchEngine):
                 "callbacks": [budget_callback]
             }
             
-            # Try to run tracing if available
-            try:
-                from langchain_core.tracers.context import tracing_v2_enabled
-                context_mgr = tracing_v2_enabled(project_name="NeosisLM-ResearchMode")
-            except ImportError:
-                import contextlib
+            import contextlib
+            if os.environ.get("LANGCHAIN_TRACING_V2", "").lower() == "true" and os.environ.get("LANGCHAIN_API_KEY"):
+                try:
+                    from langchain_core.tracers.context import tracing_v2_enabled
+                    context_mgr = tracing_v2_enabled(project_name="NeosisLM-ResearchMode")
+                except ImportError:
+                    context_mgr = contextlib.nullcontext()
+            else:
                 context_mgr = contextlib.nullcontext()
                 
             with context_mgr:

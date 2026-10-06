@@ -165,6 +165,16 @@ async def health_check():
         status["status"] = "degraded"
         status["neo4j"] = "failed"
         
+    s3 = getattr(app.state, "s3_client", None)
+    if s3 is not None:
+        try:
+            await s3.head_bucket(Bucket=settings.S3_BUCKET)
+            status["s3"] = "ok"
+        except Exception as e:
+            logger.error(f"S3/MinIO health check failed: {e}")
+            status["status"] = "degraded"
+            status["s3"] = "failed"
+
     if not settings.OPEN_NOTEBOOK_ENABLED:
         status["open_notebook"] = "disabled"
     else:
@@ -187,20 +197,13 @@ from app.api.routes.rate_limiter import router as rate_limiter_router
 from app.api.routes.worker import router as worker_router
 from app.api.routes.metrics import router as metrics_router
 
-# Limit the workspace router routes explicitly if needed, but slowapi works automatically
 # Primary API v1 routes
-app.include_router(workspaces_router, prefix="/api/v1")
-app.include_router(chat_router, prefix="/api/v1")
-app.include_router(scratchpad_router, prefix="/api/v1")
-app.include_router(promotions_router, prefix="/api/v1")
-app.include_router(research_router, prefix="/api/v1")
+for _router in (
+    workspaces_router, chat_router, scratchpad_router, promotions_router, research_router,
+    jobs_router, quota_router, rate_limiter_router, worker_router, metrics_router,
+):
+    app.include_router(_router, prefix="/api/v1")
 
-# Legacy compatibility un-prefixed routes
-app.include_router(workspaces_router)
-app.include_router(chat_router)
-app.include_router(promotions_router)
-app.include_router(jobs_router, prefix="/api/v1")
-app.include_router(quota_router, prefix="/api/v1")
-app.include_router(rate_limiter_router, prefix="/api/v1")
-app.include_router(worker_router, prefix="/api/v1")
-app.include_router(metrics_router, prefix="/api/v1")
+# Legacy compatibility un-prefixed routes (hidden from OpenAPI to avoid duplicate operation IDs)
+for _router in (workspaces_router, chat_router, promotions_router):
+    app.include_router(_router, include_in_schema=False)

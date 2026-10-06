@@ -12,7 +12,8 @@ asyncpg
 pydantic-settings
 greenlet
 PyJWT
-aioboto3
+aioboto3==15.5.0
+aiobotocore[boto3]==2.25.1
 python-multipart
 docling
 langgraph
@@ -30,3 +31,4 @@ pandas
 pyarrow
 gpt-researcher
 knowledge-storm
+langchain-openai

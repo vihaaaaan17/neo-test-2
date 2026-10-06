@@ -128,7 +128,10 @@ async def test_ground_engine_astream_success():
     )
     mock_conv_res.scalars.return_value.first.return_value = conv_binding
 
-    db.execute.side_effect = [mock_ws_res, mock_conv_res]
+    # Second query lists the workspace's projected upstream sources (no explicit scope given)
+    mock_src_res = MagicMock()
+    mock_src_res.scalars.return_value.all.return_value = []
+    db.execute.side_effect = [mock_ws_res, mock_src_res, mock_conv_res]
 
     # Mock search and streaming chunks
     engine.client.search = AsyncMock(return_value=[{"id": "upstream-1"}])

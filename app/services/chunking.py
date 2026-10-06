@@ -9,7 +9,7 @@ class ChunkingService:
         """
         blocks = []
         
-        # Mock output handling for testing
+        # Plain-text documents (no Docling structure) arrive as {"text": ...}
         if "text" in doc_dict and len(doc_dict) == 1:
             blocks.append(DocumentBlockCreate(
                 block_type="text",

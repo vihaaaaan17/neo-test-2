@@ -98,7 +98,7 @@ async def tavily_search(
         max_tokens=configurable.summarization_model_max_tokens,
         api_key=model_api_key,
         tags=["langsmith:nostream"]
-    ).with_structured_output(Summary).with_retry(
+    ).with_structured_output(Summary, method="function_calling").with_retry(
         stop_after_attempt=configurable.max_structured_output_retries
     )
     
@@ -595,9 +595,9 @@ async def get_all_tools(config: RunnableConfig):
     search_tools = await get_search_tool(search_api)
     tools.extend(search_tools)
     
-    # Inject Neosis GPT-Researcher Tool Adapter
-    from app.integrations.research_engine.tools.gpt_researcher_tool import GPTResearcherTool
-    tools.append(GPTResearcherTool())
+    # ODR natively uses Tavily web search (search_tools above) which handles web retrieval cleanly
+    # from app.integrations.research_engine.tools.gpt_researcher_tool import GPTResearcherTool
+    # tools.append(GPTResearcherTool())
     
     # Track existing tool names to prevent conflicts
     existing_tool_names = {
@@ -906,35 +906,25 @@ def get_config_value(value):
 
 def get_api_key_for_model(model_name: str, config: RunnableConfig):
     """Get API key for a specific model from environment or config."""
-    should_get_from_config = os.getenv("GET_API_KEYS_FROM_CONFIG", "false")
-    model_name = model_name.lower()
-    if should_get_from_config.lower() == "true":
-        api_keys = config.get("configurable", {}).get("apiKeys", {})
-        if not api_keys:
-            return None
-        if model_name.startswith("openai:"):
-            return api_keys.get("OPENAI_API_KEY")
-        elif model_name.startswith("anthropic:"):
-            return api_keys.get("ANTHROPIC_API_KEY")
+    model_name = (model_name or "").lower()
+    fallback_key = os.getenv("OPENAI_API_KEY") or os.getenv("NVIDIA_API_KEY")
+    api_keys = config.get("configurable", {}).get("apiKeys", {}) if config else {}
+    if api_keys:
+        if model_name.startswith("anthropic:"):
+            return api_keys.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
         elif model_name.startswith("google"):
-            return api_keys.get("GOOGLE_API_KEY")
-        return None
+            return api_keys.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        return api_keys.get("OPENAI_API_KEY") or api_keys.get("NVIDIA_API_KEY") or fallback_key
     else:
-        if model_name.startswith("openai:"): 
-            return os.getenv("OPENAI_API_KEY")
-        elif model_name.startswith("anthropic:"):
+        if model_name.startswith("anthropic:"):
             return os.getenv("ANTHROPIC_API_KEY")
         elif model_name.startswith("google"):
             return os.getenv("GOOGLE_API_KEY")
-        return None
+        return fallback_key
 
 def get_tavily_api_key(config: RunnableConfig):
     """Get Tavily API key from environment or config."""
-    should_get_from_config = os.getenv("GET_API_KEYS_FROM_CONFIG", "false")
-    if should_get_from_config.lower() == "true":
-        api_keys = config.get("configurable", {}).get("apiKeys", {})
-        if not api_keys:
-            return None
+    api_keys = config.get("configurable", {}).get("apiKeys", {}) if config else {}
+    if api_keys and api_keys.get("TAVILY_API_KEY"):
         return api_keys.get("TAVILY_API_KEY")
-    else:
-        return os.getenv("TAVILY_API_KEY")
+    return os.getenv("TAVILY_API_KEY")

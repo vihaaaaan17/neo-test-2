@@ -54,11 +54,36 @@ services:
       - SURREAL_PASSWORD=${SURREAL_PASSWORD:-root}
       - SURREAL_NAMESPACE=open_notebook
       - SURREAL_DATABASE=open_notebook
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_COMPATIBLE_BASE_URL=${OPENAI_BASE_URL}
+      - OPENAI_COMPATIBLE_API_KEY=${OPENAI_API_KEY}
     volumes:
       - notebook_data:/app/data
     depends_on:
       - surrealdb
     restart: always
+
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    restart: always
+
+  minio-init:
+    image: cgr.dev/chainguard/minio-client:latest
+    depends_on:
+      - minio
+    environment:
+      MC_HOST_myminio: http://${MINIO_ROOT_USER:-minioadmin}:${MINIO_ROOT_PASSWORD:-minioadmin}@minio:9000
+    command: mb --ignore-existing myminio/${S3_BUCKET:-neosislm-dev}
 
 volumes:
   postgres_data:
@@ -66,3 +91,4 @@ volumes:
   neo4j_data:
   surreal_data:
   notebook_data:
+  minio_data:

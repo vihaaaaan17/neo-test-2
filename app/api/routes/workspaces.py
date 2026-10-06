@@ -126,7 +126,8 @@ async def delete_workspace(
         # Enqueue background job to process the tombstone deletion
         await arq_redis.enqueue_job(
             "process_deletion_tombstone_job",
-            tombstone_id=str(tombstone_id)
+            tombstone_id=str(tombstone_id),
+            _queue_name="research-standard"
         )
 
 @router.post("/{workspace_id}/files", response_model=SourceResponse, status_code=status.HTTP_202_ACCEPTED)
@@ -168,7 +169,8 @@ async def upload_file_to_workspace(
         "parse_and_chunk_job",
         source_id=str(source.source_id),
         workspace_id=str(workspace_id),
-        owner_id=str(current_user_id)
+        owner_id=str(current_user_id),
+        _queue_name="research-standard"
     )
     
     # Enqueue background job for Open Notebook projection
@@ -177,7 +179,8 @@ async def upload_file_to_workspace(
             "project_to_open_notebook_job",
             source_id=str(source.source_id),
             snapshot_id=str(source.snapshots[0].snapshot_id),
-            workspace_id=str(workspace_id)
+            workspace_id=str(workspace_id),
+            _queue_name="research-standard"
         )
     
     return source
@@ -201,6 +204,48 @@ async def get_source_status(
         raise HTTPException(status_code=404, detail="Source not found")
         
     return {"status": source.processing_status}
+
+@router.get("/{workspace_id}/sources/{source_id}/download", summary="Download raw source file from S3 object store")
+async def download_source_file(
+    workspace_id: UUID,
+    source_id: UUID,
+    current_user_id: UUID = Depends(get_current_user),
+    repo: WorkspaceRepository = Depends(get_workspace_repository),
+    source_repo: SourceRepository = Depends(get_source_repository),
+    storage: ObjectStoreProtocol = Depends(get_object_store)
+):
+    """
+    Download the raw stored source document from S3/MinIO.
+    Verifies object store persistence, tenant isolation, and workspace ownership.
+    """
+    workspace = await repo.get_workspace(workspace_id, current_user_id)
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+        
+    from sqlalchemy.orm import selectinload
+    result = await source_repo.session.execute(
+        select(Source).options(selectinload(Source.snapshots)).where(Source.source_id == source_id)
+    )
+    source = result.scalars().first()
+    if not source or source.workspace_id != workspace_id:
+        raise HTTPException(status_code=404, detail="Source not found")
+        
+    if not source.snapshots:
+        raise HTTPException(status_code=404, detail="No snapshot found for source")
+        
+    snapshot = source.snapshots[0]
+    file_bytes = await storage.download_file(snapshot.file_uri)
+    
+    return Response(
+        content=file_bytes,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{snapshot.filename}"',
+            "X-Checksum-SHA256": snapshot.checksum_sha256,
+            "X-Source-Size": str(snapshot.size),
+            "X-File-URI": snapshot.file_uri
+        }
+    )
 
 @router.get("/{workspace_id}/projection-status")
 async def get_projection_status(

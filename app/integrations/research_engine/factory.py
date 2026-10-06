@@ -22,11 +22,12 @@ class ResearchEngineFactory:
         import os
         from app.core.config import settings
         
-        # Override with environment variable if set (e.g., operational cutover/rollback)
-        if "ACTIVE_RESEARCH_ENGINE" in os.environ:
-            engine_name = os.environ["ACTIVE_RESEARCH_ENGINE"]
-        elif not engine_name and settings.ACTIVE_RESEARCH_ENGINE:
-            engine_name = settings.ACTIVE_RESEARCH_ENGINE
+        # Use requested engine_name if provided; otherwise fallback to environment / settings
+        if not engine_name:
+            if "ACTIVE_RESEARCH_ENGINE" in os.environ:
+                engine_name = os.environ["ACTIVE_RESEARCH_ENGINE"]
+            elif settings.ACTIVE_RESEARCH_ENGINE:
+                engine_name = settings.ACTIVE_RESEARCH_ENGINE
 
         """
         Instantiate the requested research engine.

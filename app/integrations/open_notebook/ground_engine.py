@@ -1,3 +1,4 @@
+import os
 import logging
 import asyncio
 import json
@@ -7,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi import HTTPException
 from app.integrations.open_notebook.client import OpenNotebookClient
-from app.integrations.open_notebook.citation_mapper import map_citations, map_canonical_sources_to_upstream
+from app.integrations.open_notebook.citation_mapper import map_citations, map_canonical_sources_to_upstream, list_workspace_upstream_source_ids
 from app.models.open_notebook_binding import OpenNotebookWorkspaceBinding, OpenNotebookConversationBinding
 
 logger = logging.getLogger(__name__)
@@ -54,10 +55,19 @@ class OpenNotebookGroundEngine:
         result = await db.execute(stmt)
         binding = result.scalars().first()
         if not binding:
-            raise HTTPException(
-                status_code=400,
-                detail="Workspace does not have an active Open Notebook binding."
-            )
+            try:
+                res = await self.client.create_notebook(name=f"Workspace-{str(workspace_id)[:8]}")
+                on_notebook_id = res.get("id") or str(res)
+                from app.repositories.open_notebook import OpenNotebookRepository
+                repo = OpenNotebookRepository(db)
+                binding = await repo.create_workspace_binding(workspace_id, on_notebook_id)
+                await db.commit()
+            except Exception as e:
+                logger.warning("Could not lazily bind Open Notebook workspace: %s", e)
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Workspace does not have an active Open Notebook binding: {e}"
+                )
         return binding
 
     async def _resolve_citations(
@@ -175,11 +185,14 @@ class OpenNotebookGroundEngine:
                         detail="ground_provenance_failure: Zero mapped canonical evidence."
                     )
 
+        # Without an explicit scope, ground on every projected source in the workspace;
+        # Open Notebook otherwise sends only source titles to the model.
+        context_ids = mapped_upstream_ids or await list_workspace_upstream_source_ids(workspace_id, db)
         context_config = {
             "sources": {
-                sid: "full content" for sid in mapped_upstream_ids
+                sid: "full content" for sid in context_ids
             }
-        } if mapped_upstream_ids else {}
+        } if context_ids else {}
 
         try:
             # 1. Concurrently search and ask/chat
@@ -259,7 +272,7 @@ class OpenNotebookGroundEngine:
 
             # Standalone unary run (search + ask_simple)
             default_models = await self.client.get_default_models()
-            model_name = default_models.get("default_chat_model", self.default_answer_model)
+            model_name = default_models.get("default_chat_model") or self.default_answer_model
             search_task = self.client.search(query=query)
             ask_task = self.client.ask_simple(
                 question=query,
@@ -338,11 +351,14 @@ class OpenNotebookGroundEngine:
                         detail="ground_provenance_failure: Zero mapped canonical evidence."
                     )
 
+        # Without an explicit scope, ground on every projected source in the workspace;
+        # Open Notebook otherwise sends only source titles to the model.
+        context_ids = mapped_upstream_ids or await list_workspace_upstream_source_ids(workspace_id, db)
         context_config = {
             "sources": {
-                sid: "full content" for sid in mapped_upstream_ids
+                sid: "full content" for sid in context_ids
             }
-        } if mapped_upstream_ids else {}
+        } if context_ids else {}
 
         # 1. Resolve citations & provenance upfront
         try:
@@ -439,9 +455,9 @@ class OpenNotebookGroundEngine:
                     raise
         else:
             default_models = await self.client.get_default_models()
-            strategy_model = default_models.get("default_chat_model", self.default_strategy_model)
-            answer_model = default_models.get("default_chat_model", self.default_answer_model)
-            final_answer_model = default_models.get("default_chat_model", self.default_final_answer_model)
+            strategy_model = default_models.get("default_chat_model") or self.default_strategy_model
+            answer_model = default_models.get("default_chat_model") or self.default_answer_model
+            final_answer_model = default_models.get("default_chat_model") or self.default_final_answer_model
 
             if hasattr(self.client, "ask_stream"):
                 async for sse_chunk in self.client.ask_stream(

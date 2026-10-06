@@ -74,3 +74,19 @@ async def map_canonical_sources_to_upstream(
     result = await db.execute(stmt)
     return [str(s) for s in result.scalars().all() if s]
 
+async def list_workspace_upstream_source_ids(
+    workspace_id: UUID,
+    db: AsyncSession
+) -> list[str]:
+    """All projected Open Notebook source IDs belonging to a workspace (used when no explicit scope is given)."""
+    stmt = (
+        select(OpenNotebookSourceBinding.open_notebook_source_id)
+        .join(Source, Source.source_id == OpenNotebookSourceBinding.source_id)
+        .where(
+            Source.workspace_id == workspace_id,
+            OpenNotebookSourceBinding.open_notebook_source_id.isnot(None)
+        )
+    )
+    result = await db.execute(stmt)
+    return sorted({str(s) for s in result.scalars().all() if s})
+

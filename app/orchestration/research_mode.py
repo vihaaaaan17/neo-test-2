@@ -191,8 +191,14 @@ class ResearchModeOrchestrator:
             "summary": None
         }
         
-        from langchain_core.tracers.context import tracing_v2_enabled
-        with tracing_v2_enabled(project_name="NeosisLM-ResearchMode"):
+        import os
+        import contextlib
+        if os.environ.get("LANGCHAIN_TRACING_V2", "").lower() == "true" and os.environ.get("LANGCHAIN_API_KEY"):
+            from langchain_core.tracers.context import tracing_v2_enabled
+            ctx_mgr = tracing_v2_enabled(project_name="NeosisLM-ResearchMode")
+        else:
+            ctx_mgr = contextlib.nullcontext()
+        with ctx_mgr:
             async for step in self.graph.astream(initial_state):
                 node_name = list(step.keys())[0]
                 state = step[node_name]
@@ -219,8 +225,14 @@ class ResearchModeOrchestrator:
             "summary": None
         }
         
-        from langchain_core.tracers.context import tracing_v2_enabled
-        with tracing_v2_enabled(project_name="NeosisLM-ResearchMode"):
+        import os
+        import contextlib
+        if os.environ.get("LANGCHAIN_TRACING_V2", "").lower() == "true" and os.environ.get("LANGCHAIN_API_KEY"):
+            from langchain_core.tracers.context import tracing_v2_enabled
+            ctx_mgr = tracing_v2_enabled(project_name="NeosisLM-ResearchMode")
+        else:
+            ctx_mgr = contextlib.nullcontext()
+        with ctx_mgr:
             final_state = await self.graph.ainvoke(initial_state)
             
         if "context" in final_state and final_state["context"]:
