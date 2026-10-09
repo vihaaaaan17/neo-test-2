@@ -4,7 +4,7 @@ import uuid
 from uuid import UUID
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from arq.connections import Redis
 from sqlalchemy import exc
 
@@ -50,12 +50,13 @@ class ResearchRepository:
         workspace_id: UUID,
         owner_id: UUID,
         objective: str,
-        engine: str,
+        engine: Optional[str],
         engine_revision: Optional[str] = None,
         conversation_id: Optional[UUID] = None,
         turn_id: Optional[UUID] = None,
         base_commit_id: Optional[UUID] = None,
-        timeline_epoch: Optional[int] = None
+        timeline_epoch: Optional[int] = None,
+        routing_mode: str = "explicit",
     ) -> ResearchRun:
         attempt_id = uuid.uuid4()
         if timeline_epoch is None:
@@ -74,6 +75,7 @@ class ResearchRepository:
             owner_id=owner_id,
             objective=objective,
             engine=engine,
+            routing_mode=routing_mode,
             engine_revision=engine_revision,
             conversation_id=conversation_id,
             turn_id=turn_id,
@@ -289,8 +291,8 @@ class ResearchRepository:
     ) -> List[ResearchArtifact]:
         stmt = (
             select(ResearchArtifact)
-            .join(ResearchRun, ResearchArtifact.run_id == ResearchRun.run_id)
-            .where(ResearchRun.workspace_id == workspace_id)
+            .outerjoin(ResearchRun, ResearchArtifact.run_id == ResearchRun.run_id)
+            .where(or_(ResearchRun.workspace_id == workspace_id, ResearchArtifact.workspace_id == workspace_id))
         )
         if status is not None:
             stmt = stmt.where(ResearchArtifact.promotion_status == status)
@@ -303,10 +305,10 @@ class ResearchRepository:
     async def get_candidate_for_review(self, workspace_id: UUID, artifact_id: UUID) -> Optional[ResearchArtifact]:
         stmt = (
             select(ResearchArtifact)
-            .join(ResearchRun, ResearchArtifact.run_id == ResearchRun.run_id)
+            .outerjoin(ResearchRun, ResearchArtifact.run_id == ResearchRun.run_id)
             .where(
                 ResearchArtifact.artifact_id == artifact_id,
-                ResearchRun.workspace_id == workspace_id
+                or_(ResearchRun.workspace_id == workspace_id, ResearchArtifact.workspace_id == workspace_id)
             )
         )
         result = await self.session.execute(stmt)

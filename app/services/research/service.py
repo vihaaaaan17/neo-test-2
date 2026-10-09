@@ -26,60 +26,6 @@ class ResearchService:
         self.memory_router = memory_router
         self.graph_repo = graph_repo
 
-    async def finalize_report(
-        self,
-        workspace_id: uuid.UUID,
-        run_id: uuid.UUID,
-        objective: str,
-        report: str,
-    ) -> ResearchArtifact:
-        """
-        Engine-agnostic finalization of a completed run's final report.
-
-        Persists the canonical ResearchReport and emits a `memory_candidate` artifact in `pending_review`
-        with v2 provenance (evidence refs + the originating conversation turn). Candidates are NEVER
-        auto-promoted: human review gates every transition to KnowledgeMemory / Output KG.
-        """
-        repo = self.research_repo
-        await repo.create_report(
-            workspace_id=workspace_id,
-            run_id=run_id,
-            objective=objective,
-            content=report,
-        )
-
-        evidence_list = await repo.list_evidence_for_run(workspace_id, run_id) or []
-        evidence_refs = [str(ev.evidence_id) for ev in evidence_list]
-        source_refs = [{"ref_type": "research_evidence", "ref_id": ref} for ref in evidence_refs]
-
-        run = await repo.get_run(workspace_id, run_id)
-        if run and run.turn_id:
-            source_refs.append({"ref_type": "conversation_turn", "ref_id": str(run.turn_id)})
-
-        payload = {
-            "candidate_type": "memory_candidate",
-            "content": report,
-            "text": report,
-            "evidence_refs": evidence_refs,
-            "source_refs": source_refs,
-            "provenance": {
-                "source_refs": evidence_refs,
-                "derived_from_refs": evidence_refs,
-                "derived_from": source_refs,
-            },
-            "proposed_memory_type": "research_memory",
-            "provenance_version": "v2",
-            "domain": "deep_research",
-            "metadata": {"source": run.engine if run else "unknown", "objective": objective},
-        }
-        return await repo.create_artifact(
-            workspace_id=workspace_id,
-            run_id=run_id,
-            artifact_type="memory_candidate",
-            payload=payload,
-            promotion_status="pending_review",
-        )
-
     async def promote_memory_candidates(self, workspace_id: uuid.UUID, run_id: uuid.UUID, owner_id: uuid.UUID) -> int:
         """
         Finds all ResearchArtifacts for a given run with type='memory_candidate'

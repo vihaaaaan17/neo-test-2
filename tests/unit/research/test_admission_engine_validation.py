@@ -47,3 +47,31 @@ async def test_unsupported_engine_is_rejected_before_quota_and_run_creation(engi
     assert exc.value.detail == "unsupported_research_engine"
     quota.enforce_user_quota.assert_not_awaited()
     repo.create_run.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_auto_routing_is_admitted_without_an_engine_name():
+    controller, _, repo = _controller()
+    await controller.admit_research_run(
+        workspace_id=uuid.uuid4(), owner_id=uuid.uuid4(), objective="x", engine=None, routing_mode="auto"
+    )
+    kwargs = repo.create_run.await_args.kwargs
+    assert kwargs["routing_mode"] == "auto" and kwargs["engine"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("routing_mode,engine,detail", [
+    ("smart", None, "unsupported_routing_mode"),
+    ("auto", "storm", "engine_not_allowed_with_auto_routing"),
+    ("explicit", None, "unsupported_research_engine"),
+    ("explicit", "auto", "unsupported_research_engine"),  # "auto" is a routing mode, never an engine name
+])
+async def test_invalid_routing_is_rejected_before_quota_and_run_creation(routing_mode, engine, detail):
+    controller, quota, repo = _controller()
+    with pytest.raises(HTTPException) as exc:
+        await controller.admit_research_run(
+            workspace_id=uuid.uuid4(), owner_id=uuid.uuid4(), objective="x", engine=engine, routing_mode=routing_mode
+        )
+    assert exc.value.status_code == 422 and exc.value.detail == detail
+    quota.enforce_user_quota.assert_not_awaited()
+    repo.create_run.assert_not_awaited()

@@ -1,7 +1,7 @@
 """
 Shared engine contract, run against all three adapters (Open Deep Research, STORM, GPT-Researcher), each over a
 deterministic stand-in for its upstream runtime. Every engine must: yield progress events then exactly one
-`final_report`, never a terminal status; carry the run identity into evidence persistence; signal failure by
+`turn_response`, never a terminal status; carry the run identity into evidence persistence; signal failure by
 raising; and stop its upstream work when the consuming task is cancelled.
 """
 import asyncio
@@ -46,7 +46,7 @@ class FakeResearcher:
         if FakeResearcher.mode == "fail":
             raise RuntimeError("upstream failure")
 
-    async def write_report(self):
+    async def write_report(self, custom_prompt=""):
         return f"# {self.query}"
 
     def get_research_sources(self):
@@ -114,16 +114,16 @@ def test_factory_resolves_every_supported_engine(name):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("name", SUPPORTED_ENGINES)
-async def test_contract_progress_then_exactly_one_final_report_with_run_identity(name, tmp_path):
+async def test_contract_progress_then_exactly_one_turn_response_with_run_identity(name, tmp_path):
     run_id, workspace_id = uuid4(), uuid4()
     with _engine(name, tmp_path) as (engine, handle):
         events = [e async for e in engine.astream_events(run_id=run_id, workspace_id=workspace_id, objective="Contract objective")]
 
     statuses = [e["status"] for e in events]
     assert statuses[0] == "starting"
-    assert statuses.count("final_report") == 1 and statuses[-1] == "final_report"
+    assert statuses.count("turn_response") == 1 and statuses[-1] == "turn_response"
     assert not TERMINAL & set(statuses)  # the worker, not the engine, owns terminal state
-    assert isinstance(events[-1]["report"], str) and "Contract objective" in events[-1]["report"]
+    assert isinstance(events[-1]["text"], str) and "Contract objective" in events[-1]["text"]
 
     # Evidence is persisted through Neosis, scoped to this run and workspace (no bypass of provenance).
     scopes = _evidence_scopes(name, handle)
@@ -138,7 +138,7 @@ async def test_contract_failure_is_raised_not_yielded(name, tmp_path):
         with pytest.raises(RuntimeError, match="upstream failure"):
             async for e in engine.astream_events(run_id=uuid4(), workspace_id=uuid4(), objective="x"):
                 seen.append(e["status"])
-    assert "final_report" not in seen and not TERMINAL & set(seen)
+    assert "turn_response" not in seen and not TERMINAL & set(seen)
 
 
 @pytest.mark.asyncio

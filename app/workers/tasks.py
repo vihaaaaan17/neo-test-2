@@ -379,6 +379,13 @@ async def sync_knowledge_to_graph_job(
 # run_research_agent_job
 # --------------------------------------------------------------------------- #
 
+def build_research_engine(routing_mode: str, engine_name: str | None, redis_client: Any):
+    """The engine the worker drives: the EngineRouter, which runs exactly one adapter at a time."""
+    from app.integrations.research_engine.router import EngineRouter
+
+    return EngineRouter(routing_mode=routing_mode, engine=engine_name, redis_client=redis_client)
+
+
 async def run_research_agent_job(
     ctx: dict,
     *,
@@ -393,7 +400,7 @@ async def run_research_agent_job(
     import json
     from uuid import UUID
     import uuid
-    from app.integrations.research_engine.factory import ResearchEngineFactory
+    from app.integrations.research_engine.engine import TURN_RESPONSE
 
     job_id = ctx.get("job_id")
     if not job_id:
@@ -436,10 +443,21 @@ async def run_research_agent_job(
             await publish_event({"status": "failed", "error": "ResearchRun not found"})
             return {"status": "failed", "error": "ResearchRun not found"}
 
+        # Idempotent on redelivery: ARQ re-runs a job whose worker died (max_tries). A run that is already terminal
+        # must not execute engines again or emit a second terminal event.
+        if isinstance(getattr(run, "status", None), str) and run.status in _ENGINE_TERMINAL_STATUSES:
+            logger.info("Run %s is already %s; redelivered job is a no-op", run_id, run.status)
+            return {"status": run.status, "workspace_id": workspace_id, "run_id": run_id, "redelivered": True}
+
+        queue_wait_ms = None
+        created_at = getattr(run, "created_at", None)
+        if isinstance(created_at, datetime):
+            queue_wait_ms = max(0, int((datetime.now(timezone.utc) - created_at).total_seconds() * 1000))
         expected_epoch = getattr(run, "timeline_epoch", None) or (workspace.timeline_epoch if workspace and isinstance(getattr(workspace, "timeline_epoch", None), int) else 1)
             
         owner_id = run.owner_id
-        engine_flag = run.engine
+        routing_mode = run.routing_mode if isinstance(getattr(run, "routing_mode", None), str) else "explicit"
+        engine_flag = run.engine or routing_mode  # an auto run has no engine until an attempt answers
         actual_run_id = UUID(run_id)
 
         # The worker resolves engine inputs (DB reads); adapters receive plain data.
@@ -485,7 +503,7 @@ async def run_research_agent_job(
         await _bridge_chat_event(
             run.turn_id,
             EVENT_TURN_RESEARCH_STARTED,
-            {"run_id": str(actual_run_id), "status": "started", "engine": engine_flag}
+            {"run_id": str(actual_run_id), "status": "started", "engine": engine_flag, "routing_mode": routing_mode}
         )
 
     logger.info(json.dumps({
@@ -495,11 +513,8 @@ async def run_research_agent_job(
         "engine": engine_flag
     }))
 
-    # Instantiate the appropriate engine via factory
-    engine = ResearchEngineFactory.get_engine(
-        engine_name=engine_flag,
-        redis_client=redis
-    )
+    # The router runs exactly one adapter at a time (auto: chosen + at most one escalation; explicit: the named engine).
+    engine = build_research_engine(routing_mode, run.engine, redis)
 
     cancel_task = None
     consume_ref: dict = {}  # holds the child task consuming the engine stream so a cancel signal can stop it
@@ -522,12 +537,12 @@ async def run_research_agent_job(
         cancel_task = asyncio.create_task(_listen_for_cancellation())
 
     try:
-        final_report = None
+        final_response: dict | None = None
         final_status = "completed"
         final_reason = "Engine finished normally"
 
         async def _consume_engine() -> None:
-            nonlocal final_report
+            nonlocal final_response
             async for event in engine.astream_events(
                 run_id=actual_run_id,
                 workspace_id=UUID(workspace_id),
@@ -537,9 +552,9 @@ async def run_research_agent_job(
             ):
                 status = event.get("status")
 
-                # The engine hands the report over as data and signals failure by raising.
-                if status == "final_report":
-                    final_report = event.get("report")
+                # The engine hands its answer over as data and signals failure by raising.
+                if status == TURN_RESPONSE:
+                    final_response = event
                     continue
                 if status in _ENGINE_TERMINAL_STATUSES:
                     logger.warning(
@@ -618,6 +633,7 @@ async def run_research_agent_job(
         import contextlib
         from app.integrations.research_engine.budget import ResearchBudgetExceeded
 
+        engine_t0 = time.time()
         consume_task = asyncio.create_task(_consume_engine())
         consume_ref["task"] = consume_task
         try:
@@ -638,6 +654,8 @@ async def run_research_agent_job(
             final_status = "failed"
             final_reason = f"Research engine failed: {engine_err}"
 
+        engine_ms = int((time.time() - engine_t0) * 1000)
+        finalize_t0 = time.time()
         # ---------------------------------------------------------
         # Finalize execution, transition state, and promote candidates
         # ---------------------------------------------------------
@@ -711,17 +729,12 @@ async def run_research_agent_job(
                 await publish_event({"status": "aborted_by_timeline_fence", "error": fence_reason})
                 return {"status": "aborted_by_timeline_fence", "reason": fence_reason}
 
-            # A completed run requires the engine's final report; the worker persists it (engine-agnostic).
-            if final_status == "completed" and not final_report:
+            # A completed run requires the engine's answer. It becomes the turn's assistant message; no ResearchReport or
+            # promotion candidate is created for an ordinary turn (formal papers come only from StudyReportCompiler).
+            answer_text = (final_response or {}).get("text") or ""
+            if final_status == "completed" and not answer_text.strip():
                 final_status = "failed"
-                final_reason = "engine_finished_without_report"
-            if final_status == "completed":
-                await ResearchService(repo).finalize_report(
-                    workspace_id=UUID(workspace_id),
-                    run_id=actual_run_id,
-                    objective=objective,
-                    report=final_report,
-                )
+                final_reason = "engine_finished_without_response"
 
             # Transition state to final_status. Another writer (e.g. the API cancelling the turn) may already
             # have made the run terminal; that is success for us, and we must not emit a second terminal event.
@@ -751,6 +764,7 @@ async def run_research_agent_job(
             # In Phase 3: Finalize candidate artifacts in pending_review status
             # Research completion NEVER automatically promotes KnowledgeMemory or projects Output KG.
             # ---------------------------------------------------------
+            candidates = []
             if final_status == "completed":
                 from app.services.research.derivation import DerivationService
                 derivation_svc = DerivationService(session)
@@ -774,22 +788,18 @@ async def run_research_agent_job(
 
                 await session.commit()
 
-            # Retrieve final research report content if available to attach as assistant summary
-            # Finalize ConversationTurn status, assistant message, and research_run_id
+            # Finalize ConversationTurn status, assistant message (the conversational answer) and research_run_id
             if run and getattr(run, "turn_id", None):
-                report_content = None
-                try:
-                    rep_stmt = (
-                        select(ResearchReport)
-                        .where(ResearchReport.run_id == actual_run_id)
-                        .order_by(ResearchReport.created_at.desc())
-                    )
-                    rep_res = await session.execute(rep_stmt)
-                    rep = rep_res.scalars().first() if rep_res else None
-                    if rep and hasattr(rep, "content"):
-                        report_content = rep.content
-                except Exception as rep_err:
-                    logger.debug("Could not retrieve research report for turn summary: %s", rep_err)
+                report_content = answer_text if final_status == "completed" else None
+                response_payload = {
+                    "answer_details": (final_response or {}).get("details"),
+                    "timings": {"queue_wait_ms": queue_wait_ms, "engine_ms": engine_ms,
+                                "finalize_ms": int((time.time() - finalize_t0) * 1000)},
+                    "answer_format": (final_response or {}).get("format"),
+                    "evidence": (final_response or {}).get("evidence") or [],
+                    "evidence_refs": (final_response or {}).get("evidence_refs") or [],
+                    "routing": (final_response or {}).get("routing") or getattr(engine, "summary", None) or None,
+                }
 
                 completed_turn = None
                 try:
@@ -817,7 +827,8 @@ async def run_research_agent_job(
                             "status": final_status,
                             "assistant_message": fail_msg,
                             "error": final_reason if final_status == "failed" else None,
-                            "research_run_id": str(actual_run_id)
+                            "research_run_id": str(actual_run_id),
+                            **response_payload,
                         }
                     )
                     await _bridge_chat_event(
@@ -827,12 +838,14 @@ async def run_research_agent_job(
                             "status": final_status,
                             "assistant_message": fail_msg,
                             "error": final_reason if final_status == "failed" else None,
-                            "research_run_id": str(actual_run_id)
+                            "research_run_id": str(actual_run_id),
+                            **response_payload,
                         }
                     )
 
         await publish_event({"status": final_status, "message": f"Research {final_status}"})
-        if redis and final_status == "completed":
+        # Promotion review is only announced when a candidate exists (ordinary turns create none).
+        if redis and final_status == "completed" and candidates:
             prom_event = {
                 "event_type": "promotion.available",
                 "workspace_id": workspace_id,
@@ -842,7 +855,7 @@ async def run_research_agent_job(
             await redis.publish(f"workspace_events:{workspace_id}", json.dumps(prom_event))
             await redis.publish(f"research_events:{actual_run_id}", json.dumps(prom_event))
 
-        if run and run.turn_id and final_status == "completed":
+        if run and run.turn_id and final_status == "completed" and candidates:
             await _bridge_chat_event(
                 run.turn_id,
                 EVENT_TURN_PROMOTION_AVAILABLE,
@@ -1328,3 +1341,50 @@ async def delete_open_notebook_workspace_job(ctx: dict, *, workspace_id: str) ->
             return {"status": "skipped", "reason": "no_binding"}
         return {"status": "completed"}
 
+
+
+async def reconcile_stale_research_runs_job(ctx: dict) -> dict[str, Any]:
+    """
+    Periodic supervisor sweep for research runs that can no longer be executing: still `pending`/`running` long after
+    the turn deadline and the ARQ job timeout (e.g. the worker process died mid-run). Each is finalized once as `failed`
+    (`stale_run_reconciled`) and its turn is closed with one terminal event, so it stops holding concurrency quota.
+    A run that a live worker is still finalizing is never this old.
+    """
+    from datetime import timedelta
+    from sqlalchemy import select
+
+    from app.models.research import ResearchRun
+    from app.repositories.conversation import ConversationRepository
+    from app.repositories.research import ResearchRepository
+    from app.services.chat.events import ChatEventRepository, ChatEventService
+    from app.services.research.lifecycle import InvalidTransitionError, ResearchLifecycleService
+
+    stale_after = int(getattr(settings, "RESEARCH_STALE_RUN_AFTER_S", 7200))
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=stale_after)
+    reconciled = 0
+    async with async_session_maker() as session:
+        rows = (await session.execute(
+            select(ResearchRun).where(ResearchRun.status.in_(("pending", "planning", "researching", "synthesizing", "finalizing", "running")),
+                                      ResearchRun.updated_at < cutoff)
+        )).scalars().all()
+        for run in rows:
+            reason = f"stale_run_reconciled: no progress for more than {stale_after}s"
+            try:
+                await ResearchLifecycleService(ResearchRepository(session)).transition_run(run.workspace_id, run.run_id, "failed", {"reason": reason})
+            except InvalidTransitionError:
+                run.status = "failed"
+            await session.commit()
+            reconciled += 1
+            if run.turn_id:
+                turn = await ConversationRepository(session).set_turn_status(
+                    turn_id=run.turn_id, status="failed", expected_statuses=["pending", "running"],
+                    error_code="stale_run_reconciled", error_message=reason, completed_at=datetime.now(timezone.utc),
+                )
+                if turn:
+                    events = ChatEventService(ChatEventRepository(session), ctx.get("redis"))
+                    payload = {"status": "failed", "error": reason, "research_run_id": str(run.run_id)}
+                    await events.record_and_publish(run.turn_id, EVENT_TURN_FAILED, payload)
+                    await events.record_and_publish(run.turn_id, EVENT_DONE, payload)
+    if reconciled:
+        logger.warning("Reconciled %d stale research run(s)", reconciled)
+    return {"status": "completed", "reconciled": reconciled}

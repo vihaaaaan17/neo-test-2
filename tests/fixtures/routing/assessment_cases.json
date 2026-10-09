@@ -1,0 +1,133 @@
+[
+  {
+    "id": "sufficient_normal",
+    "intent": "normal",
+    "objective": "Explain how retrieval-augmented generation reduces hallucinations in language models.",
+    "answer": "Retrieval-augmented generation (RAG) reduces hallucinations because the language model answers from retrieved documents instead of only from what it memorised during training [1]. A retriever first finds passages relevant to the question, and the generator is then conditioned on those passages, which grounds its output in real text [2]. This matters because models that rely purely on parametric memory tend to produce fluent but unsupported statements when they lack knowledge. By providing current, citable context, RAG lets the model quote or paraphrase evidence and lets readers verify the source [3]. It does not eliminate hallucinations entirely: if retrieval returns irrelevant passages the model can still invent details, so retrieval quality, re-ranking and asking the model to cite its passages all help. In practice, teams combine RAG with evaluation of groundedness to measure how often answers are actually supported by the retrieved documents, and they tune chunk size and the number of passages to balance recall against noise in the prompt.",
+    "evidence": [
+      {"url": "https://arxiv.org/abs/2005.11401", "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP", "excerpt": "Retrieval-augmented generation combines a retriever with a generator so language models ground answers in retrieved documents, reducing hallucinations."},
+      {"url": "https://www.ibm.com/think/topics/retrieval-augmented-generation", "title": "What is retrieval-augmented generation?", "excerpt": "RAG grounds language model output in retrieved passages, which reduces hallucinations and improves factual accuracy."},
+      {"url": "https://aws.amazon.com/what-is/retrieval-augmented-generation/", "title": "What is RAG?", "excerpt": "Retrieval-augmented generation retrieves relevant documents for the language model to reduce hallucinations."}
+    ],
+    "expected": null
+  },
+  {
+    "id": "insufficient_depth",
+    "intent": "normal",
+    "objective": "Explain how retrieval-augmented generation reduces hallucinations in language models.",
+    "answer": "Retrieval-augmented generation reduces hallucinations because the language model answers from retrieved documents rather than from memory alone [1], which grounds its output [2].",
+    "evidence": [
+      {"url": "https://arxiv.org/abs/2005.11401", "title": "Retrieval-Augmented Generation", "excerpt": "Retrieval-augmented generation grounds language models in retrieved documents, reducing hallucinations."},
+      {"url": "https://www.ibm.com/think/topics/rag", "title": "What is retrieval-augmented generation?", "excerpt": "RAG reduces hallucinations in language models by retrieval of documents."}
+    ],
+    "expected": "insufficient_depth"
+  },
+  {
+    "id": "unanswered_parts",
+    "intent": "normal",
+    "objective": "What is vector search, and how does BM25 ranking work?",
+    "answer": "Vector search represents documents and queries as embeddings, numeric vectors produced by a neural encoder, and finds the nearest neighbours of the query vector using a similarity measure such as cosine similarity [1]. Because similar meanings map to nearby points, vector search can match paraphrases that share no keywords, which is why it is popular for semantic retrieval [2]. Approximate nearest neighbour indexes such as HNSW make this fast at scale by navigating a graph of vectors instead of comparing against every document. Vector databases store the embeddings with metadata and let applications filter results while still ranking by similarity, which is the basis of most modern semantic search and retrieval pipelines.",
+    "evidence": [
+      {"url": "https://www.pinecone.io/learn/vector-search/", "title": "What is vector search?", "excerpt": "Vector search finds nearest neighbours of a query embedding; BM25 ranking is a keyword-based alternative."},
+      {"url": "https://en.wikipedia.org/wiki/Okapi_BM25", "title": "Okapi BM25", "excerpt": "BM25 is a ranking function used by search engines to estimate the relevance of documents to a search query based on term frequency."}
+    ],
+    "expected": "unanswered_parts"
+  },
+  {
+    "id": "unresolved_relationship",
+    "intent": "normal",
+    "objective": "How does sleep deprivation affect memory consolidation?",
+    "answer": "Sleep deprivation is a condition in which a person gets less sleep than they need, commonly defined as fewer than seven hours a night for adults [1]. Memory consolidation is the process by which new memories become stable long-term memories, and it involves the hippocampus and the neocortex [2]. Researchers study sleep deprivation in laboratories using controlled schedules, and they study memory consolidation with learning tasks given before rest periods. Both topics are active areas of neuroscience and psychology research, with many published studies on sleep deprivation and many on memory consolidation in humans and animals.",
+    "evidence": [
+      {"url": "https://www.sleepfoundation.org/sleep-deprivation", "title": "Sleep deprivation", "excerpt": "Sleep deprivation impairs memory consolidation and attention."},
+      {"url": "https://www.nature.com/articles/memory-consolidation", "title": "Memory consolidation during sleep", "excerpt": "Memory consolidation depends on sleep; deprivation disrupts hippocampal replay."}
+    ],
+    "expected": "unresolved_relationship"
+  },
+  {
+    "id": "low_source_coverage",
+    "intent": "normal",
+    "objective": "Explain how retrieval-augmented generation reduces hallucinations in language models.",
+    "answer": "Retrieval-augmented generation (RAG) reduces hallucinations because the language model answers from retrieved documents instead of only from memorised training data [1]. A retriever finds passages relevant to the question and the generator is conditioned on them, which grounds its output in real text [1]. This matters because purely parametric models produce fluent but unsupported statements when they lack knowledge. Providing current, citable context lets the model quote evidence and lets readers verify it. Retrieval quality still matters: irrelevant passages can mislead the model, so re-ranking and citation prompts are commonly added to keep answers grounded and to measure how often generated statements are actually supported by the retrieved documents.",
+    "evidence": [
+      {"url": "https://arxiv.org/abs/2005.11401", "title": "Retrieval-Augmented Generation", "excerpt": "Retrieval-augmented generation grounds language models in retrieved documents, reducing hallucinations."},
+      {"url": "https://arxiv.org/abs/2312.10997", "title": "Retrieval-Augmented Generation for Large Language Models: A Survey", "excerpt": "Survey of retrieval-augmented generation methods for reducing hallucinations in language models."}
+    ],
+    "expected": "low_source_coverage"
+  },
+  {
+    "id": "duplicated_sources",
+    "intent": "normal",
+    "objective": "Explain how retrieval-augmented generation reduces hallucinations in language models.",
+    "answer": "Retrieval-augmented generation (RAG) reduces hallucinations because the language model answers from retrieved documents instead of only from memorised training data [1]. A retriever finds passages relevant to the question and the generator is conditioned on them, which grounds its output in real text [2]. This matters because purely parametric models produce fluent but unsupported statements when they lack knowledge. Providing current, citable context lets the model quote evidence and lets readers verify it. Retrieval quality still matters: irrelevant passages can mislead the model, so re-ranking and citation prompts are commonly added to keep answers grounded and to measure how often generated statements are actually supported.",
+    "evidence": [
+      {"url": "https://blog.example.com/rag", "title": "RAG explained", "excerpt": "Retrieval-augmented generation reduces hallucinations in language models by grounding answers in documents."},
+      {"url": "https://blog.example.com/rag", "title": "RAG explained", "excerpt": "Retrieval-augmented generation reduces hallucinations in language models by grounding answers in documents."},
+      {"url": "https://blog.example.com/rag?utm=1", "title": "RAG explained", "excerpt": "Retrieval-augmented generation reduces hallucinations in language models by grounding answers in documents."},
+      {"url": "https://mirror.example.org/rag", "title": "RAG explained (mirror)", "excerpt": "Retrieval-augmented generation reduces hallucinations in language models by grounding answers in documents."},
+      {"url": "https://www.ibm.com/think/topics/rag", "title": "What is retrieval-augmented generation?", "excerpt": "RAG reduces hallucinations in language models by retrieval of relevant documents."}
+    ],
+    "expected": "excessive_duplication"
+  },
+  {
+    "id": "no_usable_evidence",
+    "intent": "normal",
+    "objective": "Explain how retrieval-augmented generation reduces hallucinations in language models.",
+    "answer": "Retrieval-augmented generation (RAG) reduces hallucinations because the language model answers from retrieved documents instead of only from memorised training data. A retriever finds passages relevant to the question and the generator is conditioned on them, which grounds its output in real text. This matters because purely parametric models produce fluent but unsupported statements when they lack knowledge. Providing current, citable context lets the model quote evidence and lets readers verify it. Retrieval quality still matters: irrelevant passages can mislead the model, so re-ranking and citation prompts are commonly added to keep answers grounded.",
+    "evidence": [
+      {"url": "https://cooking.example.com/bread", "title": "How to bake sourdough bread", "excerpt": "Mix flour, water and starter, then proof the dough overnight before baking."},
+      {"url": "https://travel.example.org/rome", "title": "Three days in Rome", "excerpt": "Visit the Colosseum early in the morning to avoid queues."}
+    ],
+    "expected": "no_usable_evidence"
+  },
+  {
+    "id": "uncited_claims",
+    "intent": "normal",
+    "objective": "Explain how retrieval-augmented generation reduces hallucinations in language models.",
+    "answer": "Retrieval-augmented generation reduces hallucinations because the language model answers from retrieved documents. In 2020 the original RAG paper reported gains of more than 10 points on open-domain question answering benchmarks. A 2023 survey found that over 60% of production assistants used some form of retrieval to ground their answers. One industry study claimed hallucination rates fell from 27% to 8% after adding retrieval and citation prompts. These systems retrieve about 5 passages per query on average, which keeps prompts short while still grounding the language model output. Retrieval quality still matters, since irrelevant passages can mislead the model and reintroduce errors into otherwise grounded responses.",
+    "evidence": [
+      {"url": "https://arxiv.org/abs/2005.11401", "title": "Retrieval-Augmented Generation", "excerpt": "Retrieval-augmented generation grounds language models in retrieved documents, reducing hallucinations."},
+      {"url": "https://www.ibm.com/think/topics/rag", "title": "What is retrieval-augmented generation?", "excerpt": "RAG reduces hallucinations in language models by retrieval of documents."}
+    ],
+    "expected": "uncited_claims"
+  },
+  {
+    "id": "engine_reported_gap",
+    "intent": "normal",
+    "objective": "Explain how retrieval-augmented generation reduces hallucinations in language models.",
+    "answer": "Retrieval-augmented generation reduces hallucinations because the language model answers from retrieved documents rather than only from memorised data [1]. The retriever supplies passages and the generator is conditioned on them, which grounds the output [2]. However, I could not find reliable measurements of how much hallucination rates actually drop in production systems, and the available sources do not quantify the effect across different language models, so the size of the improvement remains unclear. Retrieval quality, re-ranking and citation prompts are commonly recommended to keep answers grounded, but their individual contribution to reducing hallucinations was not established by the sources found.",
+    "evidence": [
+      {"url": "https://arxiv.org/abs/2005.11401", "title": "Retrieval-Augmented Generation", "excerpt": "Retrieval-augmented generation grounds language models in retrieved documents, reducing hallucinations."},
+      {"url": "https://www.ibm.com/think/topics/rag", "title": "What is retrieval-augmented generation?", "excerpt": "RAG reduces hallucinations in language models by retrieval of documents."}
+    ],
+    "expected": "engine_reported_gap"
+  },
+  {
+    "id": "simple_sufficient_without_search",
+    "intent": "simple",
+    "objective": "Who wrote the novel Dune?",
+    "answer": "The novel Dune was written by Frank Herbert and first published in 1965 by Chilton Books.",
+    "evidence": [],
+    "expected": null
+  },
+  {
+    "id": "simple_unanswered",
+    "intent": "simple",
+    "objective": "Who wrote the novel Dune?",
+    "answer": "I am not certain about that; it might be one of several science fiction authors from the period.",
+    "evidence": [],
+    "expected": "unanswered_parts"
+  },
+  {
+    "id": "broad_needs_more_sources",
+    "intent": "broad",
+    "objective": "Find as many sources as possible about microplastics in drinking water.",
+    "answer": "Microplastics have been detected in both tap and bottled drinking water in many countries [1]. Studies report particles from fibres and fragments, with bottled water often showing higher counts than tap water [2]. The World Health Organization reviewed the evidence and concluded that current levels do not appear to pose a health risk, while calling for more research on smaller nanoplastics [3]. Treatment plants remove most larger particles, but removal of the smallest particles is less certain. Researchers continue to standardise sampling methods because different filters and detection techniques make microplastics counts hard to compare across studies of drinking water.",
+    "evidence": [
+      {"url": "https://www.who.int/publications/microplastics-drinking-water", "title": "Microplastics in drinking-water", "excerpt": "WHO review of microplastics in drinking water and health risks."},
+      {"url": "https://www.nature.com/articles/microplastics-water", "title": "Microplastics in bottled and tap drinking water", "excerpt": "Microplastics detected in bottled and tap drinking water samples."},
+      {"url": "https://www.sciencedirect.com/microplastics-treatment", "title": "Removal of microplastics in drinking water treatment", "excerpt": "Drinking water treatment removes most microplastics particles."}
+    ],
+    "expected": "low_source_coverage"
+  }
+]

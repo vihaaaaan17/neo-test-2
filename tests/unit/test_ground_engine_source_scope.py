@@ -34,9 +34,9 @@ async def test_ground_engine_source_scope_injected_into_context_config():
     mock_client.chat_execute.return_value = {"answer": "Grounded answer", "evidence": [on_source1_id]}
 
     with patch("app.integrations.open_notebook.ground_engine.map_canonical_sources_to_upstream", new_callable=AsyncMock) as mock_map_up, \
-         patch("app.integrations.open_notebook.ground_engine.map_citations", new_callable=AsyncMock) as mock_map_cit:
+         patch("app.integrations.open_notebook.ground_engine.resolve_ground_evidence", new_callable=AsyncMock) as mock_map_cit:
         mock_map_up.return_value = [on_source1_id]
-        mock_map_cit.return_value = ([source1], False)
+        mock_map_cit.return_value = {"source_ids": [source1], "evidence": [], "unresolved": [], "provenance_status": "full"}
 
         result = await engine.run(
             workspace_id=workspace_id,
@@ -55,6 +55,7 @@ async def test_ground_engine_source_scope_injected_into_context_config():
         call_kwargs = mock_client.chat_execute.call_args.kwargs
         assert "context_config" in call_kwargs
         assert call_kwargs["context_config"] == {"sources": {on_source1_id: "full content"}}
+        assert mock_map_cit.await_args.kwargs["source_scope"] == [source1]  # resolution is filtered by the same scope
 
 @pytest.mark.asyncio
 async def test_ground_engine_source_scope_fails_closed_when_unmapped():

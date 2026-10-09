@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 from arq.connections import Redis
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.research import ResearchArtifact
@@ -118,12 +118,13 @@ class PromotionService:
             # concurrent accept/reject calls from racing on the same candidate.
             stmt = (
                 select(_Artifact)
-                .join(_Run, _Artifact.run_id == _Run.run_id)
+                .outerjoin(_Run, _Artifact.run_id == _Run.run_id)
                 .where(
                     _Artifact.artifact_id == artifact_id,
-                    _Run.workspace_id == workspace_id,
+                    # run-scoped candidates belong to the workspace via their run; study-session candidates directly
+                    or_(_Run.workspace_id == workspace_id, _Artifact.workspace_id == workspace_id),
                 )
-                .with_for_update()
+                .with_for_update(of=_Artifact)
             )
             result = await self.session.execute(stmt)
             try:
@@ -299,7 +300,7 @@ class PromotionService:
         logger.info(json.dumps({
             "event": "candidate_promotion_decision",
             "workspace_id": str(workspace_id),
-            "run_id": str(candidate.run_id),
+            "run_id": str(candidate.run_id) if candidate.run_id else None,
             "artifact_id": str(candidate.artifact_id),
             "candidate_type": candidate.type,
             "promotion_decision": "accepted",
@@ -349,7 +350,7 @@ class PromotionService:
         logger.info(json.dumps({
             "event": "candidate_promotion_decision",
             "workspace_id": str(workspace_id),
-            "run_id": str(candidate.run_id),
+            "run_id": str(candidate.run_id) if candidate.run_id else None,
             "artifact_id": str(candidate.artifact_id),
             "candidate_type": candidate.type,
             "promotion_decision": "rejected",
@@ -439,7 +440,7 @@ class PromotionService:
                 "event_type": event_type,
                 "workspace_id": str(workspace_id),
                 "artifact_id": str(candidate.artifact_id),
-                "run_id": str(candidate.run_id),
+                "run_id": str(candidate.run_id) if candidate.run_id else None,
                 "candidate_type": candidate.type,
                 "promotion_status": candidate.promotion_status,
                 "promoted_target_type": candidate.promoted_target_type,

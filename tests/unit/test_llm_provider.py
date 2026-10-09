@@ -71,5 +71,5 @@ async def test_odr_engine_run_does_not_modify_environment():
         session_maker.return_value.__aenter__.return_value = AsyncMock()
         events = [e async for e in engine.astream_events(run_id=uuid4(), workspace_id=uuid4(), objective="x")]
 
-    assert events[-1]["status"] == "final_report"
+    assert events[-1]["status"] == "turn_response"
     assert dict(os.environ) == before

@@ -511,7 +511,7 @@ async def chat_ground_mode(
     )
 
 from datetime import datetime, timezone
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from app.models.research import ResearchArtifact, ResearchRun
 from app.models.scratchpad import ScratchpadEntry
 
@@ -542,9 +542,9 @@ async def create_workspace_commit(
     try:
         artifact_stmt = (
             select(ResearchArtifact.artifact_id)
-            .join(ResearchRun, ResearchArtifact.run_id == ResearchRun.run_id)
+            .outerjoin(ResearchRun, ResearchArtifact.run_id == ResearchRun.run_id)
             .where(
-                ResearchRun.workspace_id == workspace_id,
+                or_(ResearchRun.workspace_id == workspace_id, ResearchArtifact.workspace_id == workspace_id),
                 ResearchArtifact.promotion_status == "accepted"
             )
         )

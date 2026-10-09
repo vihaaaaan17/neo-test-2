@@ -1,7 +1,8 @@
 """
 The worker is the only owner of terminal run state and terminal events (Chapter 5, Phase 1):
-  * engines yield progress + one `final_report`; failures are raised;
-  * `completed` requires a final report, otherwise `failed` / engine_finished_without_report;
+  * engines yield progress + one `turn_response`; failures are raised;
+  * `completed` requires an answer, otherwise `failed` / engine_finished_without_response;
+  * an ordinary turn creates no ResearchReport and no promotion candidate (Chapter 6);
   * budget exhaustion -> partial, other exceptions -> failed, cancellation -> cancelled (with finalization);
   * exactly one terminal event is published, and an already-terminal run (API cancelled it) is a no-op.
 """
@@ -59,11 +60,9 @@ class _Harness:
         ctx = {"job_id": "job", "redis": self.redis, "llm_call": AsyncMock(return_value="mock")}
 
         with patch("app.workers.tasks.async_session_maker") as session_cls, \
-             patch("app.integrations.research_engine.factory.ResearchEngineFactory.get_engine", return_value=engine), \
+             patch("app.workers.tasks.build_research_engine", return_value=engine), \
              patch("app.services.research.lifecycle.ResearchLifecycleService") as lifecycle_cls, \
-             patch("app.services.research.service.ResearchService.finalize_report", new_callable=AsyncMock) as finalize, \
              patch("app.repositories.research.ResearchRepository") as repo_cls:
-            self.finalize = finalize
             self.lifecycle = lifecycle_cls.return_value
             self.lifecycle.transition_run = AsyncMock(side_effect=transition_side_effect)
 
@@ -71,6 +70,10 @@ class _Harness:
             repo.get_run = AsyncMock(return_value=mock_run)
             repo.list_candidates_by_status = AsyncMock(return_value=[])
             repo.list_evidence_for_run = AsyncMock(return_value=[])
+            repo.create_report = AsyncMock()
+            repo.create_artifact = AsyncMock()
+            self.finalize = repo.create_report  # must never be called for an ordinary turn
+            self.create_artifact = repo.create_artifact
 
             session = AsyncMock()
             session_cls.return_value.__aenter__.return_value = session
@@ -91,27 +94,27 @@ class _Harness:
 
 
 @pytest.mark.asyncio
-async def test_completed_requires_final_report_and_persists_via_service():
+async def test_completed_requires_an_answer_and_creates_no_report_or_candidate():
     h = _Harness()
 
     async def stream(*args, **kwargs):
         yield {"status": "planning", "message": "p"}
-        yield {"status": "final_report", "report": "The report"}
+        yield {"status": "turn_response", "text": "The report"}
 
     result = await h.run(stream)
 
     assert result["status"] == "completed"
-    h.finalize.assert_awaited_once()
-    assert h.finalize.await_args.kwargs["report"] == "The report"
+    h.finalize.assert_not_awaited()
+    h.create_artifact.assert_not_awaited()
     assert h.final_transition().args[2] == "completed"
     terminals = h.terminal_events()
     assert [t["status"] for t in terminals] == ["completed"]  # exactly one terminal event
-    # The report travels as data: it is never republished as a progress event.
-    assert all("report" not in json.loads(c.args[1]) for c in h.redis.publish.await_args_list)
+    # The answer travels as data: it is never republished as a progress event.
+    assert all("text" not in json.loads(c.args[1]) for c in h.redis.publish.await_args_list)
 
 
 @pytest.mark.asyncio
-async def test_no_final_report_means_failed():
+async def test_no_answer_means_failed():
     h = _Harness()
 
     async def stream(*args, **kwargs):
@@ -123,7 +126,7 @@ async def test_no_final_report_means_failed():
     h.finalize.assert_not_awaited()
     last = h.final_transition()
     assert last.args[2] == "failed"
-    assert last.args[3] == {"reason": "engine_finished_without_report"}
+    assert last.args[3] == {"reason": "engine_finished_without_response"}
     assert [t["status"] for t in h.terminal_events()] == ["failed"]
 
 
@@ -166,7 +169,7 @@ async def test_engine_yielded_terminal_statuses_are_ignored_not_republished():
     async def stream(*args, **kwargs):
         yield {"status": "failed", "message": "legacy-style engine failure"}
         yield {"status": "cancelled", "message": "legacy-style cancel"}
-        yield {"status": "final_report", "report": "The report"}
+        yield {"status": "turn_response", "text": "The report"}
         yield {"status": "completed", "message": "legacy-style done"}
 
     result = await h.run(stream)
@@ -199,7 +202,7 @@ async def test_redis_cancel_signal_cancels_child_task_and_finalizes_as_cancelled
         except asyncio.CancelledError:
             engine_cancelled["flag"] = True
             raise
-        yield {"status": "final_report", "report": "never reached"}  # pragma: no cover
+        yield {"status": "turn_response", "text": "never reached"}  # pragma: no cover
 
     result = await asyncio.wait_for(h.run(stream), timeout=10)
 
@@ -217,7 +220,7 @@ async def test_already_terminal_run_is_a_noop_with_no_second_terminal_event():
     h = _Harness()
 
     async def stream(*args, **kwargs):
-        yield {"status": "final_report", "report": "The report"}
+        yield {"status": "turn_response", "text": "The report"}
 
     result = await h.run(
         stream,

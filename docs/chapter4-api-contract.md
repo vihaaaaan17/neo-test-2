@@ -288,12 +288,45 @@ For validation errors (HTTP 422 Unprocessable Entity):
     "source_scope": ["3fa85f64-5717-4562-b3fc-2c963f66afa6"],
     "selected_source_ids": ["3fa85f64-5717-4562-b3fc-2c963f66afa6"],
     "research_options": {
-      "engine": "open_deep_research",
-      "engine_revision": "v1.2",
-      "max_iterations": 3
+      "routing_mode": "auto",
+      "token_budget": 8000
     }
   }
   ```
+- **Research routing (Chapter 6, ADR 0007):** `research_options.routing_mode` is `"auto"` (default when no engine is given; the
+  EngineRouter chooses and may escalate once, sequentially) or `"explicit"` with `"engine"` one of `open_deep_research`, `storm`,
+  `gpt_researcher` (an `engine` without `routing_mode` means explicit). `"auto"` is not an engine name. Errors (422):
+  `unsupported_routing_mode`, `engine_not_allowed_with_auto_routing`, `unsupported_research_engine`. `token_budget` sizes the
+  research context; it is not an execution cap.
+- **Research completion payload (`turn.completed` / `done`):**
+  - The answer:
+    - `assistant_message`: the conversational answer;
+    - `answer_format`: `conversational` | `article`;
+    - `answer_details`: a longer upstream output such as STORM's full article, or null.
+  - Its evidence:
+    - `evidence`: a list of `{evidence_id, url, title, excerpt, retriever, provenance}`;
+    - `evidence_refs`.
+  - `timings`: `{queue_wait_ms, engine_ms, finalize_ms}`.
+  - `routing`:
+    - `mode`, `intent`, `intent_rule`, `preferred_engine`, `answered_by`, `answer_budget_profile`;
+    - `escalated`: bool; `escalation`: `{from, to, reason, diagnosis, executed, blocked?, specialist_failed?}`;
+    - `attempts[]`: engine, profile, trigger, reason, status, latency, tokens, cost, `usage_quality`, `timings`,
+      `engine_metrics`, `assessment`;
+    - `readiness[]`, `budget_enforced`, `budget_note`, `limits`, `timings`.
+  - No ResearchReport or promotion candidate is created for an ordinary turn.
+- **Ground completion payload (`done`) / turn `context_version.ground_evidence`:**
+  - `ground_evidence_refs` holds canonical source ids only (resolved).
+  - `evidence_details` / `ground_evidence.evidence` is a list of
+    `{source_id, title, document_ref, excerpt, page_number, upstream_ids, cited_inline, retrieved, resolution}`.
+  - `unresolved_citations` is a list of `{upstream_id, reason, source_id?}`.
+  - `provenance_status` is `full` | `partial` | `none`.
+- **Ground errors:**
+  - an invalid or foreign `source_scope` / `selected_source_ids` returns `400` *before* a turn is created;
+  - an answer whose citations all fail to resolve returns `422 ground_provenance_failure` (the turn is closed as failed);
+  - `409 conversation_turn_in_progress` only for a turn that may still be executing.
+- **Explicit study report:** a turn whose message explicitly asks to compile the session (e.g. "Compile everything we've discussed
+  into a research paper") is answered by the StudyReportCompiler instead of a research engine: `research_run_id` is null,
+  `assistant_message` is the paper, `context_version.study_report = {report_id, candidate_id}`.
 - **Responses:**
   - **Ground Turn (Non-streaming):** `200 OK` returning `TurnResponse`
   - **Research Turn (Non-streaming):** `202 Accepted` returning `TurnResponse` (with `status: "running"` and `research_run_id`)
@@ -584,3 +617,15 @@ All legacy Chapter 3 / early Chapter 4 routes are preserved as backward-compatib
 - **Query Parameters:** `status` (optional, e.g. `pending_review`), `limit`, `offset`
 - **Response Body:** `List[PromotionCandidateResponse]`
 
+
+### Study-session reports (Chapter 6)
+- **`POST /api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/study-report`**: body `{"request": "<optional instruction>"}`.
+  Compiles the conversation (completed turns, Ground-cited workspace sources with passages, the conversation's research evidence,
+  scratchpad notes) into a cited paper with one LLM call; runs no research. Returns `{report_id, candidate_id, content, cited[],
+  warnings[], limitations, source_summary}`. Persists `research_reports` (`scope = "study_session"`, `run_id = null`) and one
+  `pending_review` memory candidate. `422 study_session_empty` when the conversation has no completed turns.
+- **`GET /api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/study-reports`**: `{"items": [...]}` newest first.
+- **`GET /api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/study-reports/{report_id}`**: one report (`version`,
+  `content`, `citations` (incl. `claims` validation counts), `source_summary`, `warnings`, `limitations`). 404 for other users.
+- Compile responses also carry `version`, `claims` and `structured`. Each recompile creates a new version
+  (`source_summary.previous_report_id`). Authorization (workspace + owner) is enforced inside the compiler service.

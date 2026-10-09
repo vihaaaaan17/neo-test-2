@@ -65,6 +65,18 @@ async def test_env(db_session: AsyncSession):
         status="active"
     )
     db_session.add(conv_a)
+    # A canonical source projected to Open Notebook: Ground evidence must resolve to a real Source of this workspace.
+    from app.models.source import Source, SourceSnapshot
+    from app.models.open_notebook_binding import OpenNotebookSourceBinding
+    src = Source(workspace_id=ws_a.workspace_id, owner_id=user_a, processing_status="completed")
+    db_session.add(src)
+    await db_session.flush()
+    snap = SourceSnapshot(source_id=src.source_id, file_uri="s3://x", filename="spec.pdf", size=1, checksum_sha256="0")
+    db_session.add(snap)
+    await db_session.flush()
+    on_id = f"source:{uuid.uuid4().hex[:20]}"
+    db_session.add(OpenNotebookSourceBinding(source_id=src.source_id, snapshot_id=snap.snapshot_id, checksum_sha256="0",
+                                             open_notebook_source_id=on_id, projection_status="ACTIVE"))
 
     await db_session.commit()
     await db_session.refresh(conv_a)
@@ -75,6 +87,8 @@ async def test_env(db_session: AsyncSession):
         "ws_a": ws_a,
         "ws_b": ws_b,
         "conv_a": conv_a,
+        "on_id": on_id,
+        "source_id": src.source_id,
     }
 
 
@@ -207,7 +221,7 @@ async def test_ground_turn_sse_streaming(test_env, db_session: AsyncSession):
         yield {"event": "strategy", "data": {"reasoning": "analyzing sources...", "searches": ["specs"]}}
         yield {"event": "token", "data": {"token": "The "}}
         yield {"event": "token", "data": {"token": "architecture "}}
-        yield {"event": "token", "data": {"token": "is sound."}}
+        yield {"event": "token", "data": {"token": f"is sound [{test_env['on_id']}]."}}
         yield {"event": "citation", "data": {"evidence": [{"source_id": evidence_id, "title": "Spec"}]}}
         yield {"event": "done", "data": {"answer": "The architecture is sound.", "evidence": [{"source_id": evidence_id}]}}
 
@@ -238,7 +252,8 @@ async def test_ground_turn_sse_streaming(test_env, db_session: AsyncSession):
                 # Verify terminal done payload
                 done_event = next(e for e in events if e["event"] == "done")
                 assert done_event["data"]["status"] == "completed"
-                assert "The architecture is sound." in done_event["data"]["assistant_message"]
+                assert "The architecture is sound" in done_event["data"]["assistant_message"]
+                assert done_event["data"]["ground_evidence_refs"] == [str(test_env["source_id"])]
 
                 # Verify DB persistence
                 repo = ChatEventRepository(db_session)
@@ -343,7 +358,7 @@ async def test_client_disconnect_does_not_abort_turn(test_env, db_session: Async
     async def slow_stream(session_id, notebook_id, message, context_config=None):
         yield {"event": "token", "data": {"token": "Part 1 "}}
         await asyncio.sleep(0.15)
-        yield {"event": "token", "data": {"token": "Part 2."}}
+        yield {"event": "token", "data": {"token": f"Part 2 [{test_env['on_id']}]."}}
         yield {"event": "done", "data": {"answer": "Part 1 Part 2.", "evidence": []}}
 
     try:
@@ -373,7 +388,8 @@ async def test_client_disconnect_does_not_abort_turn(test_env, db_session: Async
                 turn_data = turns_resp.json()["turns"][0]
 
                 assert turn_data["status"] == "completed"
-                assert "Part 1 Part 2." in turn_data["assistant_message"]
+                assert "Part 1 Part 2" in turn_data["assistant_message"]
+                assert turn_data["ground_evidence_refs"] == [str(test_env["source_id"])]
     finally:
         app.dependency_overrides.pop(get_current_user, None)
         app.dependency_overrides.pop(get_arq_redis, None)

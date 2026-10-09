@@ -22,7 +22,7 @@ class MockODREngine(ResearchEngine):
 
         # New contract: the engine hands the report to the worker as data; the worker persists it.
         yield {"status": "synthesizing", "message": "done"}
-        yield {"status": "final_report", "report": "Mock final report"}
+        yield {"status": "turn_response", "text": "Mock final report"}
 
     async def cancel(self) -> None:
         pass
@@ -37,7 +37,7 @@ def mock_engine_factory(monkeypatch):
 async def test_phase3_end_to_end_flow(mock_engine_factory, db_session: AsyncSession):
     """
     Tests the End-to-End flow of Phase 3 Research Engine.
-    Worker -> ODR Adapter (Mock) -> Postgres -> Memory Promotion.
+    Worker -> EngineRouter -> ODR Adapter (Mock) -> Postgres; no automatic report, candidate or promotion.
     """
     # 1. Setup Data
     workspace_id = uuid.uuid4()
@@ -48,7 +48,7 @@ async def test_phase3_end_to_end_flow(mock_engine_factory, db_session: AsyncSess
     db_session.add(workspace)
     await db_session.flush()
     
-    run = ResearchRun(run_id=run_id, workspace_id=workspace_id, owner_id=owner_id, objective="Test Objective", engine="odr", status="pending")
+    run = ResearchRun(run_id=run_id, workspace_id=workspace_id, owner_id=owner_id, objective="Test Objective", engine="open_deep_research", status="pending")
     db_session.add(run)
     await db_session.commit()
     
@@ -68,33 +68,21 @@ async def test_phase3_end_to_end_flow(mock_engine_factory, db_session: AsyncSess
     await db_session.refresh(run)
     assert run.status == "completed", "ResearchRun should be transitioned to completed by the worker task"
     
-    # Check artifacts and reports
+    # Chapter 6: an ordinary research turn creates no ResearchReport and no promotion candidate...
     report_result = await db_session.execute(select(ResearchReport).where(ResearchReport.run_id == run_id))
-    report = report_result.scalar_one_or_none()
-    assert report is not None
-    assert report.content == "Mock final report"
-    
+    assert report_result.scalars().all() == []
     artifact_result = await db_session.execute(select(ResearchArtifact).where(ResearchArtifact.run_id == run_id))
-    artifacts = artifact_result.scalars().all()
-    assert len(artifacts) == 1
-    assert artifacts[0].type == "memory_candidate"
-    
-    # Check memory promotion via Promotion Service
-    from app.services.research.service import ResearchService
-    from app.services.memory_router import MemoryRouter
-    from app.repositories.knowledge import KnowledgeRepository
+    assert artifact_result.scalars().all() == []
 
-    research_svc = ResearchService(
-        research_repo=ResearchRepository(db_session),
-        memory_router=MemoryRouter(repository=KnowledgeRepository(db_session)),
-        graph_repo=None
-    )
-    promoted = await research_svc.promote_memory_candidates(workspace_id=workspace_id, run_id=run_id, owner_id=owner_id)
-    assert promoted >= 1
+    # ...and the router recorded exactly one attempt, by the explicitly requested engine.
+    from app.models.research import ResearchEngineAttempt
+    attempts = (await db_session.execute(
+        select(ResearchEngineAttempt).where(ResearchEngineAttempt.run_id == run_id)
+    )).scalars().all()
+    assert [(a.engine, a.trigger, a.status) for a in attempts] == [("open_deep_research", "explicit", "answered")]
+    await db_session.refresh(run)
+    assert run.current_attempt_id == attempts[0].attempt_id
 
+    # Nothing reached knowledge memory.
     mem_result = await db_session.execute(select(KnowledgeMemory).where(KnowledgeMemory.workspace_id == workspace_id))
-    memories = mem_result.scalars().all()
-    assert len(memories) >= 1
-    
-    memory = memories[-1]
-    assert memory.domain == "deep_research"
+    assert mem_result.scalars().all() == []

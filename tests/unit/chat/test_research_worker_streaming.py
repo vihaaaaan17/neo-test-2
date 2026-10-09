@@ -177,7 +177,7 @@ async def test_worker_persists_structured_scratchpad_and_publishes_event():
                 "metadata": {"source": "engine"}
             }
         }
-        yield {"status": "final_report", "report": "Report body"}
+        yield {"status": "turn_response", "text": "Report body"}
 
     mock_engine = MagicMock()
     mock_engine.astream_events = mock_stream_events
@@ -191,7 +191,7 @@ async def test_worker_persists_structured_scratchpad_and_publishes_event():
     mock_sp_entry.metadata_ = {"source": "engine"}
 
     with patch("app.workers.tasks.async_session_maker") as mock_session_cls, \
-         patch("app.integrations.research_engine.factory.ResearchEngineFactory.get_engine", return_value=mock_engine), \
+         patch("app.workers.tasks.build_research_engine", return_value=mock_engine), \
          patch("app.repositories.scratchpad.ScratchpadRepository") as mock_sp_repo_cls, \
          patch("app.services.research.lifecycle.ResearchLifecycleService") as mock_lifecycle_cls, \
          patch("app.services.research.service.ResearchService") as mock_res_service_cls:
@@ -290,13 +290,13 @@ async def test_worker_rejects_raw_chain_of_thought_scratchpad():
                 "content": "<thought>I will now query Google for YBCO data and see what comes back</thought>"
             }
         }
-        yield {"status": "final_report", "report": "Report body"}
+        yield {"status": "turn_response", "text": "Report body"}
 
     mock_engine = MagicMock()
     mock_engine.astream_events = mock_cot_stream
 
     with patch("app.workers.tasks.async_session_maker") as mock_session_cls, \
-         patch("app.integrations.research_engine.factory.ResearchEngineFactory.get_engine", return_value=mock_engine), \
+         patch("app.workers.tasks.build_research_engine", return_value=mock_engine), \
          patch("app.repositories.scratchpad.ScratchpadRepository") as mock_sp_repo_cls, \
          patch("app.services.research.lifecycle.ResearchLifecycleService") as mock_lifecycle_cls, \
          patch("app.services.research.service.ResearchService") as mock_res_service_cls:

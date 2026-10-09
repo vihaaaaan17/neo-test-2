@@ -53,6 +53,34 @@ class Settings(BaseSettings):
 
     # STORM runs in an isolated environment (knowledge-storm's dependency pins conflict with the app's)
     STORM_PYTHON: str | None = None  # interpreter of the isolated STORM env; default: <repo>/venv-storm
+
+    # Engine routing (app/integrations/research_engine/router.py). See docs/engine-readiness.md.
+    # Specialist auto-routing gates: "auto" = eligible whenever the engine's runtime prerequisites pass (default);
+    # "off" = never chosen automatically (explicit overrides still work). Production-capacity approval is separate.
+    ROUTER_AUTO_STORM: str = "auto"
+    ROUTER_AUTO_GPT_RESEARCHER: str = "auto"
+    # Conservative concurrency: specialist attempts running at once across the deployment (Redis-backed slots).
+    ROUTER_MAX_CONCURRENT_STORM: int = 1
+    ROUTER_MAX_CONCURRENT_GPT_RESEARCHER: int = 2
+    ROUTER_MAX_SPECIALIST_ESCALATIONS: int = 1  # per Research turn; 0 disables escalation
+    ROUTER_TURN_TOKEN_CEILING: int = 1_200_000  # measured tokens across ALL attempts of one turn
+    # Timeout hierarchy (see effective_turn_deadline_s and docs/engine-readiness.md):
+    #   ARQ_JOB_TIMEOUT_S (ARQ kills the job)  >  router turn deadline + ROUTER_FINALIZE_MARGIN_S (persist, clean up,
+    #   emit the single terminal event)  >  each engine attempt (capped by the remaining turn deadline).
+    ARQ_JOB_TIMEOUT_S: int = 1800
+    ROUTER_FINALIZE_MARGIN_S: int = 180
+    ROUTER_TURN_DEADLINE_S: int = 1500  # clipped at runtime to ARQ_JOB_TIMEOUT_S - ROUTER_FINALIZE_MARGIN_S
+    ROUTER_MIN_SPECIALIST_TIME_S: int = 180  # do not start a specialist with less time than this left
+    ROUTER_TIMEOUT_ODR_S: int = 600
+    ROUTER_TIMEOUT_STORM_S: int = 900
+    ROUTER_TIMEOUT_GPT_RESEARCHER_S: int = 900
+    # Upstream-native budget profiles for the specialists (see their adapters): "bounded" or "standard".
+    ROUTER_STORM_PROFILE: str = "bounded"
+    ROUTER_GPT_RESEARCHER_PROFILE: str = "bounded"
+    # A run still pending/running after this long cannot be executing (> deadline + ARQ job timeout); it is finalized.
+    RESEARCH_STALE_RUN_AFTER_S: int = 7200
+    # A Ground turn still running after this long cannot be executing (Open Notebook calls time out far earlier).
+    GROUND_TURN_STALE_AFTER_S: int = 600
     # Checkpointer Settings
     ASYNC_POSTGRES_SAVER_ENABLED: bool = False
     POSTGRES_DSN: str = "postgresql+asyncpg://user:password@localhost:5432/dbname"
@@ -150,3 +178,14 @@ if _provider.name == "nvidia":
 
 if settings.TAVILY_API_KEY:
     os.environ["TAVILY_API_KEY"] = settings.TAVILY_API_KEY
+
+
+def effective_turn_deadline_s(cfg=None) -> float:
+    """
+    The research turn deadline actually used by the router: the configured ROUTER_TURN_DEADLINE_S, but never closer to
+    the ARQ job timeout than ROUTER_FINALIZE_MARGIN_S - so ARQ can never kill a job before the worker has persisted the
+    outcome and emitted the terminal event.
+    """
+    cfg = cfg or settings
+    ceiling = int(cfg.ARQ_JOB_TIMEOUT_S) - int(cfg.ROUTER_FINALIZE_MARGIN_S)
+    return float(max(60, min(int(cfg.ROUTER_TURN_DEADLINE_S), ceiling)))

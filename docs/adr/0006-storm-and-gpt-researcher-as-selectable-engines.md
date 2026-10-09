@@ -2,8 +2,10 @@
 
 ## Status
 
-Accepted (2026-10-08). Supersedes [ADR 0002](0002-storm-formal-deferral.md) (the STORM deferral) and completes the engine
-set started in [ADR 0005](0005-odr-only-research-runtime.md).
+Accepted (2026-10-08) for **explicit** selection. Supersedes [ADR 0002](0002-storm-formal-deferral.md)'s deferral of STORM as a
+selectable engine and completes the engine set started in [ADR 0005](0005-odr-only-research-runtime.md). ADR 0002's load-testing condition is
+the separate *production workload* state. Automatic routing is governed by [ADR 0007](0007-conversational-turns-and-engine-routing.md):
+per-specialist readiness gates (default `auto`), bounded upstream profiles, a shared turn budget and concurrency slots.
 
 ## Context
 

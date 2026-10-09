@@ -88,8 +88,9 @@ async def test_ground_engine_unary_run_success():
     engine.client.search = AsyncMock(return_value=[{"id": "upstream-source-1"}])
     engine.client.ask_simple = AsyncMock(return_value={"answer": "Photosynthesis is the process..."})
 
-    with patch("app.integrations.open_notebook.ground_engine.map_citations", new_callable=AsyncMock) as mock_map:
-        mock_map.return_value = ([canonical_source_id], False)
+    # Citation resolution (upstream id -> canonical Source of this workspace) is resolve_ground_evidence's job.
+    with patch("app.integrations.open_notebook.ground_engine.resolve_ground_evidence", new_callable=AsyncMock) as mock_map:
+        mock_map.return_value = {"source_ids": [canonical_source_id], "evidence": [{"source_id": str(canonical_source_id), "title": "doc.pdf", "resolution": "resolved"}], "unresolved": [], "provenance_status": "full"}
 
         result = await engine.run(
             workspace_id=workspace_id,
@@ -101,6 +102,8 @@ async def test_ground_engine_unary_run_success():
         assert result["answer"] == "Photosynthesis is the process..."
         assert result["evidence"] == [canonical_source_id]
         assert result["provenance_status"] == "full"
+        assert result["evidence_details"][0]["title"] == "doc.pdf"
+        assert mock_map.await_args.kwargs["answer"] == "Photosynthesis is the process..."
 
 
 @pytest.mark.asyncio
@@ -144,8 +147,8 @@ async def test_ground_engine_astream_success():
 
     engine.client.chat_stream = mock_chat_stream
 
-    with patch("app.integrations.open_notebook.ground_engine.map_citations", new_callable=AsyncMock) as mock_map:
-        mock_map.return_value = ([canonical_source_id], False)
+    with patch("app.integrations.open_notebook.ground_engine.resolve_ground_evidence", new_callable=AsyncMock) as mock_map:
+        mock_map.return_value = {"source_ids": [canonical_source_id], "evidence": [{"source_id": str(canonical_source_id), "title": "doc.pdf", "resolution": "resolved"}], "unresolved": [], "provenance_status": "full"}
 
         events = []
         async for chunk in engine.astream(
@@ -157,9 +160,10 @@ async def test_ground_engine_astream_success():
             events.append(chunk)
 
         # Check citation event
-        assert events[0]["type"] == "citation"
-        assert events[0]["evidence"] == [canonical_source_id]
-        assert events[0]["provenance_status"] == "full"
+        # Citations are resolved once the full answer is known, so the citation event follows the tokens.
+        citation = next(e for e in events if e["type"] == "citation")
+        assert citation["evidence"] == [canonical_source_id] and citation["provenance_status"] == "full"
+        assert mock_map.await_args.kwargs["answer"] == "Paris is France."
 
         # Check token events
         token_contents = [e["content"] for e in events if e["type"] == "token"]

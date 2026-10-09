@@ -125,10 +125,18 @@ async def build_ground_context(
         )
         meta_res = await session.execute(meta_stmt)
         sources = meta_res.scalars().all()
+        # Sources have no title column; the uploaded file name (latest snapshot) is their title.
+        from app.models.source import SourceSnapshot
+        snap_rows = (await session.execute(
+            select(SourceSnapshot.source_id, SourceSnapshot.filename)
+            .where(SourceSnapshot.source_id.in_([s.source_id for s in sources]))
+            .order_by(SourceSnapshot.created_at)
+        )).all() if sources else []
+        filenames = {sid: name for sid, name in snap_rows}
         for src in sources:
             source_meta.append({
                 "source_id": str(src.source_id),
-                "title": src.title,
+                "title": filenames.get(src.source_id),
                 "created_at": src.created_at.isoformat() if src.created_at else None
             })
 

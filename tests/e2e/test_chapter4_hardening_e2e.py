@@ -82,14 +82,16 @@ async def test_e2e_ground_source_containment():
     turns_res.scalars.return_value.all.return_value = []
 
     # Source metadata query
-    meta_src = MagicMock()
+    meta_src = MagicMock(spec=["source_id", "created_at"])  # the real Source model has no title column
     meta_src.source_id = valid_source_id
-    meta_src.title = "Physics_Handbook_Vol_1.pdf"
     meta_src.created_at = datetime.now(timezone.utc)
     meta_res = MagicMock()
     meta_res.scalars.return_value.all.return_value = [meta_src]
+    # The title comes from the source's latest snapshot file name.
+    snap_res = MagicMock()
+    snap_res.all.return_value = [(valid_source_id, "Physics_Handbook_Vol_1.pdf")]
 
-    mock_db.execute = AsyncMock(side_effect=[src_res, ws_b_res, conv_b_res, turns_res, meta_res])
+    mock_db.execute = AsyncMock(side_effect=[src_res, ws_b_res, conv_b_res, turns_res, meta_res, snap_res])
 
     # Build ground context with source scope
     ground_ctx = await build_ground_context(
@@ -193,7 +195,7 @@ async def test_e2e_timeline_epoch_fence_worker_abort():
     mock_engine.astream_events = mock_stream_events
 
     with patch("app.workers.tasks.async_session_maker") as mock_session_cls, \
-         patch("app.integrations.research_engine.factory.ResearchEngineFactory.get_engine", return_value=mock_engine), \
+         patch("app.workers.tasks.build_research_engine", return_value=mock_engine), \
          patch("app.services.research.lifecycle.ResearchLifecycleService") as mock_lifecycle_cls, \
          patch("app.repositories.research.ResearchRepository") as mock_res_repo_cls, \
          patch("app.repositories.conversation.ConversationRepository") as mock_conv_repo_cls, \

@@ -2,10 +2,29 @@ import logging
 from typing import AsyncGenerator, Any, Optional
 from uuid import UUID
 
-from app.integrations.research_engine.engine import ResearchEngine
+from app.integrations.research_engine.engine import CONVERSATIONAL_STYLE, ResearchEngine, turn_response
 from app.services.research.context import format_research_context
 
 logger = logging.getLogger(__name__)
+
+# Budget profiles expressed only through ODR's own configuration knobs plus the UsageTracker caps the adapter already
+# enforces mid-run (ResearchBudgetExceeded). "balanced" is the previous fixed configuration.
+# The *_model_max_tokens values are ODR's own per-call output caps (configuration.py; upstream defaults 10000/8192/10000).
+# Live measurement (2026-10-10): with the upstream default, ODR's single final-answer call for "Who wrote Dune?" produced
+# ~4.5k tokens and took 223 s on the free gateway - the cap bounds the dominant latency of conversational turns.
+ODR_BUDGET_PROFILES: dict[str, dict[str, int]] = {
+    "low": {"max_concurrent_research_units": 1, "max_researcher_iterations": 1, "max_react_tool_calls": 2,
+            "research_model_max_tokens": 3000, "compression_model_max_tokens": 2000, "final_report_model_max_tokens": 1200,
+            "max_model_calls": 30, "max_input_tokens": 200_000, "max_output_tokens": 30_000, "max_search_calls": 6},
+    "balanced": {"max_concurrent_research_units": 3, "max_researcher_iterations": 2, "max_react_tool_calls": 3,
+                 "research_model_max_tokens": 5000, "compression_model_max_tokens": 4000, "final_report_model_max_tokens": 2500,
+                 "max_model_calls": 100, "max_input_tokens": 1_000_000, "max_output_tokens": 200_000, "max_search_calls": 50},
+    "deep": {"max_concurrent_research_units": 4, "max_researcher_iterations": 3, "max_react_tool_calls": 5,
+             "research_model_max_tokens": 10000, "compression_model_max_tokens": 8192, "final_report_model_max_tokens": 10000,
+             "max_model_calls": 160, "max_input_tokens": 1_600_000, "max_output_tokens": 300_000, "max_search_calls": 80},
+}
+_ODR_NATIVE_KNOBS = ("max_concurrent_research_units", "max_researcher_iterations", "max_react_tool_calls",
+                     "research_model_max_tokens", "compression_model_max_tokens", "final_report_model_max_tokens")
 
 
 class OpenDeepResearchEngine(ResearchEngine):
@@ -14,13 +33,18 @@ class OpenDeepResearchEngine(ResearchEngine):
 
     Contract with the worker (the worker owns terminal state, persistence and finalization):
       * yields progress events (`starting`, `planning`, `executing`, `synthesizing`);
-      * yields exactly one `{"status": "final_report", "report": <markdown>}` when ODR produces its report;
+      * yields exactly one `turn_response` with ODR's final answer;
       * never yields terminal statuses and never persists reports/candidates - failures are raised
         (`ResearchBudgetExceeded`, `asyncio.CancelledError`, or any other exception).
     """
 
-    def __init__(self, redis_client: Any = None):
+    def __init__(self, redis_client: Any = None, budget_profile: str = "balanced", token_ceiling: Optional[int] = None):
         self.redis_client = redis_client
+        if budget_profile not in ODR_BUDGET_PROFILES:
+            raise ValueError(f"Unknown ODR budget profile: {budget_profile!r}")
+        self.budget_profile = budget_profile
+        # Remaining measured-token allowance of the whole turn (set by the router); caps the profile's own limits.
+        self.token_ceiling = token_ceiling
 
         # Compile graph lazily or here
         from app.integrations.research_engine.upstream.open_deep_research.deep_researcher import deep_researcher_builder
@@ -51,7 +75,7 @@ class OpenDeepResearchEngine(ResearchEngine):
         async_session_maker = None
         ResearchRepository = None
         try:
-            from app.integrations.research_engine.budget import UsageTracker, BudgetEnforcingCallbackHandler
+            from app.integrations.research_engine.budget import UsageTracker, BudgetEnforcingCallbackHandler, ModelTimingHandler
             from app.core.database import async_session_maker
             from app.repositories.research import ResearchRepository
 
@@ -67,6 +91,10 @@ class OpenDeepResearchEngine(ResearchEngine):
             context_block = format_research_context(research_context)
             if context_block:
                 objective_text = f"{context_block}\n\n=== OBJECTIVE ===\n{objective_text}"
+
+            # ODR's final-answer prompt takes the user's messages into account; the response-style instruction is
+            # passed there (input only - the vendored ODR prompts are not modified).
+            objective_text = f"{objective_text}\n\n{CONVERSATIONAL_STYLE}"
 
             initial_state = {
                 "messages": [{"role": "user", "content": objective_text}]
@@ -84,7 +112,22 @@ class OpenDeepResearchEngine(ResearchEngine):
 
             model_id = f"openai:{active_model}" if not active_model.startswith("openai:") else active_model
 
-            tracker = UsageTracker()
+            profile = ODR_BUDGET_PROFILES[self.budget_profile]
+            max_input = profile["max_input_tokens"]
+            max_output = profile["max_output_tokens"]
+            if self.token_ceiling is not None:
+                max_input = min(max_input, self.token_ceiling)
+                max_output = min(max_output, self.token_ceiling)
+            tracker = UsageTracker(
+                max_model_calls=profile["max_model_calls"],
+                max_input_tokens=max_input,
+                max_output_tokens=max_output,
+                max_search_calls=profile["max_search_calls"],
+            )
+            timing = ModelTimingHandler()
+            node_ms: dict[str, int] = {}
+            import time as _time
+            last_t = _time.monotonic()
             budget_callback = BudgetEnforcingCallbackHandler(tracker)
 
             # The config object maps to ODR's expected configuration
@@ -104,15 +147,13 @@ class OpenDeepResearchEngine(ResearchEngine):
                         "TAVILY_API_KEY": tavily_key,
                     },
                     "usage_tracker": tracker,  # Inject tracker for custom tools
-                    "max_concurrent_research_units": 3,
-                    "max_researcher_iterations": 2,
-                    "max_react_tool_calls": 3,
+                    **{knob: profile[knob] for knob in _ODR_NATIVE_KNOBS},
                 },
                 "metadata": {
                     "owner": str(workspace_id),
                     "run_id": str(run_id)
                 },
-                "callbacks": [budget_callback]
+                "callbacks": [budget_callback, timing]
             }
 
             import contextlib
@@ -129,6 +170,9 @@ class OpenDeepResearchEngine(ResearchEngine):
                 async for step in self.graph.astream(initial_state, config, stream_mode="updates"):
                     node_name = list(step.keys())[0]
                     state = step[node_name]
+                    now_t = _time.monotonic()
+                    node_ms[node_name] = node_ms.get(node_name, 0) + int((now_t - last_t) * 1000)
+                    last_t = now_t
 
                     # Periodic checkpointing of usage
                     async with async_session_maker() as session:
@@ -182,9 +226,22 @@ class OpenDeepResearchEngine(ResearchEngine):
                         }
                     elif node_name == "final_report_generation":
                         report = state.get("final_report", "")
-                        yield {"status": "synthesizing", "message": "Finalizing comprehensive report"}
-                        # Hand the report to the worker as data; the worker persists it and owns terminal state.
-                        yield {"status": "final_report", "report": report}
+                        yield {"status": "synthesizing", "message": "Writing the answer"}
+                        yield {
+                            "status": "metrics",
+                            "budget_profile": self.budget_profile,
+                            "node_ms": dict(node_ms),
+                            "search_calls": tracker.search_calls,
+                            "model_calls": tracker.model_calls,
+                            "input_tokens": tracker.input_tokens,
+                            "output_tokens": tracker.output_tokens,
+                            "limits": {"max_model_calls": tracker.max_model_calls, "max_input_tokens": tracker.max_input_tokens,
+                                       "max_output_tokens": tracker.max_output_tokens, "max_search_calls": tracker.max_search_calls,
+                                       **{knob: profile[knob] for knob in _ODR_NATIVE_KNOBS}},
+                            **timing.snapshot(),
+                        }
+                        # Hand the answer to the worker as data; the worker persists it and owns terminal state.
+                        yield turn_response(report)
 
         finally:
             # Final checkpoint of usage when execution ends (success, failure or cancellation)

@@ -111,7 +111,7 @@ async def test_worker_fence_blocks_stale_epoch_mutation():
     mock_engine.astream_events = mock_stream_events
 
     with patch("app.workers.tasks.async_session_maker") as mock_session_cls, \
-         patch("app.integrations.research_engine.factory.ResearchEngineFactory.get_engine", return_value=mock_engine), \
+         patch("app.workers.tasks.build_research_engine", return_value=mock_engine), \
          patch("app.services.research.lifecycle.ResearchLifecycleService") as mock_lifecycle_cls, \
          patch("app.repositories.research.ResearchRepository") as mock_res_repo_cls:
 

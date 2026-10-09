@@ -1,8 +1,8 @@
 """
 ODR adapter contract (Chapter 5, Phase 1):
-  * the adapter formats/prepends context and yields progress + exactly one `final_report` event;
+  * the adapter formats/prepends context and yields progress + exactly one `turn_response` event;
   * it never persists reports/candidates and never yields terminal statuses (failures are raised);
-  * persistence of the report + pending_review memory_candidate lives in ResearchService.finalize_report;
+  * ordinary turns persist no report or candidate (formal papers come only from StudyReportCompiler);
   * the worker resolves context/evidence and forwards them as plain data.
 """
 import asyncio
@@ -189,7 +189,7 @@ async def test_astream_events_prepends_research_context_and_prior_evidence():
 
 
 @pytest.mark.asyncio
-async def test_astream_events_yields_final_report_and_persists_nothing():
+async def test_astream_events_yields_turn_response_and_persists_nothing():
     report_text = "# Final Synthesis Report\nKey discovery: Topological insulator edge states."
 
     async def mock_astream(initial_state, config, stream_mode="updates"):
@@ -205,8 +205,8 @@ async def test_astream_events_yields_final_report_and_persists_nothing():
         events = [e async for e in engine.astream_events(run_id=uuid4(), workspace_id=uuid4(), objective="Objective")]
 
     statuses = [e["status"] for e in events]
-    assert statuses == ["starting", "synthesizing", "final_report"]
-    assert events[-1] == {"status": "final_report", "report": report_text}
+    assert statuses == ["starting", "synthesizing", "metrics", "turn_response"]
+    assert events[-1] == {"status": "turn_response", "text": report_text, "format": "conversational", "evidence_refs": []}
     assert "summary" not in events[1] and "final_graph" not in events[1]
     # The engine hands the report over as data; it must not write reports/candidates itself.
     repo.create_report.assert_not_called()
@@ -262,65 +262,6 @@ async def test_astream_events_propagates_cancellation():
 
 
 # --------------------------------------------------------------------------- #
-# ResearchService.finalize_report (engine-agnostic persistence)
-# --------------------------------------------------------------------------- #
-
-@pytest.mark.asyncio
-async def test_finalize_report_creates_report_and_pending_review_candidate_no_autopromotion():
-    workspace_id, run_id, evidence_id, turn_id = uuid4(), uuid4(), uuid4(), uuid4()
-
-    ev = MagicMock()
-    ev.evidence_id = evidence_id
-    run = MagicMock()
-    run.turn_id = turn_id
-    run.engine = "open_deep_research"
-
-    repo = AsyncMock()
-    repo.list_evidence_for_run.return_value = [ev]
-    repo.get_run.return_value = run
-
-    service = ResearchService(repo)
-    await service.finalize_report(workspace_id, run_id, "Objective", "# Report\nBody")
-
-    repo.create_report.assert_called_once_with(
-        workspace_id=workspace_id, run_id=run_id, objective="Objective", content="# Report\nBody"
-    )
-    repo.create_artifact.assert_called_once()
-    kwargs = repo.create_artifact.call_args.kwargs
-    assert kwargs["artifact_type"] == "memory_candidate"
-    assert kwargs["promotion_status"] == "pending_review"
-
-    payload = kwargs["payload"]
-    assert payload["candidate_type"] == "memory_candidate"
-    assert payload["text"] == "# Report\nBody"
-    assert payload["proposed_memory_type"] == "research_memory"
-    assert payload["provenance_version"] == "v2"
-    assert payload["evidence_refs"] == [str(evidence_id)]
-    assert {"ref_type": "research_evidence", "ref_id": str(evidence_id)} in payload["source_refs"]
-    turn_refs = [r for r in payload["source_refs"] if r["ref_type"] == "conversation_turn"]
-    assert [r["ref_id"] for r in turn_refs] == [str(turn_id)]
-    assert payload["metadata"]["source"] == "open_deep_research"
-    # No graph candidate: ODR does not produce a graph, and nothing is auto-promoted.
-    assert repo.create_artifact.call_count == 1
-
-
-@pytest.mark.asyncio
-async def test_finalize_report_without_turn_or_evidence():
-    repo = AsyncMock()
-    repo.list_evidence_for_run.return_value = []
-    run = MagicMock()
-    run.turn_id = None
-    run.engine = "open_deep_research"
-    repo.get_run.return_value = run
-
-    await ResearchService(repo).finalize_report(uuid4(), uuid4(), "Objective", "Report")
-
-    payload = repo.create_artifact.call_args.kwargs["payload"]
-    assert payload["evidence_refs"] == []
-    assert payload["source_refs"] == []
-
-
-# --------------------------------------------------------------------------- #
 # Worker forwards resolved context to the engine
 # --------------------------------------------------------------------------- #
 
@@ -352,7 +293,7 @@ async def test_worker_task_passes_research_context_to_engine():
 
     async def mock_stream_events(*args, **kwargs):
         received.append((kwargs.get("research_context"), kwargs.get("prior_evidence_context")))
-        yield {"status": "final_report", "report": "Report body"}
+        yield {"status": "turn_response", "text": "Report body"}
 
     mock_engine = MagicMock()
     mock_engine.astream_events = mock_stream_events
@@ -362,9 +303,8 @@ async def test_worker_task_passes_research_context_to_engine():
     prior.content = "prior finding"
 
     with patch("app.workers.tasks.async_session_maker") as mock_session_cls, \
-         patch("app.integrations.research_engine.factory.ResearchEngineFactory.get_engine", return_value=mock_engine), \
+         patch("app.workers.tasks.build_research_engine", return_value=mock_engine), \
          patch("app.services.research.lifecycle.ResearchLifecycleService") as mock_lifecycle_cls, \
-         patch("app.services.research.service.ResearchService.finalize_report", new_callable=AsyncMock) as mock_finalize, \
          patch("app.repositories.research.ResearchRepository") as mock_repo_cls:
 
         mock_lifecycle = mock_lifecycle_cls.return_value
@@ -395,9 +335,6 @@ async def test_worker_task_passes_research_context_to_engine():
         assert len(received) == 1
         assert received[0][0] == test_context
         assert "https://example.com/prior" in received[0][1]
-        mock_finalize.assert_awaited_once()
-        assert mock_finalize.await_args.kwargs["report"] == "Report body"
-        assert mock_finalize.await_args.kwargs["objective"] == "Forwarding test"
 
 
 @pytest.mark.asyncio
@@ -423,7 +360,7 @@ async def test_worker_loads_research_context_from_turn_when_not_supplied():
 
     async def mock_stream_events(*args, **kwargs):
         received.append(kwargs.get("research_context"))
-        yield {"status": "final_report", "report": "Report body"}
+        yield {"status": "turn_response", "text": "Report body"}
 
     mock_engine = MagicMock()
     mock_engine.astream_events = mock_stream_events
@@ -433,9 +370,8 @@ async def test_worker_loads_research_context_from_turn_when_not_supplied():
     mock_run.turn_id = turn_id
 
     with patch("app.workers.tasks.async_session_maker") as mock_session_cls, \
-         patch("app.integrations.research_engine.factory.ResearchEngineFactory.get_engine", return_value=mock_engine), \
+         patch("app.workers.tasks.build_research_engine", return_value=mock_engine), \
          patch("app.services.research.lifecycle.ResearchLifecycleService") as mock_lifecycle_cls, \
-         patch("app.services.research.service.ResearchService.finalize_report", new_callable=AsyncMock), \
          patch("app.repositories.research.ResearchRepository") as mock_repo_cls, \
          patch("app.workers.tasks._bridge_chat_event", new_callable=AsyncMock, create=True):
 

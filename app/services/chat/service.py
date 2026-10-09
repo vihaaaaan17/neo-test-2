@@ -44,6 +44,17 @@ from app.services.chat.events import (
 logger = logging.getLogger(__name__)
 
 
+def resolve_research_routing(research_options: Optional[Dict[str, Any]]) -> Tuple[str, Optional[str]]:
+    """
+    (routing_mode, engine) for a Research turn. `routing_mode` "auto" (the default) lets the EngineRouter choose;
+    naming an engine without a routing_mode means an explicit override. Validation happens at admission.
+    """
+    opts = research_options or {}
+    engine = opts.get("engine") or None
+    mode = opts.get("routing_mode") or ("explicit" if engine else "auto")
+    return mode, engine
+
+
 class ChatService:
     """
     Coordinates turn submission, mode dispatching (Ground vs Research),
@@ -125,6 +136,14 @@ class ChatService:
                 detail="Cannot submit turn to archived conversation"
             )
 
+        # 1b. Resolve the Ground source scope BEFORE a turn row exists: an invalid or foreign scope is a 400 that can
+        #     never leave a turn behind to lock the conversation. `selected_source_ids` is the documented alias.
+        if turn_create.mode == "ground":
+            requested_scope = turn_create.source_scope or turn_create.selected_source_ids
+            if requested_scope:
+                from app.services.chat.context import resolve_ground_source_scope
+                turn_create.source_scope = await resolve_ground_source_scope(self.db, workspace_id, requested_scope)
+
         # 2. Idempotency check via client_request_id
         if turn_create.client_request_id:
             existing = await self.conv_repo.get_turn_by_client_request_id(
@@ -144,10 +163,12 @@ class ChatService:
         if active_turn is not None:
             status_val = getattr(active_turn, "status", None)
             if isinstance(status_val, str) and status_val in ("pending", "running"):
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="conversation_turn_in_progress"
-                )
+                # Only a turn that provably cannot still be executing is recovered; a live one keeps the 409.
+                if not await self._recover_stale_active_turn(active_turn):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="conversation_turn_in_progress"
+                    )
 
         # 4. Monotonic sequence allocation under row-level lock (FOR UPDATE)
         sequence = await self.conv_repo.allocate_turn_sequence(conversation_id)
@@ -164,7 +185,12 @@ class ChatService:
             source_scope=turn_create.source_scope
         )
 
-        # 6. Dispatch by mode
+        # 6. An explicit request to compile the study session is handled by the StudyReportCompiler (either mode).
+        from app.services.research.study_report import is_study_report_request
+        if is_study_report_request(turn_create.message):
+            return await self._execute_study_report_turn(workspace, conversation, turn)
+
+        # 7. Dispatch by mode
         if turn_create.mode == "ground":
             return await self._execute_ground_turn(workspace, conversation, turn, stream=stream)
         elif turn_create.mode == "research":
@@ -223,6 +249,14 @@ class ChatService:
                 detail="Cannot submit turn to archived conversation"
             )
 
+        # 1b. Resolve the Ground source scope BEFORE a turn row exists: an invalid or foreign scope is a 400 that can
+        #     never leave a turn behind to lock the conversation. `selected_source_ids` is the documented alias.
+        if turn_create.mode == "ground":
+            requested_scope = turn_create.source_scope or turn_create.selected_source_ids
+            if requested_scope:
+                from app.services.chat.context import resolve_ground_source_scope
+                turn_create.source_scope = await resolve_ground_source_scope(self.db, workspace_id, requested_scope)
+
         # 2. Idempotency check via client_request_id
         if turn_create.client_request_id:
             existing = await self.conv_repo.get_turn_by_client_request_id(
@@ -238,10 +272,12 @@ class ChatService:
         if active_turn is not None:
             status_val = getattr(active_turn, "status", None)
             if isinstance(status_val, str) and status_val in ("pending", "running"):
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="conversation_turn_in_progress"
-                )
+                # Only a turn that provably cannot still be executing is recovered; a live one keeps the 409.
+                if not await self._recover_stale_active_turn(active_turn):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="conversation_turn_in_progress"
+                    )
 
         # 4. Monotonic sequence allocation under row-level lock (FOR UPDATE)
         sequence = await self.conv_repo.allocate_turn_sequence(conversation_id)
@@ -258,23 +294,28 @@ class ChatService:
             source_scope=turn_create.source_scope
         )
 
-        # 6. Dispatch background execution and return stream generator
+        # 6. An explicit request to compile the study session is handled by the StudyReportCompiler (either mode).
+        from app.services.research.study_report import is_study_report_request
+        if is_study_report_request(turn_create.message):
+            await self._execute_study_report_turn(workspace, conversation, turn, raise_on_error=False)
+            return self.stream_turn_events(turn.turn_id)
+
+        # 7. Dispatch background execution and return stream generator
         if turn_create.mode == "ground":
             bg_task = asyncio.create_task(
                 self._execute_ground_stream_background(
                     workspace_id=workspace.workspace_id,
                     conversation_id=conversation.conversation_id,
                     turn_id=turn.turn_id,
-                    user_message=turn_create.message
+                    user_message=turn_create.message,
+                    source_scope=turn_create.source_scope,
                 )
             )
             ChatService._running_tasks[turn.turn_id] = bg_task
             bg_task.add_done_callback(lambda t: ChatService._running_tasks.pop(turn.turn_id, None))
             return self.stream_turn_events(turn.turn_id)
         elif turn_create.mode == "research":
-            engine = workspace.research_engine or "open_deep_research"
-            if turn_create.research_options:
-                engine = turn_create.research_options.get("engine") or engine
+            routing_mode, engine = resolve_research_routing(turn_create.research_options)
             admission_controller = self.admission_controller or ResearchAdmissionController(
                 quota_service=ResearchQuotaService(self.research_repo),
                 rate_limiter=ProviderRateLimiter(self.arq_redis),
@@ -288,6 +329,7 @@ class ChatService:
                 owner_id=owner_id,
                 objective=turn_create.message,
                 engine=engine,
+                routing_mode=routing_mode,
                 conversation_id=conversation.conversation_id,
                 turn_id=turn.turn_id,
                 base_commit_id=base_commit
@@ -477,57 +519,73 @@ class ChatService:
         workspace_id: UUID,
         conversation_id: UUID,
         turn_id: UUID,
-        user_message: str
+        user_message: str,
+        source_scope: Optional[List[UUID]] = None,
     ):
         """
-        Executes Ground turn in background with independent DB session.
-        Delegates exclusively through OpenNotebookGroundEngine. Survives client disconnects.
+        Executes a Ground turn in the background with its own DB session (survives client disconnects).
+        Every exit path - success, upstream failure, unexpected data, cancellation - closes the turn exactly once
+        (compare-and-set on pending/running), so a failed turn can never leave the conversation locked.
         """
         async with async_session_maker() as session:
             event_repo = ChatEventRepository(session)
             event_service = ChatEventService(event_repo, self.arq_redis)
             conv_repo = ConversationRepository(session)
 
-            # Record running status event
-            await event_service.record_and_publish(
-                turn_id=turn_id,
-                event_type="status_change",
-                payload={"status": "running"}
-            )
-            await conv_repo.set_turn_status(
-                turn_id=turn_id,
-                status="running",
-                started_at=datetime.now(timezone.utc)
-            )
-
-            # Assemble Ground context adhering strictly to GroundContextPolicy
-            from app.services.chat.context import build_ground_context
-            ground_ctx = await build_ground_context(
-                session=session,
-                workspace_id=workspace_id,
-                conversation_id=conversation_id,
-                query=user_message,
-                explicit_scope=None
-            )
-
-            engine = self.ground_engine or OpenNotebookGroundEngine(
-                workspace_id=workspace_id,
-                client=self.open_notebook_client
-            )
-
-            full_answer: List[str] = []
-            evidence_refs: List[Any] = []
-            prov_status: str = "full"
+            async def close(status_value: str, error_code: str, message: str, extra_event: Optional[tuple] = None) -> bool:
+                try:
+                    await session.rollback()
+                except Exception:
+                    pass
+                closed = await conv_repo.set_turn_status(
+                    turn_id=turn_id, status=status_value, expected_statuses=["pending", "running"],
+                    error_code=error_code, error_message=(message or "")[:2000], completed_at=datetime.now(timezone.utc),
+                )
+                if closed:
+                    if extra_event:
+                        await event_service.record_and_publish(turn_id=turn_id, event_type=extra_event[0], payload=extra_event[1])
+                    await event_service.record_and_publish(
+                        turn_id=turn_id, event_type=EVENT_DONE, payload={"status": status_value, "error": message}
+                    )
+                return bool(closed)
 
             try:
+                await event_service.record_and_publish(turn_id=turn_id, event_type="status_change", payload={"status": "running"})
+                await conv_repo.set_turn_status(turn_id=turn_id, status="running", started_at=datetime.now(timezone.utc))
+
+                # Assemble Ground context adhering strictly to GroundContextPolicy (with the turn's validated scope).
+                from app.services.chat.context import build_ground_context
+                ground_ctx = await build_ground_context(
+                    session=session,
+                    workspace_id=workspace_id,
+                    conversation_id=conversation_id,
+                    query=user_message,
+                    explicit_scope=source_scope,
+                )
+
+                engine = self.ground_engine or OpenNotebookGroundEngine(
+                    workspace_id=workspace_id,
+                    client=self.open_notebook_client
+                )
+
+                full_answer: List[str] = []
+                evidence_refs: List[Any] = []
+                evidence_details: List[Any] = []
+                unresolved: List[Any] = []
+                prov_status: str = "none"
+
                 async for chunk in engine.astream(
                     workspace_id=workspace_id,
                     conversation_id=conversation_id,
                     turn_id=turn_id,
                     query=user_message,
                     db=session,
+                    source_scope=ground_ctx.source_scope,
                     ground_context=ground_ctx
                 ):
+                    if not isinstance(chunk, dict):
+                        logger.warning("Ignoring unexpected Ground stream chunk of type %s", type(chunk).__name__)
+                        continue
                     ev_type = chunk.get("event") or chunk.get("type") or "token"
                     ev_data = chunk.get("data") or {}
 
@@ -540,12 +598,14 @@ class ChatService:
                         await event_service.record_and_publish(turn_id, "strategy", ev_data)
                     elif ev_type == "citation":
                         evidence_refs = chunk.get("evidence") or ev_data.get("evidence") or []
-                        prov_status = chunk.get("provenance_status") or ev_data.get("provenance_status") or "full"
-                        formatted_ev = [e if isinstance(e, dict) else {"source_id": str(e)} for e in evidence_refs]
+                        evidence_details = chunk.get("evidence_details") or evidence_details
+                        unresolved = chunk.get("unresolved_citations") or unresolved
+                        prov_status = chunk.get("provenance_status") or ev_data.get("provenance_status") or prov_status
                         await event_service.record_and_publish(
                             turn_id,
                             "citation",
-                            {"evidence": formatted_ev, "provenance_status": prov_status}
+                            {"evidence": evidence_details or [e if isinstance(e, dict) else {"source_id": str(e)} for e in evidence_refs],
+                             "unresolved_citations": unresolved, "provenance_status": prov_status}
                         )
                     elif ev_type == "done":
                         if not full_answer:
@@ -554,13 +614,14 @@ class ChatService:
                                 full_answer.append(ans)
                         if not evidence_refs:
                             evidence_refs = chunk.get("evidence") or ev_data.get("evidence") or []
+                        evidence_details = chunk.get("evidence_details") or evidence_details
+                        unresolved = chunk.get("unresolved_citations") or unresolved
                         prov_status = chunk.get("provenance_status") or ev_data.get("provenance_status") or prov_status
 
                 final_answer_text = "".join(full_answer)
-                formatted_evidence_refs = [
-                    e if isinstance(e, dict) else str(e)
-                    for e in evidence_refs
-                ]
+                if not final_answer_text.strip():
+                    raise HTTPException(status_code=502, detail="ground_upstream_empty_answer")
+                formatted_evidence_refs = [e if isinstance(e, dict) else str(e) for e in evidence_refs]
 
                 completed_turn = await conv_repo.set_turn_status(
                     turn_id=turn_id,
@@ -568,7 +629,9 @@ class ChatService:
                     expected_statuses=["pending", "running"],
                     assistant_message=final_answer_text,
                     ground_evidence_refs=formatted_evidence_refs,
-                    context_version={"ground_context": ground_ctx.model_dump(mode="json")},
+                    context_version={"ground_context": ground_ctx.model_dump(mode="json"),
+                                     "ground_evidence": {"evidence": evidence_details, "unresolved_citations": unresolved,
+                                                         "provenance_status": prov_status}},
                     completed_at=datetime.now(timezone.utc)
                 )
                 if completed_turn:
@@ -579,55 +642,24 @@ class ChatService:
                             "status": "completed",
                             "assistant_message": final_answer_text,
                             "ground_evidence_refs": formatted_evidence_refs,
+                            "evidence_details": evidence_details,
+                            "unresolved_citations": unresolved,
                             "provenance_status": prov_status
                         }
                     )
             except asyncio.CancelledError:
                 logger.info("Ground turn %s execution was cancelled.", turn_id)
+                try:
+                    await asyncio.shield(close("cancelled", "turn_cancelled", "Ground turn cancelled",
+                                               (EVENT_TURN_CANCELLED, {"status": "cancelled"})))
+                except BaseException as close_err:
+                    logger.warning("Could not close cancelled Ground turn %s: %s", turn_id, close_err)
                 raise
             except HTTPException as e:
-                error_detail = str(e.detail)
-                failed_turn = await conv_repo.set_turn_status(
-                    turn_id=turn_id,
-                    status="failed",
-                    expected_statuses=["pending", "running"],
-                    error_code="upstream_ground_failure",
-                    error_message=error_detail,
-                    completed_at=datetime.now(timezone.utc)
-                )
-                if failed_turn:
-                    await event_service.record_and_publish(
-                        turn_id=turn_id,
-                        event_type=EVENT_ERROR,
-                        payload={"message": error_detail}
-                    )
-                    await event_service.record_and_publish(
-                        turn_id=turn_id,
-                        event_type=EVENT_DONE,
-                        payload={"status": "failed", "error": error_detail}
-                    )
+                await close("failed", "upstream_ground_failure", str(e.detail), (EVENT_ERROR, {"message": str(e.detail)}))
             except Exception as e:
                 logger.error(f"Background ground execution failed: {e}", exc_info=True)
-                error_detail = str(e)
-                failed_turn = await conv_repo.set_turn_status(
-                    turn_id=turn_id,
-                    status="failed",
-                    expected_statuses=["pending", "running"],
-                    error_code="ground_execution_error",
-                    error_message=error_detail,
-                    completed_at=datetime.now(timezone.utc)
-                )
-                if failed_turn:
-                    await event_service.record_and_publish(
-                        turn_id=turn_id,
-                        event_type=EVENT_ERROR,
-                        payload={"message": error_detail}
-                    )
-                    await event_service.record_and_publish(
-                        turn_id=turn_id,
-                        event_type=EVENT_DONE,
-                        payload={"status": "failed", "error": error_detail}
-                    )
+                await close("failed", "ground_execution_error", str(e), (EVENT_ERROR, {"message": str(e)}))
 
     async def _bridge_research_events_background(
         self,
@@ -641,7 +673,97 @@ class ChatService:
         """
         pass
 
+    async def _recover_stale_active_turn(self, turn: Any) -> bool:
+        """
+        Close an active turn that provably cannot still be executing, so a crashed request or worker cannot lock the
+        conversation forever. Live turns are never touched (the caller keeps returning 409 for them):
+          * Ground: no live task in this process and running longer than GROUND_TURN_STALE_AFTER_S (Ground calls are
+            bounded by the Open Notebook client timeouts, far below that);
+          * Research: its ResearchRun is already terminal (the worker died between run and turn finalization), or no run
+            was ever linked and the turn is older than GROUND_TURN_STALE_AFTER_S (admission crashed).
+        """
+        from app.core.config import settings
+
+        stale_after = int(getattr(settings, "GROUND_TURN_STALE_AFTER_S", 600))
+        now = datetime.now(timezone.utc)
+        mode = getattr(turn, "mode", None)
+        started = getattr(turn, "started_at", None) or getattr(turn, "created_at", None)
+        age = (now - started).total_seconds() if isinstance(started, datetime) else None
+        new_status, code = None, None
+        if mode == "ground":
+            task = ChatService._running_tasks.get(turn.turn_id)
+            if (task is None or task.done()) and age is not None and age > stale_after:
+                new_status, code = "failed", "stale_turn_recovered"
+        elif mode == "research":
+            run_id = getattr(turn, "research_run_id", None)
+            if run_id:
+                run = await self.research_repo.get_run(turn.workspace_id, run_id)
+                run_status = getattr(run, "status", None)
+                if run_status in ("completed", "failed", "partial", "cancelled", "aborted_by_timeline_fence"):
+                    new_status = {"aborted_by_timeline_fence": "cancelled", "completed": "failed"}.get(run_status, run_status)
+                    code = "turn_reconciled_from_run"
+            elif age is not None and age > stale_after:
+                new_status, code = "failed", "stale_turn_recovered"
+        if not new_status:
+            return False
+        closed = await self.conv_repo.set_turn_status(
+            turn_id=turn.turn_id, status=new_status, expected_statuses=["pending", "running"], error_code=code,
+            error_message=f"Recovered a turn that could no longer be executing ({code})", completed_at=now,
+        )
+        if closed:
+            logger.warning("Recovered stale %s turn %s -> %s (%s)", mode, turn.turn_id, new_status, code)
+            await self.event_service.record_and_publish(
+                turn_id=turn.turn_id, event_type=EVENT_DONE, payload={"status": new_status, "error": code}
+            )
+        return True
+
+    async def _close_open_turn(self, turn_id: UUID, exc: BaseException) -> None:
+        """Close a still-open turn after an unhandled failure or cancellation (no-op if it was already closed)."""
+        cancelled = isinstance(exc, asyncio.CancelledError)
+        status_value = "cancelled" if cancelled else "failed"
+        if cancelled:
+            code, message = "turn_cancelled", "Ground turn cancelled"
+        elif isinstance(exc, HTTPException):
+            code, message = "upstream_ground_failure", str(exc.detail)
+        else:
+            code, message = "ground_execution_error", str(exc)
+
+        async def _close():
+            try:
+                await self.db.rollback()
+            except Exception:
+                pass
+            closed = await self.conv_repo.set_turn_status(
+                turn_id=turn_id, status=status_value, expected_statuses=["pending", "running"], error_code=code,
+                error_message=message[:2000], completed_at=datetime.now(timezone.utc),
+            )
+            if closed:
+                if cancelled:
+                    await self.event_service.record_and_publish(turn_id=turn_id, event_type=EVENT_TURN_CANCELLED,
+                                                                payload={"status": "cancelled"})
+                await self.event_service.record_and_publish(turn_id=turn_id, event_type=EVENT_DONE,
+                                                            payload={"status": status_value, "error": message})
+
+        try:
+            await asyncio.shield(_close())
+        except BaseException as close_err:
+            logger.warning("Could not close turn %s after %s: %s", turn_id, type(exc).__name__, close_err)
+
     async def _execute_ground_turn(
+        self,
+        workspace: Any,
+        conversation: Conversation,
+        turn: ConversationTurn,
+        stream: bool = False
+    ) -> ConversationTurn:
+        """Runs a Ground turn; any failure or cancellation (incl. client disconnect) closes the turn exactly once."""
+        try:
+            return await self._execute_ground_turn_inner(workspace, conversation, turn, stream)
+        except BaseException as exc:
+            await self._close_open_turn(turn.turn_id, exc)
+            raise
+
+    async def _execute_ground_turn_inner(
         self,
         workspace: Any,
         conversation: Conversation,
@@ -665,13 +787,29 @@ class ChatService:
 
         # Assemble Ground context adhering strictly to GroundContextPolicy
         from app.services.chat.context import build_ground_context
-        ground_ctx = await build_ground_context(
-            session=self.db,
-            workspace_id=workspace.workspace_id,
-            conversation_id=conversation.conversation_id,
-            query=turn.user_message,
-            explicit_scope=turn.source_scope
-        )
+        try:
+            ground_ctx = await build_ground_context(
+                session=self.db,
+                workspace_id=workspace.workspace_id,
+                conversation_id=conversation.conversation_id,
+                query=turn.user_message,
+                explicit_scope=turn.source_scope
+            )
+        except HTTPException as scope_err:
+            # A rejected source scope (e.g. a source of another workspace) must close the turn, otherwise it stays
+            # 'running' and blocks the conversation with 409 conversation_turn_in_progress.
+            await self.conv_repo.set_turn_status(
+                turn_id=turn.turn_id,
+                status="failed",
+                expected_statuses=["pending", "running"],
+                error_code="invalid_source_scope",
+                error_message=str(scope_err.detail),
+                completed_at=datetime.now(timezone.utc)
+            )
+            await self.event_service.record_and_publish(
+                turn_id=turn.turn_id, event_type="done", payload={"status": "failed", "error": str(scope_err.detail)}
+            )
+            raise
 
         # 1. Check if custom ground_engine is injected or if Open Notebook is disabled
         from app.core.config import settings
@@ -701,6 +839,8 @@ class ChatService:
                 kwargs["ground_context"] = ground_ctx
 
             state = await engine_to_run.run(**kwargs)
+            if not isinstance(state, dict):
+                raise HTTPException(status_code=502, detail="ground_upstream_invalid_response")
 
             if not state.get("is_grounded", False):
                 await self.conv_repo.set_turn_status(
@@ -749,26 +889,32 @@ class ChatService:
                     event_type="citation",
                     payload={"evidence": formatted_evidence_refs, "provenance_status": prov_status}
                 )
-            await self.event_service.record_and_publish(
-                turn_id=turn.turn_id,
-                event_type="done",
-                payload={
-                    "status": "completed",
-                    "assistant_message": answer,
-                    "ground_evidence_refs": formatted_evidence_refs,
-                    "provenance_status": prov_status
-                }
-            )
-
+            evidence_details = state.get("evidence_details") or []
+            unresolved = state.get("unresolved_citations") or []
             completed_turn = await self.conv_repo.set_turn_status(
                 turn_id=turn.turn_id,
                 status="completed",
                 expected_statuses=["pending", "running"],
                 assistant_message=answer,
                 ground_evidence_refs=formatted_evidence_refs,
-                context_version={"ground_context": ground_ctx.model_dump(mode="json")},
+                context_version={"ground_context": ground_ctx.model_dump(mode="json"),
+                                 "ground_evidence": {"evidence": evidence_details, "unresolved_citations": unresolved,
+                                                     "provenance_status": prov_status}},
                 completed_at=datetime.now(timezone.utc)
             )
+            if completed_turn:
+                await self.event_service.record_and_publish(
+                    turn_id=turn.turn_id,
+                    event_type="done",
+                    payload={
+                        "status": "completed",
+                        "assistant_message": answer,
+                        "ground_evidence_refs": formatted_evidence_refs,
+                        "evidence_details": evidence_details,
+                        "unresolved_citations": unresolved,
+                        "provenance_status": prov_status
+                    }
+                )
             return completed_turn
         except HTTPException:
             raise
@@ -813,6 +959,55 @@ class ChatService:
         await self.db.commit()
         return new_session_id
 
+    async def _execute_study_report_turn(
+        self,
+        workspace: Any,
+        conversation: Conversation,
+        turn: ConversationTurn,
+        raise_on_error: bool = True,
+    ) -> Optional[ConversationTurn]:
+        """
+        Compile the conversation into a cited study-session paper (explicit request only). No research is run: the
+        compiler reads this conversation's turns, cited workspace sources, research evidence and scratchpad notes.
+        """
+        from app.schemas.chat import EVENT_TURN_COMPLETED, EVENT_TURN_FAILED
+        from app.services.research.study_report import StudyReportCompiler, StudySessionEmpty
+
+        await self.conv_repo.set_turn_status(turn_id=turn.turn_id, status="running", started_at=datetime.now(timezone.utc))
+        await self.event_service.record_and_publish(
+            turn_id=turn.turn_id, event_type=EVENT_STATUS_CHANGE, payload={"status": "running", "task": "study_report"}
+        )
+        try:
+            result = await StudyReportCompiler(self.db, llm=getattr(self, "study_report_llm", None)).compile(
+                workspace_id=workspace.workspace_id, conversation_id=conversation.conversation_id, request=turn.user_message,
+                owner_id=turn.owner_id,
+            )
+        except Exception as exc:
+            code = "study_session_empty" if isinstance(exc, StudySessionEmpty) else "study_report_failed"
+            logger.error("Study report compilation failed for conversation %s: %s", conversation.conversation_id, exc)
+            await self.db.rollback()
+            await self.conv_repo.set_turn_status(
+                turn_id=turn.turn_id, status="failed", expected_statuses=["pending", "running"], error_code=code,
+                error_message=str(exc), completed_at=datetime.now(timezone.utc)
+            )
+            payload = {"status": "failed", "error": code}
+            await self.event_service.record_and_publish(turn_id=turn.turn_id, event_type=EVENT_TURN_FAILED, payload=payload)
+            await self.event_service.record_and_publish(turn_id=turn.turn_id, event_type=EVENT_DONE, payload=payload)
+            if raise_on_error:
+                raise HTTPException(status_code=422 if code == "study_session_empty" else 500, detail=code)
+            return None
+
+        study = {k: result[k] for k in ("report_id", "candidate_id", "warnings", "cited")}
+        completed = await self.conv_repo.set_turn_status(
+            turn_id=turn.turn_id, status="completed", expected_statuses=["pending", "running"],
+            assistant_message=result["content"], context_version={"study_report": {k: study[k] for k in ("report_id", "candidate_id")}},
+            completed_at=datetime.now(timezone.utc)
+        )
+        payload = {"status": "completed", "assistant_message": result["content"], "study_report": study}
+        await self.event_service.record_and_publish(turn_id=turn.turn_id, event_type=EVENT_TURN_COMPLETED, payload=payload)
+        await self.event_service.record_and_publish(turn_id=turn.turn_id, event_type=EVENT_DONE, payload=payload)
+        return completed
+
     async def _admit_research_run_or_close_turn(self, admission_controller: Any, turn: ConversationTurn, **admit_kwargs: Any):
         """
         Admit a research run. If admission rejects it (unsupported engine, quota, rate limit) the turn row
@@ -843,13 +1038,8 @@ class ChatService:
         """
         Admits research run, links to turn, enqueues ARQ job, and returns running turn (HTTP 202).
         """
-        engine = "open_deep_research"
-        engine_revision = None
-        if turn_create and turn_create.research_options:
-            engine = turn_create.research_options.get("engine") or engine
-            engine_revision = turn_create.research_options.get("engine_revision")
-        elif getattr(workspace, "research_engine", None):
-            engine = workspace.research_engine
+        routing_mode, engine = resolve_research_routing(turn_create.research_options if turn_create else None)
+        engine_revision = (turn_create.research_options or {}).get("engine_revision") if turn_create else None
 
         admission_controller = self.admission_controller or ResearchAdmissionController(
             quota_service=ResearchQuotaService(self.research_repo),
@@ -866,6 +1056,7 @@ class ChatService:
             owner_id=turn.owner_id,
             objective=turn.user_message,
             engine=engine,
+            routing_mode=routing_mode,
             engine_revision=engine_revision,
             conversation_id=conversation.conversation_id,
             turn_id=turn.turn_id,

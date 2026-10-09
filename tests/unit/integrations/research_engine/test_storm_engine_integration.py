@@ -59,7 +59,7 @@ def _engine(tmp_path, body):
 
 
 @pytest.mark.asyncio
-async def test_storm_adapter_yields_progress_then_one_final_report_and_records_evidence(tmp_path):
+async def test_storm_adapter_yields_progress_then_one_turn_response_and_records_evidence(tmp_path):
     engine = _engine(tmp_path, GOOD_RUNNER)
     run_id, workspace_id = uuid4(), uuid4()
 
@@ -71,10 +71,11 @@ async def test_storm_adapter_yields_progress_then_one_final_report_and_records_e
     statuses = [e["status"] for e in events]
     assert statuses[0] == "starting"
     assert {"planning", "executing", "synthesizing"} <= set(statuses)
-    assert statuses.count("final_report") == 1 and statuses[-1] == "final_report"
+    assert statuses.count("turn_response") == 1 and statuses[-1] == "turn_response"
     assert not TERMINAL & set(statuses)
 
-    report = events[-1]["report"]
+    assert events[-1]["format"] == "article"  # STORM has no conversational output control
+    report = events[-1]["text"]
     assert report.startswith("# Topic X") and "### Sources" in report
     assert "[1] A: https://a.example/1" in report and "[2] B: https://b.example/2" in report
 
@@ -98,7 +99,7 @@ print({PROTOCOL_PREFIX!r} + json.dumps({{"type": "result", "article": json.dumps
          patch.object(StormResearchEngine, "_record_usage", new_callable=AsyncMock):
         events = [e async for e in engine.astream_events(run_id=uuid4(), workspace_id=uuid4(), objective="Quantum dots")]
 
-    job = json.loads(events[-1]["report"])
+    job = json.loads(events[-1]["text"])
     assert job["topic"] == "Quantum dots"
     assert job["llm"] == {"model": "auto", "api_key": "sk-test", "base_url": "http://localhost:3001/v1"}
     assert job["tavily_api_key"] == "tvly-test"
@@ -165,6 +166,22 @@ async def test_storm_adapter_reports_a_missing_storm_environment():
             pass
 
 
+@pytest.mark.asyncio
+async def test_storm_adapter_accepts_a_result_line_larger_than_the_default_stream_limit(tmp_path):
+    big = f'''
+import json, sys
+json.load(sys.stdin)
+sources = [{{"index": i, "url": f"https://s{{i}}.example", "title": "T", "snippets": ["x" * 4000]}} for i in range(1, 60)]
+print({PROTOCOL_PREFIX!r} + json.dumps({{"type": "result", "article": "# summary\\nLead [1].\\n\\n# Body\\nText [2].", "sources": sources, "usage": {{}}}}), flush=True)
+'''
+    engine = _engine(tmp_path, big)
+    with patch("app.integrations.research_engine.storm.engine.record_sources_as_evidence", new_callable=AsyncMock) as evidence, \
+         patch.object(StormResearchEngine, "_record_usage", new_callable=AsyncMock):
+        events = [e async for e in engine.astream_events(run_id=uuid4(), workspace_id=uuid4(), objective="x")]
+    assert events[-1]["status"] == "turn_response" and events[-1]["text"].startswith("Lead [1].")
+    assert len(evidence.await_args.kwargs["sources"]) == 59  # a >200 KiB result line was read whole
+
+
 def test_format_storm_report_appends_numbered_sources_in_order():
     sources = [
         {"index": 2, "url": "https://b", "title": "B"},
@@ -175,6 +192,14 @@ def test_format_storm_report_appends_numbered_sources_in_order():
     assert out.index("[1] https://a: https://a") < out.index("[2] B: https://b")
     assert "skipped" not in out
     assert format_storm_report("Article", []) == "Article"
+
+
+def test_runner_drops_blank_search_queries_before_they_reach_tavily():
+    from app.integrations.research_engine.storm.runner import non_empty_queries
+
+    assert non_empty_queries("") == [] and non_empty_queries("   ") == []
+    assert non_empty_queries(["RAG history", "", "  ", None, "BM25"]) == ["RAG history", "BM25"]
+    assert non_empty_queries("What is RAG") == ["What is RAG"]
 
 
 def test_runner_strips_characters_that_are_invalid_in_directory_names():
@@ -195,4 +220,4 @@ print({PROTOCOL_PREFIX!r} + json.dumps({{"type": "result", "article": str(sys.fl
     engine = _engine(tmp_path, probe)
     with patch("app.integrations.research_engine.storm.engine.record_sources_as_evidence", new_callable=AsyncMock),          patch.object(StormResearchEngine, "_record_usage", new_callable=AsyncMock):
         events = [e async for e in engine.astream_events(run_id=uuid4(), workspace_id=uuid4(), objective="x")]
-    assert events[-1]["report"] == "1"
+    assert events[-1]["text"] == "1"

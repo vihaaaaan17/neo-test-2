@@ -20,13 +20,13 @@ def versions_dir():
 
 def test_migration_dag_linearity_and_single_head(versions_dir):
     """
-    Asserts all 20 Alembic revisions form a strictly linear DAG with a single root and single head.
+    Asserts all 22 Alembic revisions form a strictly linear DAG with a single root and single head.
     """
     audit = audit_dag_linearity(versions_dir)
-    assert audit["total_revisions"] == 20
+    assert audit["total_revisions"] == 22
     assert audit["root"] == "f23c3a900272"
-    assert audit["head"] == "5c1e7a9d2b30"
-    assert len(audit["ordered_chain"]) == 20
+    assert audit["head"] == "7a3e9c5d1f68"
+    assert len(audit["ordered_chain"]) == 22
     assert audit["ordered_chain"][0] == audit["root"]
     assert audit["ordered_chain"][-1] == audit["head"]
 
@@ -122,6 +122,8 @@ def test_core_column_nullability_and_defaults():
     # Research artifacts
     art_tbl = tables["research_artifacts"]
     assert art_tbl.columns["artifact_id"].primary_key is True
-    assert art_tbl.columns["run_id"].nullable is False
+    # Run-scoped OR study-session-scoped (Chapter 6); a check constraint requires one of the two anchors.
+    assert art_tbl.columns["run_id"].nullable is True
+    assert art_tbl.columns["workspace_id"].nullable is True and art_tbl.columns["conversation_id"].nullable is True
     assert art_tbl.columns["type"].nullable is False
     assert art_tbl.columns["promotion_status"].nullable is False

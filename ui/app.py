@@ -326,6 +326,18 @@ class NeosisAPIClient:
         resp = self._request("POST", f"/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/turns/{turn_id}/cancel")
         return resp.json()
 
+    def compile_study_report(self, workspace_id: str, conversation_id: str, request: Optional[str] = None) -> Dict[str, Any]:
+        resp = self._request(
+            "POST",
+            f"/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/study-report",
+            json_data={"request": request} if request else {},
+        )
+        return resp.json()
+
+    def list_study_reports(self, workspace_id: str, conversation_id: str) -> Dict[str, Any]:
+        resp = self._request("GET", f"/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/study-reports")
+        return resp.json()
+
     def get_turn_events_sync(self, workspace_id: str, conversation_id: str, turn_id: str, after_sequence: int = 0) -> Dict[str, Any]:
         params = {"stream": "false", "after_sequence": after_sequence}
         resp = self._request("GET", f"/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/turns/{turn_id}/events", params=params)
@@ -553,6 +565,11 @@ def init_session_state():
         "accumulated_answer": "",
         "provenance_status": None,
         "evidence_refs": [],
+        "research_evidence": [],
+        "routing": None,
+        "answer_details": None,
+        "turn_timings": None,
+        "study_report": None,
         "raw_sse_log": [],
         "last_request_debug": None,
         "stage_timings": [],
@@ -1009,24 +1026,36 @@ def main():
                     selected_source_ids = [s.strip() for s in custom_source.split(",") if s.strip()]
 
         # Research Mode controls: Options
-        research_engine = "open_deep_research"
-        engine_choices = ["open_deep_research", "storm", "gpt_researcher"]
+        AUTO_ROUTE = "Auto (recommended)"
+        research_engine = AUTO_ROUTE
+        engine_choices = [AUTO_ROUTE, "open_deep_research", "storm", "gpt_researcher"]
         token_budget = 8000
         if exec_mode == "research":
             col_r1, col_r2 = st.columns(2)
             with col_r1:
                 research_engine = st.selectbox(
                     "Research Engine", engine_choices, index=0,
-                    help="open_deep_research: ~1-5 min. storm: ~2-10 min (Wikipedia-style article). gpt_researcher: ~5-15 min on a free gateway.",
+                    help=(
+                        "Auto: simple/normal questions use Open Deep Research (low/balanced budget); clearly deep "
+                        "investigations go to STORM and broad source discovery to GPT-Researcher when eligible; a weak ODR "
+                        "answer escalates once to the specialist that fits the diagnosed gap. Engines never run in parallel. "
+                        "Gates: ROUTER_AUTO_STORM / ROUTER_AUTO_GPT_RESEARCHER (auto|off). Explicit engines are for testing."
+                    ),
                 )
             with col_r2:
                 token_budget = st.number_input(
-                    "Token Budget", min_value=1000, max_value=64000, value=8000, step=1000,
-                    disabled=research_engine != "open_deep_research",
-                    help="Enforced mid-run for open_deep_research only; storm and gpt_researcher record usage afterwards.",
+                    "Context budget (tokens)", min_value=1000, max_value=64000, value=8000, step=1000,
+                    help=(
+                        "Sizes the workspace/conversation context handed to the engine. It is not an execution cap: only "
+                        "Open Deep Research enforces call/token caps mid-run (its budget profile); STORM and GPT-Researcher "
+                        "only record usage afterwards."
+                    ),
                 )
-            if research_engine != "open_deep_research":
-                st.caption(f"{research_engine} runs its own full upstream pipeline: it takes only the question (no workspace context) and can run several minutes.")
+            if research_engine in ("storm", "gpt_researcher"):
+                st.caption(f"{research_engine} runs its own full upstream pipeline, takes only the question (no workspace "
+                           "context), has no mid-run budget control and can run several minutes.")
+            st.caption("To get a cited paper of the whole session, type e.g. *Compile everything we've discussed into a "
+                       "research paper*, or use **Compile study report** below.")
 
         # Message Input
         default_prompt = (
@@ -1106,6 +1135,11 @@ def main():
             st.session_state["accumulated_answer"] = ""
             st.session_state["provenance_status"] = None
             st.session_state["evidence_refs"] = []
+            st.session_state["research_evidence"] = []
+            st.session_state["routing"] = None
+            st.session_state["answer_details"] = None
+            st.session_state["turn_timings"] = None
+            st.session_state["study_report"] = None
             st.session_state["live_events"] = []
             st.session_state["last_event_sequence"] = 0
 
@@ -1116,10 +1150,14 @@ def main():
             if exec_mode == "ground" and selected_source_ids:
                 turn_create_body["source_scope"] = selected_source_ids
             if exec_mode == "research":
-                turn_create_body["research_options"] = {
-                    "engine": research_engine,
-                    "token_budget": token_budget,
-                }
+                if research_engine == AUTO_ROUTE:
+                    turn_create_body["research_options"] = {"routing_mode": "auto", "token_budget": token_budget}
+                else:
+                    turn_create_body["research_options"] = {
+                        "routing_mode": "explicit",
+                        "engine": research_engine,
+                        "token_budget": token_budget,
+                    }
 
             if stream_toggle:
                 # STREAMING SSE PATH (POST /turns?stream=true)
@@ -1205,6 +1243,16 @@ def main():
                             if isinstance(payload, dict) and payload.get("assistant_message"):
                                 st.session_state["accumulated_answer"] = payload.get("assistant_message")
                                 answer_placeholder.markdown(st.session_state["accumulated_answer"])
+                            if isinstance(payload, dict) and payload.get("evidence_details") is not None:
+                                st.session_state["evidence_refs"] = payload.get("evidence_details") or []
+                                st.session_state["ground_unresolved"] = payload.get("unresolved_citations") or []
+                                st.session_state["provenance_status"] = payload.get("provenance_status")
+                            if isinstance(payload, dict):
+                                st.session_state["research_evidence"] = payload.get("evidence") or st.session_state.get("research_evidence") or []
+                                st.session_state["routing"] = payload.get("routing") or st.session_state.get("routing")
+                                st.session_state["study_report"] = payload.get("study_report") or st.session_state.get("study_report")
+                                st.session_state["answer_details"] = payload.get("answer_details") or st.session_state.get("answer_details")
+                                st.session_state["turn_timings"] = payload.get("timings") or st.session_state.get("turn_timings")
                             status_box.update(label="Turn Completed Successfully!", state="complete", expanded=False)
                             break
                         elif ev_type in ("turn.cancelled", "cancelled"):
@@ -1303,6 +1351,124 @@ def main():
         else:
             st.caption("No answer output yet.")
 
+        # Research evidence + routing come with the completion event (also recovered from replayed events).
+        for _ev in st.session_state.get("live_events", []) or []:
+            _p = _ev.get("data")
+            if _ev.get("event") in ("turn.completed", "done") and isinstance(_p, dict):
+                if _p.get("evidence") and not st.session_state.get("research_evidence"):
+                    st.session_state["research_evidence"] = _p["evidence"]
+                if _p.get("routing") and not st.session_state.get("routing"):
+                    st.session_state["routing"] = _p["routing"]
+                if _p.get("study_report") and not st.session_state.get("study_report"):
+                    st.session_state["study_report"] = _p["study_report"]
+                if _p.get("answer_details") and not st.session_state.get("answer_details"):
+                    st.session_state["answer_details"] = _p["answer_details"]
+                if _p.get("timings") and not st.session_state.get("turn_timings"):
+                    st.session_state["turn_timings"] = _p["timings"]
+
+        routing = st.session_state.get("routing")
+        if routing:
+            # One concise status line; the full routing record stays in a collapsed expander.
+            _esc = routing.get("escalation") or {}
+            _esc_txt = (f"escalated {_esc.get('from')} → {_esc.get('to')} ({_esc.get('reason')})" if routing.get("escalated")
+                        else (f"escalation to {_esc.get('to')} blocked" if _esc.get("blocked") else "no escalation"))
+            _total = (routing.get("timings") or {}).get("total_ms")
+            _pref = routing.get("preferred_engine")
+            st.caption(
+                f"Answered by **{routing.get('answered_by')}** ({routing.get('answer_budget_profile') or 'default'} profile)"
+                + (f" · preferred {_pref}" if _pref and _pref != routing.get("answered_by") else "")
+                + f" · {_esc_txt}"
+                + (f" · {_total / 1000:.0f}s" if _total else "")
+                + (" · budget enforced" if routing.get("budget_enforced") else " · wall-clock/config bounded only")
+            )
+            _first = (routing.get("attempts") or [{}])[0].get("assessment") or {}
+            _unretrieved = (_first.get("metrics") or {}).get("cited_urls_not_retrieved") or []
+            if _unretrieved and routing.get("answered_by") == "open_deep_research":
+                st.caption(f"⚠ {len(_unretrieved)} cited link(s) were not retrieved during this turn (written from the model's "
+                           "memory) and are not part of the evidence below.")
+            if st.session_state.get("answer_details"):
+                with st.expander("Full upstream output (STORM article)", expanded=False):
+                    st.markdown(st.session_state["answer_details"])
+            with st.expander("Engine routing details", expanded=False):
+                esc = routing.get("escalation") or {}
+                st.markdown(
+                    f"**Preferred:** `{routing.get('preferred_engine')}` · **Answered by:** `{routing.get('answered_by')}` · mode `{routing.get('mode')}`"
+                    + (f" · intent `{routing.get('intent')}`" if routing.get("intent") else "")
+                    + (f" · format `{routing.get('answer_format')}`" if routing.get("answer_format") else "")
+                )
+                if esc:
+                    if esc.get("blocked"):
+                        st.warning(f"Escalation {esc.get('from')} → {esc.get('to')} for `{esc.get('reason')}` was blocked: {esc['blocked']}")
+                    elif esc.get("specialist_failed"):
+                        st.warning(f"Escalated to {esc.get('to')} for `{esc.get('reason')}`, which failed ({esc['specialist_failed']}); kept the ODR answer.")
+                    else:
+                        st.info(f"Escalated {esc.get('from')} → {esc.get('to')}: {esc.get('reason')}"
+                                + (f" (diagnosis: {', '.join(esc.get('diagnosis') or [])})" if esc.get("diagnosis") else ""))
+                else:
+                    st.caption("No escalation: the first engine's answer was used.")
+                badge = "enforced" if routing.get("budget_enforced") else "NOT enforced"
+                st.markdown(f"**Budget:** {badge} — {routing.get('budget_note', '')}")
+                attempts = routing.get("attempts") or []
+                if attempts:
+                    st.table([{
+                        "#": a.get("sequence"), "engine": a.get("engine"), "profile": a.get("budget_profile") or "-",
+                        "trigger": a.get("trigger"), "status": a.get("status"),
+                        "latency_s": round((a.get("latency_ms") or 0) / 1000, 1),
+                        "tokens": (a.get("input_tokens") or 0) + (a.get("output_tokens") or 0),
+                        "evidence": a.get("evidence_count"),
+                        "verdict": ((a.get("assessment") or {}).get("failure") or "sufficient") if a.get("assessment") else "-",
+                        "tokens/cost": "/".join((a.get("usage_quality") or {}).values()) or "-",
+                        "reason": a.get("reason"),
+                    } for a in attempts])
+                tt = st.session_state.get("turn_timings") or {}
+                if tt or routing.get("timings"):
+                    st.caption("Timings: " + ", ".join(f"{k}={v}" for k, v in {**(routing.get("timings") or {}), **tt}.items() if v is not None))
+                for a in attempts:
+                    em = a.get("engine_metrics") or {}
+                    if em:
+                        st.caption(f"#{a.get('sequence')} {a.get('engine')} engine metrics: "
+                                   + ", ".join(f"{k}={v}" for k, v in em.items() if k not in ("limits",)))
+
+        research_evidence = st.session_state.get("research_evidence") or []
+        if research_evidence:
+            with st.expander(f"Research evidence ({len(research_evidence)})", expanded=False):
+                for i, e in enumerate(research_evidence, start=1):
+                    title = e.get("title") or e.get("url") or "source"
+                    st.markdown(f"**{i}. [{title}]({e.get('url')})** · `{e.get('retriever')}` · evidence `{e.get('evidence_id')}`")
+                    if e.get("excerpt"):
+                        st.caption(e["excerpt"][:300])
+
+        study = st.session_state.get("study_report")
+        if study:
+            st.success(f"Study-session paper saved (report `{study.get('report_id')}`"
+                       + (f", version {study.get('version')}" if study.get("version") else "")
+                       + f"); review candidate `{study.get('candidate_id')}` is pending review.")
+            for w in study.get("warnings") or []:
+                st.warning(w)
+
+        if st.button("📄 Compile study report", key="btn_compile_study_report",
+                     help="Explicitly compile this whole conversation into a cited paper. Runs no new research."):
+            with st.spinner("Compiling the study session (one LLM call over this conversation's material)..."):
+                try:
+                    rep = client.compile_study_report(active_ws_id, active_conv_id)
+                    st.session_state["accumulated_answer"] = rep.get("content", "")
+                    st.session_state["study_report"] = rep
+                    st.rerun()
+                except Exception as rep_err:
+                    st.error(f"Study report failed: {rep_err}")
+        if st.button("📚 Show saved study reports", key="btn_list_study_reports"):
+            try:
+                items = client.list_study_reports(active_ws_id, active_conv_id).get("items", [])
+                if not items:
+                    st.caption("No study-session papers saved for this conversation yet.")
+                for item in items:
+                    with st.expander(f"Version {item.get('version')} · {item.get('created_at', '')[:19]} · {item.get('report_id')}"):
+                        if item.get("warnings"):
+                            st.warning(item["warnings"])
+                        st.markdown(item.get("content", ""))
+            except Exception as list_err:
+                st.error(f"Could not list study reports: {list_err}")
+
         # Ground Provenance & Evidence Details
         prov = st.session_state.get("provenance_status")
         ev_refs = st.session_state.get("evidence_refs")
@@ -1311,9 +1477,21 @@ def main():
                 if prov:
                     prov_badge = "badge-ok" if prov == "fully_grounded" else "badge-warn"
                     st.markdown(f"Provenance Status: <span class='badge-status {prov_badge}'>{prov}</span>", unsafe_allow_html=True)
-                if ev_refs:
+                if ev_refs and all(isinstance(e, dict) and e.get("source_id") for e in ev_refs):
+                    for e in ev_refs:
+                        st.markdown(f"**{e.get('title') or e['source_id']}** · canonical source `{e['source_id']}`"
+                                    + (" · cited inline" if e.get("cited_inline") else "")
+                                    + (f" · [document]({client.base_url.rstrip('/')}{e['document_ref']})"
+                                       if e.get("document_ref") else ""))
+                        if e.get("excerpt"):
+                            st.caption(e["excerpt"][:300])
+                elif ev_refs:
                     st.markdown("Evidence References:")
                     st.json(ev_refs)
+                if prov == "none":
+                    st.warning("This answer cited none of your workspace sources, so it is not verified against them.")
+                for u in st.session_state.get("ground_unresolved") or []:
+                    st.warning(f"Unresolved citation `{u.get('upstream_id')}`: {u.get('reason')} (not shown as evidence)")
 
         # ---------------------------------------------------------------------
         # SECTION 7: SSE Event Viewer

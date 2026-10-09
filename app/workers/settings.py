@@ -16,7 +16,8 @@ from app.workers.tasks import (
     parse_and_chunk_job, compress_episodic_job, sync_knowledge_to_graph_job,
     run_research_agent_job, project_output_graph_job,
     export_workspace_job, project_to_open_notebook_job,
-    process_deletion_tombstone_job, reconcile_deletion_tombstones_job
+    process_deletion_tombstone_job, reconcile_deletion_tombstones_job,
+    reconcile_stale_research_runs_job,
 )
 from arq.cron import cron
 
@@ -26,6 +27,14 @@ logger = logging.getLogger(__name__)
 async def startup(ctx: dict) -> None:
     """Runs once when the worker process starts. Populate shared resources."""
     logger.info("NeosisLM worker starting up")
+    from app.core.config import effective_turn_deadline_s
+    deadline = effective_turn_deadline_s()
+    if deadline < settings.ROUTER_TURN_DEADLINE_S:
+        logger.warning("ROUTER_TURN_DEADLINE_S=%s clipped to %ss to fit ARQ_JOB_TIMEOUT_S=%s - ROUTER_FINALIZE_MARGIN_S=%s",
+                       settings.ROUTER_TURN_DEADLINE_S, deadline, settings.ARQ_JOB_TIMEOUT_S, settings.ROUTER_FINALIZE_MARGIN_S)
+    logger.warning("Research timeouts: arq_job_timeout=%ss turn_deadline=%ss finalize_margin=%ss attempt_timeouts odr=%s storm=%s gpt_researcher=%s",
+                   settings.ARQ_JOB_TIMEOUT_S, deadline, settings.ROUTER_FINALIZE_MARGIN_S, settings.ROUTER_TIMEOUT_ODR_S,
+                   settings.ROUTER_TIMEOUT_STORM_S, settings.ROUTER_TIMEOUT_GPT_RESEARCHER_S)
 
     # Validate checkpointer configuration (fail fast in production)
     from app.services.working_memory import validate_checkpointer
@@ -110,7 +119,8 @@ arq worker settings class. Discovered by: python -m arq app.workers.settings.Wor
     queue_name = "research-standard"
     max_jobs = 20
     cron_jobs = [
-        cron(reconcile_deletion_tombstones_job, minute=set(range(0, 60, 5)))
+        cron(reconcile_deletion_tombstones_job, minute=set(range(0, 60, 5))),
+        cron(reconcile_stale_research_runs_job, minute=set(range(0, 60, 10))),
     ]
     on_startup = startup
     on_shutdown = shutdown
@@ -120,7 +130,7 @@ arq worker settings class. Discovered by: python -m arq app.workers.settings.Wor
     # max_tries=1 here because tenacity handles retries *within* the job itself
     # for transient errors; arq retries handle process-level crashes.
     max_tries = 3
-    job_timeout = 1800  # 30 minutes max per job for deep autonomous research
+    job_timeout = settings.ARQ_JOB_TIMEOUT_S  # must exceed the router turn deadline + finalize margin (see config)
 
     def get_queue_config(self, queue_name):
         """

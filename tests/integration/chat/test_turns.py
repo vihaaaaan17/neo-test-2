@@ -62,16 +62,28 @@ async def test_env(db_session: AsyncSession):
         status="active"
     )
     db_session.add(conv_a)
-
+    # A canonical source projected to Open Notebook: Ground evidence must resolve to a real Source of this workspace.
+    from app.models.source import Source, SourceSnapshot
+    from app.models.open_notebook_binding import OpenNotebookSourceBinding
+    src = Source(workspace_id=ws_a.workspace_id, owner_id=user_a, processing_status="completed")
+    db_session.add(src)
+    await db_session.flush()
+    snap = SourceSnapshot(source_id=src.source_id, file_uri="s3://x", filename="spec-sheet.pdf", size=1, checksum_sha256="0")
+    db_session.add(snap)
+    await db_session.flush()
+    on_id = f"source:{uuid.uuid4().hex[:20]}"
+    db_session.add(OpenNotebookSourceBinding(source_id=src.source_id, snapshot_id=snap.snapshot_id, checksum_sha256="0",
+                                             open_notebook_source_id=on_id, projection_status="ACTIVE"))
     await db_session.commit()
     await db_session.refresh(conv_a)
-
     return {
         "user_a": user_a,
         "user_b": user_b,
         "ws_a": ws_a,
         "ws_b": ws_b,
         "conv_a": conv_a,
+        "on_id": on_id,
+        "source_id": src.source_id,
     }
 
 
@@ -115,10 +127,10 @@ async def test_ground_turn_execution(test_env, db_session: AsyncSession):
 
     app.dependency_overrides[get_current_user] = lambda: user_a
 
-    evidence_id = str(uuid.uuid4())
+    # Open Notebook cites its own upstream source id; Neosis resolves it to the canonical Source.
     mock_chat_res = {
-        "answer": "This is a grounded answer from Open Notebook.",
-        "evidence": [{"source_id": evidence_id, "title": "Spec Sheet"}]
+        "answer": f"This is a grounded answer from Open Notebook [{test_env['on_id']}].",
+        "evidence": []
     }
 
     try:
@@ -139,9 +151,10 @@ async def test_ground_turn_execution(test_env, db_session: AsyncSession):
                 assert data["status"] == "completed"
                 assert data["mode"] == "ground"
                 assert data["sequence"] == 1
-                assert data["assistant_message"] == "This is a grounded answer from Open Notebook."
-                assert len(data["ground_evidence_refs"]) == 1
-                assert data["ground_evidence_refs"][0]["source_id"] == evidence_id
+                assert data["assistant_message"] == mock_chat_res["answer"]
+                assert data["ground_evidence_refs"] == [str(test_env["source_id"])]
+                details = data["context_version"]["ground_evidence"]["evidence"]
+                assert details[0]["title"] == "spec-sheet.pdf" and details[0]["resolution"] == "resolved"
 
                 # Verify DB binding was created
                 binding = await db_session.get(OpenNotebookConversationBinding, conv_a.conversation_id)
@@ -175,7 +188,7 @@ async def test_ground_turn_409_rehydration_transparent_recovery(test_env, db_ses
             # First call raises 409 session_state_lost; second call succeeds after rehydration
             mock_exec.side_effect = [
                 HTTPException(status_code=409, detail="session_state_lost"),
-                {"answer": "Recovered answer after session rehydration", "evidence": []}
+                {"answer": "Recovered answer after session rehydration", "evidence": [{"source_id": test_env["on_id"]}]}
             ]
             mock_create_sess.return_value = rehydrated_sess_id
 
@@ -265,7 +278,7 @@ async def test_monotonic_sequence_allocation(test_env, db_session: AsyncSession)
         with patch("app.services.chat.service.OpenNotebookClient.create_chat_session", new_callable=AsyncMock) as mock_create_sess, \
              patch("app.services.chat.service.OpenNotebookClient.chat_execute", new_callable=AsyncMock) as mock_exec:
             mock_create_sess.return_value = f"session:seq_{uuid.uuid4()}"
-            mock_exec.return_value = {"answer": "Ground response", "evidence": []}
+            mock_exec.return_value = {"answer": "Ground response", "evidence": [{"source_id": test_env["on_id"]}]}
 
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 # Turn 1: Ground
@@ -324,7 +337,7 @@ async def test_idempotency_via_client_request_id(test_env):
         with patch("app.services.chat.service.OpenNotebookClient.create_chat_session", new_callable=AsyncMock) as mock_create_sess, \
              patch("app.services.chat.service.OpenNotebookClient.chat_execute", new_callable=AsyncMock) as mock_exec:
             mock_create_sess.return_value = f"session:idem_{uuid.uuid4()}"
-            mock_exec.return_value = {"answer": "Idempotent answer", "evidence": []}
+            mock_exec.return_value = {"answer": "Idempotent answer", "evidence": [{"source_id": test_env["on_id"]}]}
 
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 # First submission
@@ -373,7 +386,7 @@ async def test_list_and_get_turns(test_env):
         with patch("app.services.chat.service.OpenNotebookClient.create_chat_session", new_callable=AsyncMock) as mock_create_sess, \
              patch("app.services.chat.service.OpenNotebookClient.chat_execute", new_callable=AsyncMock) as mock_exec:
             mock_create_sess.return_value = f"session:list_{uuid.uuid4()}"
-            mock_exec.return_value = {"answer": "Some answer", "evidence": []}
+            mock_exec.return_value = {"answer": "Some answer", "evidence": [{"source_id": test_env["on_id"]}]}
 
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 # Create 2 turns

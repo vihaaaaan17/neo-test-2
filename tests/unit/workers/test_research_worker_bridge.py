@@ -61,7 +61,10 @@ async def test_research_worker_synchronous_event_bridging_and_completion():
             }
         }
         yield {"status": "synthesizing", "message": "Synthesizing report"}
-        yield {"status": "final_report", "report": "Superconductors operate up to 138K at ambient pressure."}
+        yield {"status": "turn_response", "text": "Superconductors operate up to 138K at ambient pressure.",
+               "format": "conversational", "evidence_refs": ["ev-1"],
+               "evidence": [{"evidence_id": "ev-1", "url": "https://example.org/sc", "title": "SC", "excerpt": "138K"}],
+               "routing": {"mode": "auto", "answered_by": "open_deep_research", "escalation": None}}
 
     mock_engine = MagicMock()
     mock_engine.astream_events = mock_stream_events
@@ -75,11 +78,10 @@ async def test_research_worker_synchronous_event_bridging_and_completion():
     mock_sp_entry.metadata_ = {}
 
     with patch("app.workers.tasks.async_session_maker") as mock_session_cls, \
-         patch("app.integrations.research_engine.factory.ResearchEngineFactory.get_engine", return_value=mock_engine), \
+         patch("app.workers.tasks.build_research_engine", return_value=mock_engine), \
          patch("app.repositories.scratchpad.ScratchpadRepository") as mock_sp_repo_cls, \
          patch("app.repositories.research.ResearchRepository") as mock_res_repo_cls, \
          patch("app.services.research.lifecycle.ResearchLifecycleService") as mock_lifecycle_cls, \
-         patch("app.services.research.service.ResearchService.finalize_report", new_callable=AsyncMock), \
          patch("app.services.research.derivation.DerivationService") as mock_derivation_cls, \
          patch("app.repositories.conversation.ConversationRepository") as mock_conv_repo_cls, \
          patch("app.services.chat.events.ChatEventService") as mock_event_service_cls:
@@ -146,9 +148,17 @@ async def test_research_worker_synchronous_event_bridging_and_completion():
         assert "turn.researching" in recorded_types
         assert "scratchpad_entry" in recorded_types
         assert "turn.synthesizing" in recorded_types
-        assert "turn.promotion_available" in recorded_types
+        assert "turn.promotion_available" not in recorded_types  # ordinary turns create no promotion candidate
         assert "turn.completed" in recorded_types
         assert "done" in recorded_types
+
+        # The completion event carries the conversational answer with its evidence and routing record.
+        completed = [c.args[2] for c in mock_event_service.record_and_publish.await_args_list
+                     if len(c.args) > 2 and c.args[1] == "turn.completed"][0]
+        assert completed["assistant_message"] == "Superconductors operate up to 138K at ambient pressure."
+        assert completed["evidence_refs"] == ["ev-1"] and completed["evidence"][0]["url"] == "https://example.org/sc"
+        assert completed["routing"]["answered_by"] == "open_deep_research"
+        assert completed["answer_format"] == "conversational"
 
 
 @pytest.mark.asyncio
@@ -190,7 +200,7 @@ async def test_research_worker_timeline_fence_cancellation():
     mock_engine.astream_events = mock_stream_events
 
     with patch("app.workers.tasks.async_session_maker") as mock_session_cls, \
-         patch("app.integrations.research_engine.factory.ResearchEngineFactory.get_engine", return_value=mock_engine), \
+         patch("app.workers.tasks.build_research_engine", return_value=mock_engine), \
          patch("app.services.research.lifecycle.ResearchLifecycleService") as mock_lifecycle_cls, \
          patch("app.repositories.conversation.ConversationRepository") as mock_conv_repo_cls, \
          patch("app.services.chat.events.ChatEventService") as mock_event_service_cls:
@@ -277,7 +287,7 @@ async def test_research_worker_job_failure_updates_turn():
     mock_engine.astream_events = mock_failing_stream
 
     with patch("app.workers.tasks.async_session_maker") as mock_session_cls, \
-         patch("app.integrations.research_engine.factory.ResearchEngineFactory.get_engine", return_value=mock_engine), \
+         patch("app.workers.tasks.build_research_engine", return_value=mock_engine), \
          patch("app.services.research.lifecycle.ResearchLifecycleService") as mock_lifecycle_cls, \
          patch("app.repositories.conversation.ConversationRepository") as mock_conv_repo_cls, \
          patch("app.services.chat.events.ChatEventService") as mock_event_service_cls:

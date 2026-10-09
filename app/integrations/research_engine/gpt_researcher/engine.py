@@ -6,7 +6,7 @@ import tempfile
 from typing import Any, AsyncGenerator, Callable, Optional
 from uuid import UUID
 
-from app.integrations.research_engine.engine import ResearchEngine
+from app.integrations.research_engine.engine import CONVERSATIONAL_STYLE, ResearchEngine, turn_response
 from app.integrations.research_engine.evidence import record_sources_as_evidence
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,24 @@ def _default_researcher_factory(**kwargs):
     return GPTResearcher(**kwargs)
 
 
-def build_config(provider_model: str, embedding_model: str) -> dict[str, Any]:
+def conversational_prompt(objective: str) -> str:
+    """GPT-Researcher's own `write_report(custom_prompt=...)` override; upstream appends the researched context to it."""
+    return (
+        f'Using the research context below, answer this question from the user: "{objective}"\n\n'
+        f"{CONVERSATIONAL_STYLE} Only state what the context supports, and cite the context's source URLs inline."
+    )
+
+
+# Budget profiles expressed only through GPT-Researcher's own config keys (gpt_researcher/config/variables/default.py).
+# GPT-Researcher has no token or cost cap; these bound its iterations, results, scraping parallelism and output length.
+GPTR_PROFILES: dict[str, dict[str, Any]] = {
+    "standard": {},
+    "bounded": {"MAX_ITERATIONS": 2, "MAX_SEARCH_RESULTS_PER_QUERY": 4, "MAX_SCRAPER_WORKERS": 4,
+                "MAX_SUBTOPICS": 2, "TOTAL_WORDS": 500, "SMART_TOKEN_LIMIT": 3000},
+}
+
+
+def build_config(provider_model: str, embedding_model: str, profile: str = "standard") -> dict[str, Any]:
     """
     Models for GPT-Researcher via its supported JSON config mechanism (no environment mutation).
     The API key and base URL come from OPENAI_API_KEY / OPENAI_BASE_URL, which `app.core.config` exports once.
@@ -53,6 +70,7 @@ def build_config(provider_model: str, embedding_model: str) -> dict[str, Any]:
         "FAST_LLM": llm,
         "STRATEGIC_LLM": llm,
         "EMBEDDING": f"openai:{embedding_model}",
+        **GPTR_PROFILES[profile],
     }
 
 
@@ -81,7 +99,8 @@ class GPTResearcherEngine(ResearchEngine):
       1. passes the Neosis objective and the configured provider models through GPT-Researcher's JSON config;
       2. forwards its `log_handler` callbacks as Neosis progress events;
       3. routes the sources it collected into Neosis evidence persistence and records its estimated cost;
-      4. yields exactly one `final_report` event; failures are raised;
+      4. asks for a conversational answer through `write_report(custom_prompt=...)` and yields exactly one
+         `turn_response`; failures are raised;
       5. relies on task cancellation (the worker cancels the task consuming this generator).
     GPT-Researcher has no input for Neosis research context or prior evidence, so neither is passed.
     """
@@ -91,7 +110,11 @@ class GPTResearcherEngine(ResearchEngine):
         redis_client: Any = None,
         researcher_factory: Optional[Callable[..., Any]] = None,
         report_type: str = "research_report",
+        budget_profile: str = "standard",
     ):
+        if budget_profile not in GPTR_PROFILES:
+            raise ValueError(f"Unknown GPT-Researcher budget profile: {budget_profile!r}")
+        self.budget_profile = budget_profile
         self.redis_client = redis_client
         self._researcher_factory = researcher_factory or _default_researcher_factory
         self.report_type = report_type
@@ -114,7 +137,7 @@ class GPTResearcherEngine(ResearchEngine):
 
         fd, config_path = tempfile.mkstemp(prefix="neosis_gptr_", suffix=".json")
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(build_config(provider.model, embedding_model), f)
+            json.dump(build_config(provider.model, embedding_model, self.budget_profile), f)
 
         queue: "asyncio.Queue[dict[str, Any]]" = asyncio.Queue()
         researcher = self._researcher_factory(
@@ -126,9 +149,17 @@ class GPTResearcherEngine(ResearchEngine):
             verbose=False,
         )
 
+        import time as _time
+        stage_ms: dict[str, int] = {}
+
         async def run_upstream() -> str:
+            t0 = _time.monotonic()
             await researcher.conduct_research()
-            return await researcher.write_report()
+            t1 = _time.monotonic()
+            stage_ms["research_ms"] = int((t1 - t0) * 1000)
+            report = await researcher.write_report(custom_prompt=conversational_prompt(objective))
+            stage_ms["write_ms"] = int((_time.monotonic() - t1) * 1000)
+            return report
 
         task = asyncio.create_task(run_upstream())
         getter: Optional[asyncio.Future] = None
@@ -162,8 +193,10 @@ class GPTResearcherEngine(ResearchEngine):
             logger.info("GPT-Researcher run %s produced %d sources (%d stored as evidence)", run_id, len(sources), stored)
             await self._record_usage(workspace_id, run_id, researcher)
 
-            yield {"status": "synthesizing", "message": "Finalizing GPT-Researcher report"}
-            yield {"status": "final_report", "report": report}
+            yield {"status": "synthesizing", "message": "Finalizing GPT-Researcher answer"}
+            yield {"status": "metrics", "budget_profile": self.budget_profile, "limits": dict(GPTR_PROFILES[self.budget_profile]),
+                   "stage_ms": dict(stage_ms), "sources": len(sources), "estimated_cost": float(researcher.get_costs() or 0.0)}
+            yield turn_response(report)
         finally:
             if getter is not None and not getter.done():
                 getter.cancel()

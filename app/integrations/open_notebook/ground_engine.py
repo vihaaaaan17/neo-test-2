@@ -1,3 +1,4 @@
+import re
 import os
 import logging
 import asyncio
@@ -12,6 +13,10 @@ from app.integrations.open_notebook.citation_mapper import map_citations, map_ca
 from app.models.open_notebook_binding import OpenNotebookWorkspaceBinding, OpenNotebookConversationBinding
 
 logger = logging.getLogger(__name__)
+
+
+
+from app.integrations.open_notebook.ground_evidence import inline_citation_ids, resolve_ground_evidence  # noqa: E402
 
 
 class OpenNotebookGroundEngine:
@@ -103,6 +108,43 @@ class OpenNotebookGroundEngine:
             )
 
         return valid_source_ids, partial
+
+    @staticmethod
+    def _grounded_result(answer: str, resolution: dict) -> dict:
+        """
+        Map a citation resolution onto the Ground result:
+          * some citations resolve -> evidence = those canonical sources (status full/partial; unresolved ones listed);
+          * citations exist but NONE resolve -> fail closed: the answer cites sources that are not this workspace's
+            (Open Notebook's search spans every tenant), so it is rejected with the unresolved ids named;
+          * no citations at all -> the answer is kept but marked provenance "none" with no evidence - it is never
+            presented as verified (the UI flags it as not verified against the workspace's sources).
+        """
+        if not resolution["source_ids"] and resolution["unresolved"]:
+            unresolved = ", ".join(u["upstream_id"] for u in resolution["unresolved"])
+            raise HTTPException(
+                status_code=422,
+                detail=f"ground_provenance_failure: Zero mapped canonical evidence. Unresolved citations: {unresolved}",
+            )
+        return {
+            "answer": answer,
+            "evidence": resolution["source_ids"],
+            "evidence_details": resolution["evidence"],
+            "unresolved_citations": resolution["unresolved"],
+            "is_grounded": True,
+            "provenance_status": resolution["provenance_status"],
+        }
+
+    async def _search_hits(self, query: str, mapped_upstream_ids: list) -> list:
+        try:
+            hits = await self.client.search(query=query)
+        except Exception as e:
+            logger.warning("Open Notebook search failed: %s", e)
+            return []
+        if not isinstance(hits, list):
+            return []
+        if mapped_upstream_ids:
+            hits = [h for h in hits if isinstance(h, dict) and h.get("id") in mapped_upstream_ids]
+        return hits
 
     async def _get_or_create_conversation_session(
         self,
@@ -240,35 +282,15 @@ class OpenNotebookGroundEngine:
                             continue
                         raise
 
-                upstream_ids = [res.get("id") for res in search_results if "id" in res] if search_results else []
-                if extra_evidence:
-                    extracted = [
-                        e.get("source_id") or e.get("id") if isinstance(e, dict) else str(e)
-                        for e in extra_evidence
-                    ]
-                    upstream_ids = list(set(upstream_ids + [x for x in extracted if x]))
-                valid_source_ids, partial = await map_citations(upstream_ids, workspace_id, db)
-                if not valid_source_ids and extra_evidence:
-                    valid_source_ids = extra_evidence
-                if source_scope:
-                    scope_set = {UUID(str(s)) for s in source_scope}
-                    initial_count = len(valid_source_ids)
-                    valid_source_ids = [s for s in valid_source_ids if (isinstance(s, UUID) and s in scope_set) or (isinstance(s, dict) and UUID(str(s.get("source_id"))) in scope_set)]
-                    if len(valid_source_ids) < initial_count:
-                        partial = True
-
-                if upstream_ids and not valid_source_ids and not extra_evidence:
-                    raise HTTPException(
-                        status_code=422,
-                        detail="ground_provenance_failure: Zero mapped canonical evidence."
-                    )
-
-                return {
-                    "answer": answer_text,
-                    "evidence": valid_source_ids,
-                    "is_grounded": True,
-                    "provenance_status": "partial" if partial else "full"
-                }
+                if not isinstance(answer_text, str):
+                    raise HTTPException(status_code=502, detail="ground_upstream_invalid_response")
+                resolution = await resolve_ground_evidence(
+                    answer=answer_text, workspace_id=workspace_id, db=db,
+                    search_hits=search_results if isinstance(search_results, list) else [],
+                    chat_evidence=extra_evidence if isinstance(extra_evidence, list) else [],
+                    source_scope=source_scope,
+                )
+                return self._grounded_result(answer_text, resolution)
 
             # Standalone unary run (search + ask_simple)
             default_models = await self.client.get_default_models()
@@ -282,27 +304,13 @@ class OpenNotebookGroundEngine:
             )
             search_results, ask_result = await asyncio.gather(search_task, ask_task)
 
-            upstream_ids = [res.get("id") for res in search_results if "id" in res] if search_results else []
-            valid_source_ids, partial = await map_citations(upstream_ids, workspace_id, db)
-            if source_scope:
-                scope_set = {UUID(str(s)) for s in source_scope}
-                initial_count = len(valid_source_ids)
-                valid_source_ids = [s for s in valid_source_ids if s in scope_set]
-                if len(valid_source_ids) < initial_count:
-                    partial = True
-
-            if upstream_ids and not valid_source_ids:
-                raise HTTPException(
-                    status_code=422,
-                    detail="ground_provenance_failure: Zero mapped canonical evidence."
-                )
-
-            return {
-                "answer": ask_result.get("answer", ""),
-                "evidence": valid_source_ids,
-                "is_grounded": True,
-                "provenance_status": "partial" if partial else "full"
-            }
+            answer = ask_result.get("answer", "") if isinstance(ask_result, dict) else ""
+            resolution = await resolve_ground_evidence(
+                answer=answer, workspace_id=workspace_id, db=db,
+                search_hits=search_results if isinstance(search_results, list) else [],
+                source_scope=source_scope,
+            )
+            return self._grounded_result(answer, resolution)
         except HTTPException:
             raise
         except Exception as e:
@@ -360,29 +368,7 @@ class OpenNotebookGroundEngine:
             }
         } if context_ids else {}
 
-        # 1. Resolve citations & provenance upfront
-        try:
-            valid_source_ids, partial = await self._resolve_citations(
-                query=query,
-                workspace_id=workspace_id,
-                db=db,
-                source_scope=source_scope
-            )
-        except Exception as e:
-            logger.warning("Upfront citation resolution skipped: %s", e)
-            valid_source_ids, partial = [], False
-
-        prov_status = "partial" if partial else "full"
-        yield {
-            "event": "citation",
-            "type": "citation",
-            "evidence": valid_source_ids,
-            "provenance_status": prov_status,
-            "data": {
-                "evidence": [str(e) for e in valid_source_ids],
-                "provenance_status": prov_status
-            }
-        }
+        # Citations are resolved once the full answer is known (its inline [source:...] citations are the primary signal).
 
         # 2. Stream tokens
         full_answer: List[str] = []
@@ -499,13 +485,30 @@ class OpenNotebookGroundEngine:
                         "data": {"content": ans}
                     }
 
-        # 3. Final done event
+        # 3. Resolve canonical evidence for the complete answer (fail closed), then the final done event
         final_answer_text = "".join(full_answer)
+        resolution = await resolve_ground_evidence(
+            answer=final_answer_text, workspace_id=workspace_id, db=db,
+            search_hits=await self._search_hits(query, mapped_upstream_ids), source_scope=source_scope,
+        )
+        result = self._grounded_result(final_answer_text, resolution)
+        valid_source_ids, prov_status = result["evidence"], result["provenance_status"]
+        yield {
+            "event": "citation",
+            "type": "citation",
+            "evidence": valid_source_ids,
+            "evidence_details": result["evidence_details"],
+            "unresolved_citations": result["unresolved_citations"],
+            "provenance_status": prov_status,
+            "data": {"evidence": [str(e) for e in valid_source_ids], "provenance_status": prov_status},
+        }
         yield {
             "event": "done",
             "type": "done",
             "answer": final_answer_text,
             "evidence": valid_source_ids,
+            "evidence_details": result["evidence_details"],
+            "unresolved_citations": result["unresolved_citations"],
             "provenance_status": prov_status,
             "data": {
                 "status": "completed",

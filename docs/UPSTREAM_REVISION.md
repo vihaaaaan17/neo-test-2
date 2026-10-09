@@ -29,9 +29,17 @@ The pinned version of Open Deep Research used as the only Research Engine runtim
 - **Acquisition Date:** 2026-09 (Chapter 3); revision recorded 2026-10-07
 
 ## Unmodified files
-`prompts.py`, `state.py` and `configuration.py` are byte-identical to the reference.
+`state.py` and `configuration.py` are byte-identical to the reference.
 
 ## Neosis patches (keep minimal; re-apply on upgrade)
+- `prompts.py` (Chapter 6, 2026-10-10)
+  - Only the formatting instructions of `final_report_generation_prompt` were changed. The "comprehensive, well-structured
+    report with ## sections" requirement became "answer what was asked, in the form that fits the question; headings only
+    when needed or a report was requested".
+  - The research brief, findings, language and citation rules (inline [Title](URL) citations and a final Sources section) are
+    unchanged.
+  - Reason: ODR has no prompt-override setting, and live runs showed the original prompt overriding the user-message style
+    instruction. For example, "Who wrote Dune?" returned an 8,036-character sectioned report.
 - `deep_researcher.py`
   - imports rewritten to the vendored package path;
   - `with_structured_output(..., method="function_calling")` for `ClarifyWithUser` and `ResearchQuestion` so OpenAI-compatible gateways work;

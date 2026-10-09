@@ -42,7 +42,8 @@ class FakeResearcher:
             raise RuntimeError("upstream failure")
         return ["ctx"]
 
-    async def write_report(self):
+    async def write_report(self, custom_prompt=""):
+        self.custom_prompt = custom_prompt
         await self.log_handler.on_research_step("writing_report")
         return "# Report\n\nBody"
 
@@ -71,7 +72,7 @@ def _provider():
 
 
 @pytest.mark.asyncio
-async def test_gpt_researcher_adapter_yields_progress_then_one_final_report_and_records_evidence():
+async def test_gpt_researcher_adapter_yields_progress_then_one_turn_response_and_records_evidence():
     engine = GPTResearcherEngine(researcher_factory=FakeResearcher)
     run_id, workspace_id = uuid4(), uuid4()
 
@@ -82,8 +83,8 @@ async def test_gpt_researcher_adapter_yields_progress_then_one_final_report_and_
     statuses = [e["status"] for e in events]
     assert statuses[0] == "starting"
     assert {"planning", "executing", "synthesizing"} <= set(statuses)
-    assert statuses.count("final_report") == 1 and statuses[-1] == "final_report"
-    assert events[-1]["report"] == "# Report\n\nBody"
+    assert statuses.count("turn_response") == 1 and statuses[-1] == "turn_response"
+    assert events[-1]["text"] == "# Report\n\nBody"
     assert not TERMINAL & set(statuses)
 
     kwargs = evidence.await_args.kwargs
@@ -107,6 +108,8 @@ async def test_gpt_researcher_adapter_configures_through_upstream_config_not_env
     assert researcher.config["SMART_LLM"] == researcher.config["FAST_LLM"] == researcher.config["STRATEGIC_LLM"] == "openai:auto"
     assert researcher.config["RETRIEVER"] == "tavily"
     assert researcher.config_exists_during_run
+    # The conversational answer is requested through GPT-Researcher's own write_report(custom_prompt=...) control.
+    assert "Objective text" in researcher.custom_prompt and "conversationally" in researcher.custom_prompt
     assert not os.path.exists(researcher.kwargs["config_path"])  # temp config cleaned up
     assert dict(os.environ) == env_before  # no environment mutation
 
@@ -123,7 +126,7 @@ async def test_gpt_researcher_adapter_raises_upstream_failures():
     with pytest.raises(RuntimeError, match="upstream failure"):
         async for event in engine.astream_events(run_id=uuid4(), workspace_id=uuid4(), objective="x"):
             seen.append(event["status"])
-    assert "final_report" not in seen and not TERMINAL & set(seen)
+    assert "turn_response" not in seen and not TERMINAL & set(seen)
 
 
 @pytest.mark.asyncio

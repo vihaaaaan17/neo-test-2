@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted (2026-10-07). Supersedes only the "GPT Researcher is integrated strictly as a capability retriever via the Neosis ACL"
+Accepted (2026-10-07); **partially superseded**: the engine set by [ADR 0006](0006-storm-and-gpt-researcher-as-selectable-engines.md)
+and the per-run `final_report` / automatic report + candidate (decision 4) and "ODR is the only engine" by
+[ADR 0007](0007-conversational-turns-and-engine-routing.md) (automatic three-engine routing).
+The worker-owns-terminal-state, thin-adapter and single-provider decisions remain in force. Originally: supersedes only the "GPT Researcher is integrated strictly as a capability retriever via the Neosis ACL"
 clause of [ADR 0002](0002-storm-formal-deferral.md). ADR 0002's STORM deferral was superseded by [ADR 0006](0006-storm-and-gpt-researcher-as-selectable-engines.md), which adds STORM and GPT-Researcher as selectable engines (so "ODR is the only supported engine" below describes the Phase 1 state).
 
 ## Context

@@ -1,7 +1,10 @@
 # ADR 0002: Formal Deferral of STORM Integration to Chapter 5
 
 ## Status
-**Superseded by [ADR 0006](0006-storm-and-gpt-researcher-as-selectable-engines.md)** (2026-10-08). Originally: Deferred (Effective Date: September 22, 2026)
+**Superseded by [ADR 0006](0006-storm-and-gpt-researcher-as-selectable-engines.md)** (2026-10-08) Its load-test condition is now the
+separate *validated for production workload* state (not yet met). Its governance concerns are addressed for automatic routing by
+[ADR 0007](0007-conversational-turns-and-engine-routing.md): sequential single-engine turns, a shared turn budget, bounded
+upstream profiles and concurrency slots. Originally: Deferred (Effective Date: September 22, 2026)
 
 ## Context
 During the Chapter 3 Research Engine architecture design and implementation, Knowledge STORM (Synthesis and Topic Oriented Research Manager) was evaluated as a potential capability for perspective generation, multi-perspective question decomposition, and outline scaffolding. 

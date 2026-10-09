@@ -1,6 +1,6 @@
 """
 Offline, deterministic run of the real ODR graph through the Neosis adapter, over the benchmark corpus.
-Verifies the engine contract (progress events, exactly one final_report, no terminal statuses) and that
+Verifies the engine contract (progress events, exactly one turn_response, no terminal statuses) and that
 search results enter Neosis evidence through neosis_web_search with provenance.
 """
 import json
@@ -28,12 +28,12 @@ async def test_offline_odr_run_honours_engine_contract(item):
 
     statuses = [e["status"] for e in events]
 
-    # Contract: progress events, then exactly one final_report as the last event, never a terminal status.
+    # Contract: progress events, then exactly one turn_response as the last event, never a terminal status.
     assert statuses[0] == "starting"
     assert "planning" in statuses and "executing" in statuses and "synthesizing" in statuses
-    assert statuses.count("final_report") == 1 and statuses[-1] == "final_report"
+    assert statuses.count("turn_response") == 1 and statuses[-1] == "turn_response"
     assert not TERMINAL & set(statuses)
-    assert item["objective"] in events[-1]["report"]
+    assert item["objective"] in events[-1]["text"]
 
     # The real ODR loop ran: supervisor delegated once then completed; researcher searched once.
     assert rec.supervisor_calls == 2

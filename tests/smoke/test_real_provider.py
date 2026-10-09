@@ -101,7 +101,7 @@ async def _new_conversation(client):
 async def _submit_research(client, ws, conv, message, engine="open_deep_research"):
     return await client.post(
         f"/workspaces/{ws}/conversations/{conv}/turns", params={"stream": "false"},
-        json={"message": message, "mode": "research", "research_options": {"engine": engine}},
+        json={"message": message, "mode": "research", "research_options": {"routing_mode": "explicit", "engine": engine}},
     )
 
 
@@ -156,13 +156,15 @@ async def test_real_provider_smoke(engine):
             warnings.warn("model answered without searching; evidence/provenance check is vacuous for this run")
         assert all(loc and prov and prov.get("url") for loc, prov in evidence)
 
-        # 4. The final report is persisted (exactly one).
-        assert await _scalar(db, "select count(*) from research_reports where run_id=:r", r=run_id) == 1
+        # 4. The conversational answer is persisted on the turn (Chapter 6: no per-turn ResearchReport).
+        assert done["assistant_message"], done
+        assert await _scalar(db, "select count(*) from research_reports where run_id=:r", r=run_id) == 0
+        attempts = await _rows(db, "select engine, trigger, status from research_engine_attempts where run_id=:r", r=run_id)
+        assert attempts == [(engine, "explicit", "answered")], attempts
 
-        # 5. Research-derived material does not become Ground evidence: only a pending_review candidate exists,
+        # 5. Research-derived material does not become Ground evidence: an ordinary turn creates no candidate, and
         #    nothing was promoted into workspace sources or knowledge memories.
-        candidates = await _rows(db, "select type, promotion_status from research_artifacts where run_id=:r", r=run_id)
-        assert candidates == [("memory_candidate", "pending_review")], candidates
+        assert await _scalar(db, "select count(*) from research_artifacts where run_id=:r", r=run_id) == 0
         assert await _scalar(db, "select count(*) from sources where workspace_id=:w", w=ws) == 0
         assert await _scalar(db, "select count(*) from knowledge_memories where workspace_id=:w", w=ws) == 0
 

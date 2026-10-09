@@ -17,7 +17,7 @@ class ResearchEngineFactory:
     """
 
     @staticmethod
-    def get_engine(engine_name: str, redis_client: Any = None) -> ResearchEngine:
+    def get_engine(engine_name: str, redis_client: Any = None, **adapter_options: Any) -> ResearchEngine:
         if engine_name not in SUPPORTED_ENGINES:
             raise ResearchEngineSetupError(
                 f"Unsupported research engine: {engine_name!r}. Supported engines: {', '.join(SUPPORTED_ENGINES)}"
@@ -27,7 +27,7 @@ class ResearchEngineFactory:
             try:
                 from app.integrations.research_engine.open_deep_research.engine import OpenDeepResearchEngine
                 logger.info("Instantiating OpenDeepResearchEngine")
-                return OpenDeepResearchEngine(redis_client=redis_client)
+                return OpenDeepResearchEngine(redis_client=redis_client, **adapter_options)
             except ImportError as e:
                 logger.error(f"Failed to import OpenDeepResearchEngine: {e}")
                 raise ResearchEngineSetupError(f"Cannot load OpenDeepResearchEngine: {e}") from e
@@ -36,7 +36,7 @@ class ResearchEngineFactory:
             try:
                 from app.integrations.research_engine.storm.engine import StormResearchEngine
                 logger.info("Instantiating StormResearchEngine")
-                return StormResearchEngine(redis_client=redis_client)
+                return StormResearchEngine(redis_client=redis_client, **adapter_options)
             except ImportError as e:
                 logger.error(f"Failed to import StormResearchEngine: {e}")
                 raise ResearchEngineSetupError(f"Cannot load StormResearchEngine: {e}") from e
@@ -45,7 +45,7 @@ class ResearchEngineFactory:
             try:
                 from app.integrations.research_engine.gpt_researcher.engine import GPTResearcherEngine
                 logger.info("Instantiating GPTResearcherEngine")
-                return GPTResearcherEngine(redis_client=redis_client)
+                return GPTResearcherEngine(redis_client=redis_client, **adapter_options)
             except ImportError as e:
                 logger.error(f"Failed to import GPTResearcherEngine: {e}")
                 raise ResearchEngineSetupError(f"Cannot load GPTResearcherEngine: {e}") from e

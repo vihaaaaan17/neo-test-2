@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, DateTime, ForeignKey, Integer, Float
+from sqlalchemy import Column, String, DateTime, ForeignKey, Integer, Float, CheckConstraint, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSONB
 from app.core.database import Base
 
@@ -12,7 +12,10 @@ class ResearchRun(Base):
     owner_id = Column(UUID(as_uuid=True), nullable=False)
     objective = Column(String, nullable=False)
     status = Column(String, default="pending", nullable=False)
-    engine = Column(String, nullable=False)
+    # "explicit": `engine` is the requested engine. "auto": the EngineRouter chooses; `engine` stays NULL until an
+    # attempt answers and then names the engine that produced the answer. Every attempt is in research_engine_attempts.
+    routing_mode = Column(String, default="explicit", server_default="explicit", nullable=False)
+    engine = Column(String, nullable=True)
     engine_revision = Column(String, nullable=True)
     current_attempt_id = Column(UUID(as_uuid=True), nullable=True)
     conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.conversation_id", ondelete="SET NULL"), nullable=True, index=True)
@@ -54,11 +57,43 @@ class ResearchEvidence(Base):
     retrieved_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
+class ResearchEngineAttempt(Base):
+    """One engine execution inside a ResearchRun. Auto-routed runs have one or two, executed strictly one after another."""
+    __tablename__ = "research_engine_attempts"
+
+    attempt_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    run_id = Column(UUID(as_uuid=True), ForeignKey("research_runs.run_id", ondelete="CASCADE"), nullable=False, index=True)
+    sequence = Column(Integer, nullable=False)
+    engine = Column(String, nullable=False)
+    budget_profile = Column(String, nullable=True)
+    trigger = Column(String, nullable=False)  # explicit | initial | intent | escalation | fallback
+    routing_mode = Column(String, nullable=True)  # the run's routing mode when the attempt ran (auto | explicit)
+    preferred_engine = Column(String, nullable=True)  # the engine the intent rules preferred (may differ from `engine`)
+    usage_quality = Column(JSONB, nullable=True)  # {"tokens": measured|unavailable, "cost": measured|estimated|unavailable}
+    timings = Column(JSONB, nullable=True)  # {"router": {...stage ms...}, "engine": {...adapter metrics...}}
+    reason = Column(String, nullable=False)
+    status = Column(String, default="running", nullable=False)  # running | answered | failed | timeout | cancelled | budget_exceeded
+    assessment = Column(JSONB, nullable=True)
+    error = Column(String, nullable=True)
+    evidence_count = Column(Integer, default=0, nullable=False)
+    input_tokens = Column(Integer, default=0, nullable=False)
+    output_tokens = Column(Integer, default=0, nullable=False)
+    cost = Column(Float, default=0.0, nullable=False)
+    latency_ms = Column(Integer, nullable=True)
+    started_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (UniqueConstraint("run_id", "sequence", name="uq_research_engine_attempt_sequence"),)
+
+
 class ResearchArtifact(Base):
     __tablename__ = "research_artifacts"
 
     artifact_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    run_id = Column(UUID(as_uuid=True), ForeignKey("research_runs.run_id", ondelete="CASCADE"), nullable=False, index=True)
+    # Run-scoped candidates set run_id; study-session candidates set workspace_id + conversation_id instead.
+    run_id = Column(UUID(as_uuid=True), ForeignKey("research_runs.run_id", ondelete="CASCADE"), nullable=True, index=True)
+    workspace_id = Column(UUID(as_uuid=True), ForeignKey("workspaces.workspace_id", ondelete="CASCADE"), nullable=True, index=True)
+    conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.conversation_id", ondelete="CASCADE"), nullable=True, index=True)
     task_id = Column(UUID(as_uuid=True), ForeignKey("research_tasks.task_id", ondelete="CASCADE"), nullable=True)
     type = Column(String, nullable=False)
     tags = Column(ARRAY(String), default=list, nullable=False)
@@ -74,12 +109,22 @@ class ResearchArtifact(Base):
     verification_metadata = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
+    __table_args__ = (
+        CheckConstraint("run_id IS NOT NULL OR (workspace_id IS NOT NULL AND conversation_id IS NOT NULL)",
+                        name="ck_research_artifacts_anchor"),
+    )
+
 
 class ResearchReport(Base):
     __tablename__ = "research_reports"
 
     report_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    run_id = Column(UUID(as_uuid=True), ForeignKey("research_runs.run_id", ondelete="CASCADE"), nullable=False, index=True)
+    # scope "run": a report of one ResearchRun. scope "study_session": a paper compiled on explicit request from a whole
+    # conversation (StudyReportCompiler); it is anchored to the conversation, never to an arbitrary run.
+    scope = Column(String, default="run", server_default="run", nullable=False)
+    run_id = Column(UUID(as_uuid=True), ForeignKey("research_runs.run_id", ondelete="CASCADE"), nullable=True, index=True)
+    workspace_id = Column(UUID(as_uuid=True), ForeignKey("workspaces.workspace_id", ondelete="CASCADE"), nullable=True, index=True)
+    conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.conversation_id", ondelete="CASCADE"), nullable=True, index=True)
     objective = Column(String, nullable=False)
     content = Column(String, nullable=False)
     citations = Column(JSONB, nullable=True)
@@ -90,6 +135,14 @@ class ResearchReport(Base):
     provenance_version = Column(String, default="v1", nullable=False)
     status = Column(String, default="draft", nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "(scope = 'run' AND run_id IS NOT NULL) OR "
+            "(scope = 'study_session' AND workspace_id IS NOT NULL AND conversation_id IS NOT NULL)",
+            name="ck_research_reports_scope_anchor",
+        ),
+    )
 
 
 class ResearchUsage(Base):

@@ -66,6 +66,39 @@ class UsageTracker:
         if self.search_calls > self.max_search_calls:
             raise ResearchBudgetExceeded("Exceeded maximum search calls budget.")
 
+class ModelTimingHandler(AsyncCallbackHandler):
+    """Measures wall time spent inside model calls (to tell model latency apart from search / orchestration time)."""
+
+    def __init__(self):
+        self._started: dict = {}
+        self.calls = 0
+        self.total_ms = 0.0
+        self.max_ms = 0.0
+
+    async def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs) -> None:
+        import time
+        self._started[run_id] = time.monotonic()
+
+    async def on_llm_start(self, serialized, prompts, *, run_id, **kwargs) -> None:
+        import time
+        self._started[run_id] = time.monotonic()
+
+    async def on_llm_end(self, response: LLMResult, *, run_id, **kwargs) -> None:
+        import time
+        t0 = self._started.pop(run_id, None)
+        if t0 is not None:
+            ms = (time.monotonic() - t0) * 1000
+            self.calls += 1
+            self.total_ms += ms
+            self.max_ms = max(self.max_ms, ms)
+
+    async def on_llm_error(self, error, *, run_id, **kwargs) -> None:
+        self._started.pop(run_id, None)
+
+    def snapshot(self) -> dict:
+        return {"model_calls_timed": self.calls, "model_time_ms": int(self.total_ms), "slowest_model_call_ms": int(self.max_ms)}
+
+
 class BudgetEnforcingCallbackHandler(AsyncCallbackHandler):
     """Intercepts LLM results to track usage and enforce budgets."""
     

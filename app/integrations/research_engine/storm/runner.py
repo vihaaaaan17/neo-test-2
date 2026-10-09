@@ -38,6 +38,16 @@ def safe_topic(topic: str) -> str:
     return cleaned or "research topic"
 
 
+def non_empty_queries(query_or_queries) -> list:
+    """
+    STORM's question generator occasionally emits an empty search query; upstream TavilySearchRM passes it straight to
+    the Tavily client, which raises "Query is missing." and aborts the whole STORM run (seen live, 2026-10-10).
+    Dropping blank queries at the retriever boundary changes no STORM behaviour for real queries.
+    """
+    queries = [query_or_queries] if isinstance(query_or_queries, str) else list(query_or_queries or [])
+    return [q for q in queries if isinstance(q, str) and q.strip()]
+
+
 def _read_json(path: str):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -110,7 +120,14 @@ def main() -> int:
         max_thread_num=int(args.get("max_thread_num", 3)),
     )
 
-    rm = TavilySearchRM(
+    class GuardedTavilySearchRM(TavilySearchRM):
+        def forward(self, query_or_queries, exclude_urls=None):
+            queries = non_empty_queries(query_or_queries)
+            if not queries:
+                return []
+            return super().forward(queries, exclude_urls=exclude_urls or [])
+
+    rm = GuardedTavilySearchRM(
         tavily_search_api_key=job["tavily_api_key"],
         k=runner_args.search_top_k,
         include_raw_content=True,

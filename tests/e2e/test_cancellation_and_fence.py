@@ -291,7 +291,7 @@ async def test_worker_timeline_epoch_fence_aborts_stale_research_run():
     mock_engine.astream_events = mock_stream_events
 
     with patch("app.workers.tasks.async_session_maker") as mock_session_cls, \
-         patch("app.integrations.research_engine.factory.ResearchEngineFactory.get_engine", return_value=mock_engine), \
+         patch("app.workers.tasks.build_research_engine", return_value=mock_engine), \
          patch("app.services.research.lifecycle.ResearchLifecycleService") as mock_lifecycle_cls, \
          patch("app.repositories.research.ResearchRepository") as mock_res_repo_cls, \
          patch("app.repositories.conversation.ConversationRepository") as mock_conv_repo_cls, \

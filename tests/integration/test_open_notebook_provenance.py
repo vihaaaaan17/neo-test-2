@@ -75,7 +75,8 @@ async def test_engine_zero_evidence_rejection():
     # Mock client methods
     engine.client.get_default_models = AsyncMock(return_value={"default_chat_model": "test-model"})
     engine.client.search = AsyncMock(return_value=[{"id": "upstream-id-1"}])
-    engine.client.ask_simple = AsyncMock(return_value={"answer": "Some answer"})
+    # The answer cites an upstream source that resolves to no canonical source of this workspace -> fail closed.
+    engine.client.ask_simple = AsyncMock(return_value={"answer": "Some answer [source:upstreamid1]"})
     
     # Mock citation mapper to return 0 mapped canonical sources
     with patch("app.integrations.open_notebook.ground_engine.map_citations", new_callable=AsyncMock) as mock_map:

@@ -75,7 +75,7 @@ async def test_partial_provenance_handling(setup_workspace, db_session: AsyncSes
     settings.OPEN_NOTEBOOK_ENABLED = True
 
     with patch("app.integrations.open_notebook.ground_engine.OpenNotebookClient") as mock_client_cls, \
-         patch("app.integrations.open_notebook.ground_engine.map_citations", new_callable=AsyncMock) as mock_map:
+         patch("app.integrations.open_notebook.ground_engine.resolve_ground_evidence", new_callable=AsyncMock) as mock_map:
 
         mock_client = mock_client_cls.return_value
         mock_client.create_chat_session = AsyncMock(side_effect=lambda *args, **kwargs: f"sess_{uuid.uuid4().hex}")
@@ -85,7 +85,10 @@ async def test_partial_provenance_handling(setup_workspace, db_session: AsyncSes
         mock_client.ask_simple = AsyncMock(return_value={"answer": "Partial answer"})
 
         mapped_uuid = uuid.uuid4()
-        mock_map.return_value = ([mapped_uuid], True)
+        mock_map.return_value = {"source_ids": [mapped_uuid],
+                                 "evidence": [{"source_id": str(mapped_uuid), "resolution": "resolved"}],
+                                 "unresolved": [{"upstream_id": "unmapped-2", "reason": "no canonical source in this workspace"}],
+                                 "provenance_status": "partial"}
 
         from app.api.deps.arq import get_arq_redis
         app.dependency_overrides[get_arq_redis] = lambda: AsyncMock()

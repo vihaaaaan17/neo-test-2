@@ -341,3 +341,104 @@ async def cancel_turn(
     )
     return TurnResponse.model_validate(turn)
 
+
+
+DEFAULT_STUDY_REPORT_REQUEST = "Compile everything we've discussed in this study session into a research paper."
+
+
+@router.post(
+    "/{conversation_id}/study-report",
+    summary="Compile the conversation into a cited study-session paper (explicit request)"
+)
+async def compile_study_report(
+    workspace_id: UUID,
+    conversation_id: UUID,
+    body: Optional[dict] = None,
+    current_user_id: UUID = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    workspace_repo: WorkspaceRepository = Depends(get_workspace_repository),
+    conv_repo: ConversationRepository = Depends(get_conversation_repository)
+):
+    """
+    Runs the StudyReportCompiler over this conversation only: its completed turns, the workspace sources its Ground turns
+    cited, the evidence its Research runs collected and its scratchpad notes. No research is run. Creates one
+    study-session ResearchReport and one pending_review memory candidate; nothing is promoted.
+    """
+    from app.services.research.study_report import StudyReportCompiler, StudySessionEmpty, StudySessionNotFound
+
+    await _verify_workspace_access(workspace_id, current_user_id, workspace_repo)
+    request = ((body or {}).get("request") or DEFAULT_STUDY_REPORT_REQUEST).strip()
+    try:
+        # The compiler itself enforces workspace + owner scoping (service layer), not only this route.
+        return await StudyReportCompiler(db).compile(workspace_id=workspace_id, conversation_id=conversation_id,
+                                                     request=request, owner_id=current_user_id)
+    except StudySessionNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+    except StudySessionEmpty:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="study_session_empty")
+
+
+@router.get(
+    "/{conversation_id}/study-reports",
+    summary="List the study-session papers compiled for this conversation"
+)
+async def list_study_reports(
+    workspace_id: UUID,
+    conversation_id: UUID,
+    current_user_id: UUID = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    workspace_repo: WorkspaceRepository = Depends(get_workspace_repository),
+    conv_repo: ConversationRepository = Depends(get_conversation_repository)
+):
+    from sqlalchemy import select
+    from app.models.research import ResearchReport
+
+    await _verify_workspace_access(workspace_id, current_user_id, workspace_repo)
+    conversation = await conv_repo.get_conversation(workspace_id, conversation_id)
+    if not conversation or conversation.owner_id != current_user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+    rows = (await db.execute(
+        select(ResearchReport)
+        .where(ResearchReport.scope == "study_session", ResearchReport.workspace_id == workspace_id,
+               ResearchReport.conversation_id == conversation_id)
+        .order_by(ResearchReport.created_at.desc())
+    )).scalars().all()
+    return {"items": [_study_report_dict(r) for r in rows]}
+
+
+def _study_report_dict(r) -> dict:
+    return {
+        "report_id": str(r.report_id), "version": r.version, "objective": r.objective, "content": r.content,
+        "citations": r.citations, "source_summary": r.source_summary, "warnings": r.warnings,
+        "limitations": r.limitations, "status": r.status, "created_at": r.created_at.isoformat(),
+    }
+
+
+@router.get(
+    "/{conversation_id}/study-reports/{report_id}",
+    summary="Get one study-session paper of this conversation"
+)
+async def get_study_report(
+    workspace_id: UUID,
+    conversation_id: UUID,
+    report_id: UUID,
+    current_user_id: UUID = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    workspace_repo: WorkspaceRepository = Depends(get_workspace_repository),
+    conv_repo: ConversationRepository = Depends(get_conversation_repository)
+):
+    from sqlalchemy import select
+    from app.models.research import ResearchReport
+
+    await _verify_workspace_access(workspace_id, current_user_id, workspace_repo)
+    conversation = await conv_repo.get_conversation(workspace_id, conversation_id)
+    if not conversation or conversation.owner_id != current_user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+    report = (await db.execute(
+        select(ResearchReport).where(ResearchReport.report_id == report_id, ResearchReport.scope == "study_session",
+                                     ResearchReport.workspace_id == workspace_id,
+                                     ResearchReport.conversation_id == conversation_id)
+    )).scalars().first()
+    if report is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Study report not found")
+    return _study_report_dict(report)

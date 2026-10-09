@@ -12,7 +12,8 @@ class ResearchRunResponse(BaseModel):
     owner_id: UUID
     objective: str
     status: str
-    engine: str
+    routing_mode: str = "explicit"
+    engine: Optional[str] = None  # NULL for an auto-routed run until an attempt answers
     engine_revision: Optional[str] = None
     current_attempt_id: Optional[UUID] = None
     conversation_id: Optional[UUID] = None

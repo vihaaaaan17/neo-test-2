@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from app.repositories.research import ResearchRepository
 from app.models.research import ResearchRun
-from app.integrations.research_engine.engine import SUPPORTED_ENGINES
+from app.integrations.research_engine.engine import ROUTING_MODES, SUPPORTED_ENGINES
 from app.services.research.quota import ResearchQuotaService
 from app.services.research.rate_limiter import ProviderRateLimiter
 
@@ -30,18 +30,30 @@ class ResearchAdmissionController:
         workspace_id: UUID,
         owner_id: UUID,
         objective: str,
-        engine: str,
+        engine: Optional[str] = None,
         engine_revision: Optional[str] = None,
         conversation_id: Optional[UUID] = None,
         turn_id: Optional[UUID] = None,
         base_commit_id: Optional[UUID] = None,
-        timeline_epoch: Optional[int] = None
+        timeline_epoch: Optional[int] = None,
+        routing_mode: str = "explicit",
     ) -> ResearchRun:
         """
         Admits a new research run after checking quotas and rate limits.
         """
-        # 0. Reject unsupported engines before any quota is consumed or any run is created
-        if engine not in SUPPORTED_ENGINES:
+        # 0. Validate routing before any quota is consumed or any run is created. "auto" lets the EngineRouter pick
+        #    (no engine name is stored up front); "explicit" requires a supported engine. "auto" is never an engine name.
+        if routing_mode not in ROUTING_MODES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="unsupported_routing_mode"
+            )
+        if routing_mode == "auto" and engine is not None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="engine_not_allowed_with_auto_routing"
+            )
+        if routing_mode == "explicit" and engine not in SUPPORTED_ENGINES:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="unsupported_research_engine"
@@ -87,6 +99,7 @@ class ResearchAdmissionController:
             owner_id=owner_id,
             objective=objective,
             engine=engine,
+            routing_mode=routing_mode,
             engine_revision=engine_revision,
             conversation_id=conversation_id,
             turn_id=turn_id,
