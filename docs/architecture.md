@@ -32,5 +32,5 @@ Instead of keeping a single chaotic graph, we maintain:
 ## Provider Agnosticism
 NeosisLM never hardcodes specific vendors for variable resources:
 - **LLMs**: Handled via `LiteLLM`, allowing hot-swapping between Gemini, OpenAI, Anthropic, or Local models.
-- **Search**: `Tavily` is used via a `WebSearchTool` abstraction.
+- **Search**: `Tavily` is used by Open Deep Research through the evidence-capturing `neosis_web_search` tool.
 - **Storage**: Any S3-compatible service (AWS S3, MinIO, Cloudflare R2) works seamlessly with the `ObjectStoreProtocol`.

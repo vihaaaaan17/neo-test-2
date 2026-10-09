@@ -12,7 +12,7 @@ from app.models.open_notebook_binding import OpenNotebookConversationBinding
 @pytest.mark.asyncio
 async def test_odr_checkpointer_thread_id_scoping():
     """Verify that OpenDeepResearchEngine scopes thread_id strictly to '{workspace_id}:{run_id}'."""
-    engine = OpenDeepResearchEngine(llm_gateway=MagicMock(), search_tool=MagicMock())
+    engine = OpenDeepResearchEngine()
     workspace_id = uuid.uuid4()
     run_id = uuid.uuid4()
 

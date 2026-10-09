@@ -121,7 +121,7 @@ async def isolated_workspace(db_session: AsyncSession):
     )
 
     owner_id = uuid.uuid4()
-    ws = Workspace(workspace_id=uuid.uuid4(), owner_id=owner_id, research_engine="legacy")
+    ws = Workspace(workspace_id=uuid.uuid4(), owner_id=owner_id, research_engine="open_deep_research")
     db_session.add(ws)
     await db_session.commit()
     await db_session.refresh(ws)
@@ -163,7 +163,7 @@ async def two_isolated_workspaces(db_session: AsyncSession):
     for _ in range(2):
         owner_id = uuid.uuid4()
         ws = Workspace(
-            workspace_id=uuid.uuid4(), owner_id=owner_id, research_engine="legacy"
+            workspace_id=uuid.uuid4(), owner_id=owner_id, research_engine="open_deep_research"
         )
         db_session.add(ws)
         await db_session.commit()
@@ -354,7 +354,7 @@ async def _make_promotion_candidate(
         workspace_id=workspace_id,
         owner_id=owner_id,
         objective="Concurrency locking test",
-        engine="legacy",
+        engine="open_deep_research",
         status="completed",
     )
     db_session.add(run)

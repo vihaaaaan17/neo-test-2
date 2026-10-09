@@ -24,6 +24,29 @@ The thin integration boundary (`app/integrations/open_notebook/`) that owns HTTP
 ## Upstream Revision
 The pinned version of the Open Notebook implementation used as the Ground Engine runtime. Recorded in `UPSTREAM_REVISION.md` at the project root. Includes repository URL, Git tag/commit, Docker image tag, Docker image digest, and acquisition date. Upgrades are deliberate, controlled migrations.
 
+## Research Engine
+The upstream runtime that performs research: planning, task decomposition, the search/research loop, reflection, synthesis and report
+generation. Today the only one is Open Deep Research (ODR), vendored under `app/integrations/research_engine/upstream/`. Neosis never
+reimplements an engine's algorithm.
+
+## Engine Adapter
+The thin Neosis class (`ResearchEngine` subclass, e.g. `OpenDeepResearchEngine`) that translates Neosis inputs into the upstream runtime's
+configuration, injects bounded research context, and translates upstream execution signals into Neosis progress events. It owns no
+research logic, persists no reports or candidates, and writes no environment variables.
+
+## Supported Engines
+`SUPPORTED_ENGINES` in `app/integrations/research_engine/engine.py`: the single allow-list of engine names admission accepts and the
+factory can instantiate (`open_deep_research`, `storm`, `gpt_researcher`). Anything else is rejected at admission with `422 unsupported_research_engine`.
+
+## Final Report Event
+`{"status": "final_report", "report": <markdown>}` — the one event through which an engine hands its finished report to the worker as
+data. It is consumed by the worker, never bridged to chat as a progress event.
+
+## Terminal State Owner
+The research worker (`run_research_agent_job`). It alone decides and writes a run's terminal state (`completed`, `partial`, `failed`,
+`cancelled`, `aborted_by_timeline_fence`) and publishes exactly one terminal event. Engines signal failure by raising; a run is
+`completed` only if a Final Report Event was received and persisted.
+
 ---
 
 # Core Architectural Invariant

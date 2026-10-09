@@ -37,8 +37,8 @@ async def test_env(db_session: AsyncSession):
     user_a = uuid.uuid4()
     user_b = uuid.uuid4()
 
-    ws_a = Workspace(workspace_id=uuid.uuid4(), owner_id=user_a, research_engine="legacy")
-    ws_b = Workspace(workspace_id=uuid.uuid4(), owner_id=user_b, research_engine="legacy")
+    ws_a = Workspace(workspace_id=uuid.uuid4(), owner_id=user_a, research_engine="open_deep_research")
+    ws_b = Workspace(workspace_id=uuid.uuid4(), owner_id=user_b, research_engine="open_deep_research")
     db_session.add(ws_a)
     db_session.add(ws_b)
     await db_session.commit()
@@ -81,6 +81,19 @@ class MockArqRedis:
 
     async def enqueue_job(self, function, *args, **kwargs):
         self.jobs.append((function, args, kwargs))
+
+    # Minimal sorted-set API used by ProviderRateLimiter (ODR admission enforces rate limits)
+    async def zrangebyscore(self, *args, **kwargs):
+        return []
+
+    async def zremrangebyscore(self, *args, **kwargs):
+        return 0
+
+    async def zadd(self, *args, **kwargs):
+        return 1
+
+    async def expire(self, *args, **kwargs):
+        return True
 
 
 @pytest.fixture(autouse=True)
@@ -270,6 +283,18 @@ async def test_monotonic_sequence_allocation(test_env, db_session: AsyncSession)
                 )
                 assert r2.status_code == 202
                 assert r2.json()["sequence"] == 2
+
+                # A conversation allows one in-progress turn (409 conversation_turn_in_progress otherwise).
+                # Simulate the worker finishing the research turn before the next prompt.
+                from sqlalchemy import update as sa_update
+                from app.core.database import async_session_maker as _session_maker
+                async with _session_maker() as worker_session:
+                    await worker_session.execute(
+                        sa_update(ConversationTurn)
+                        .where(ConversationTurn.turn_id == r2.json()["turn_id"])
+                        .values(status="completed")
+                    )
+                    await worker_session.commit()
 
                 # Turn 3: Ground
                 r3 = await client.post(

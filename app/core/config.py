@@ -51,8 +51,8 @@ class Settings(BaseSettings):
     ENABLE_ADVANCED_RESEARCH: bool = False
     ACTIVE_RESEARCH_ENGINE: str | None = "open_deep_research"
 
-    # STORM Configuration
-    STORM_ENABLED: bool = False
+    # STORM runs in an isolated environment (knowledge-storm's dependency pins conflict with the app's)
+    STORM_PYTHON: str | None = None  # interpreter of the isolated STORM env; default: <repo>/venv-storm
     # Checkpointer Settings
     ASYNC_POSTGRES_SAVER_ENABLED: bool = False
     POSTGRES_DSN: str = "postgresql+asyncpg://user:password@localhost:5432/dbname"
@@ -84,27 +84,69 @@ class Settings(BaseSettings):
 settings = Settings()
 
 import os
-# Auto-configure OpenAI compatibility variables when provider is NVIDIA or OpenAI
-if (settings.LLM_PROVIDER or "").lower() == "nvidia":
-    base_url = settings.NVIDIA_BASE_URL or "https://integrate.api.nvidia.com/v1"
-    key = settings.NVIDIA_API_KEY or ""
-    model = settings.NVIDIA_MODEL or "deepseek-ai/deepseek-v4.1-flash"
+from dataclasses import dataclass
 
-    os.environ["OPENAI_API_KEY"] = key
-    os.environ["OPENAI_BASE_URL"] = base_url
-    os.environ["OPENAI_API_BASE"] = base_url
-    os.environ["OPENAI_MODEL"] = model
-    os.environ["NVIDIA_API_KEY"] = key
-    os.environ["NVIDIA_BASE_URL"] = base_url
-    os.environ["NVIDIA_MODEL"] = model
-elif (settings.LLM_PROVIDER or "").lower() == "openai":
-    if settings.OPENAI_API_KEY:
-        os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
-    if settings.OPENAI_BASE_URL:
-        os.environ["OPENAI_BASE_URL"] = settings.OPENAI_BASE_URL
-        os.environ["OPENAI_API_BASE"] = settings.OPENAI_BASE_URL
-    if settings.OPENAI_MODEL:
-        os.environ["OPENAI_MODEL"] = settings.OPENAI_MODEL
+DEFAULT_NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
+DEFAULT_NVIDIA_MODEL = "deepseek-ai/deepseek-v4.1-flash"
+DEFAULT_OPENAI_MODEL = "gpt-4o"
+
+
+@dataclass(frozen=True)
+class LLMProvider:
+    """Resolved OpenAI-compatible LLM endpoint for the active provider."""
+    name: str  # "openai" or "nvidia"
+    api_key: str | None
+    base_url: str | None
+    model: str
+
+
+def resolve_llm_provider(cfg: Settings | None = None, require_key: bool = False) -> LLMProvider:
+    """
+    The single place that decides which LLM provider, key, base URL and model Neosis uses.
+
+    NVIDIA is used when LLM_PROVIDER is "nvidia", or when no OpenAI key is set but an NVIDIA key is.
+    A trailing "/chat/completions" is stripped from the base URL. With require_key=True a missing
+    key raises instead of returning an unusable provider.
+    """
+    cfg = cfg or settings
+    use_nvidia = (cfg.LLM_PROVIDER or "").lower() == "nvidia" or (not cfg.OPENAI_API_KEY and cfg.NVIDIA_API_KEY)
+    if use_nvidia:
+        provider = LLMProvider(
+            name="nvidia",
+            api_key=cfg.NVIDIA_API_KEY or cfg.OPENAI_API_KEY,
+            base_url=cfg.NVIDIA_BASE_URL or DEFAULT_NVIDIA_BASE_URL,
+            model=cfg.NVIDIA_MODEL or DEFAULT_NVIDIA_MODEL,
+        )
+    else:
+        provider = LLMProvider(
+            name="openai",
+            api_key=cfg.OPENAI_API_KEY,
+            base_url=cfg.OPENAI_BASE_URL,
+            model=cfg.OPENAI_MODEL or DEFAULT_OPENAI_MODEL,
+        )
+
+    if provider.base_url and provider.base_url.endswith("/chat/completions"):
+        provider = LLMProvider(provider.name, provider.api_key, provider.base_url[: -len("/chat/completions")], provider.model)
+    if require_key and not provider.api_key:
+        raise RuntimeError("Neither OPENAI_API_KEY nor NVIDIA_API_KEY is configured.")
+    return provider
+
+
+# Export the resolved provider as OpenAI-compatible environment variables. Upstream engines (ODR's
+# init_chat_model / the OpenAI client) read these, so this is the only place that writes them.
+_provider = resolve_llm_provider()
+if _provider.api_key:
+    os.environ["OPENAI_API_KEY"] = _provider.api_key
+if _provider.base_url:
+    os.environ["OPENAI_BASE_URL"] = _provider.base_url
+    os.environ["OPENAI_API_BASE"] = _provider.base_url
+if _provider.model:
+    os.environ["OPENAI_MODEL"] = _provider.model
+if _provider.name == "nvidia":
+    if _provider.api_key:
+        os.environ["NVIDIA_API_KEY"] = _provider.api_key
+    os.environ["NVIDIA_BASE_URL"] = _provider.base_url
+    os.environ["NVIDIA_MODEL"] = _provider.model
 
 if settings.TAVILY_API_KEY:
     os.environ["TAVILY_API_KEY"] = settings.TAVILY_API_KEY

@@ -281,7 +281,9 @@ class ChatService:
                 repository=self.research_repo
             )
             base_commit = getattr(workspace, "active_commit_id", None)
-            run = await admission_controller.admit_research_run(
+            run = await self._admit_research_run_or_close_turn(
+                admission_controller,
+                turn,
                 workspace_id=workspace.workspace_id,
                 owner_id=owner_id,
                 objective=turn_create.message,
@@ -811,6 +813,25 @@ class ChatService:
         await self.db.commit()
         return new_session_id
 
+    async def _admit_research_run_or_close_turn(self, admission_controller: Any, turn: ConversationTurn, **admit_kwargs: Any):
+        """
+        Admit a research run. If admission rejects it (unsupported engine, quota, rate limit) the turn row
+        already exists, so close it as failed before re-raising; otherwise it stays pending and blocks the
+        conversation with 409 conversation_turn_in_progress.
+        """
+        try:
+            return await admission_controller.admit_research_run(**admit_kwargs)
+        except HTTPException as admission_err:
+            await self.conv_repo.set_turn_status(
+                turn_id=turn.turn_id,
+                status="failed",
+                expected_statuses=["pending"],
+                error_code=str(admission_err.detail),
+                error_message=str(admission_err.detail),
+                completed_at=datetime.now(timezone.utc)
+            )
+            raise
+
     async def _execute_research_turn(
         self,
         workspace: Any,
@@ -838,7 +859,9 @@ class ChatService:
 
         # 1. Admit Research Run
         base_commit = getattr(workspace, "active_commit_id", None)
-        run = await admission_controller.admit_research_run(
+        run = await self._admit_research_run_or_close_turn(
+            admission_controller,
+            turn,
             workspace_id=workspace.workspace_id,
             owner_id=turn.owner_id,
             objective=turn.user_message,

@@ -596,8 +596,6 @@ async def get_all_tools(config: RunnableConfig):
     tools.extend(search_tools)
     
     # ODR natively uses Tavily web search (search_tools above) which handles web retrieval cleanly
-    # from app.integrations.research_engine.tools.gpt_researcher_tool import GPTResearcherTool
-    # tools.append(GPTResearcherTool())
     
     # Track existing tool names to prevent conflicts
     existing_tool_names = {

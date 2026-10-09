@@ -109,7 +109,7 @@ class NeosisAPIClient:
     def __init__(self, base_url: str, token: Optional[str] = None):
         self.base_url = base_url.rstrip("/")
         self.token = token.strip() if token else None
-        self.timeout = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=30.0)
+        self.timeout = httpx.Timeout(connect=10.0, read=900.0, write=30.0, pool=30.0)
 
     def _headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
         headers = {
@@ -1010,13 +1010,23 @@ def main():
 
         # Research Mode controls: Options
         research_engine = "open_deep_research"
+        engine_choices = ["open_deep_research", "storm", "gpt_researcher"]
         token_budget = 8000
         if exec_mode == "research":
             col_r1, col_r2 = st.columns(2)
             with col_r1:
-                research_engine = st.selectbox("Research Engine", options=["open_deep_research", "legacy"])
+                research_engine = st.selectbox(
+                    "Research Engine", engine_choices, index=0,
+                    help="open_deep_research: ~1-5 min. storm: ~2-10 min (Wikipedia-style article). gpt_researcher: ~5-15 min on a free gateway.",
+                )
             with col_r2:
-                token_budget = st.number_input("Token Budget", min_value=1000, max_value=64000, value=8000, step=1000)
+                token_budget = st.number_input(
+                    "Token Budget", min_value=1000, max_value=64000, value=8000, step=1000,
+                    disabled=research_engine != "open_deep_research",
+                    help="Enforced mid-run for open_deep_research only; storm and gpt_researcher record usage afterwards.",
+                )
+            if research_engine != "open_deep_research":
+                st.caption(f"{research_engine} runs its own full upstream pipeline: it takes only the question (no workspace context) and can run several minutes.")
 
         # Message Input
         default_prompt = (

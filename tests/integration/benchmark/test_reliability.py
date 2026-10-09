@@ -22,7 +22,7 @@ async def test_reliability_transitions():
         await session.commit()
         
         # Test 1: Worker aborts, gracefully transitions to failed
-        run1 = await repo.create_run(workspace.workspace_id, uuid.uuid4(), "Test abort", "legacy")
+        run1 = await repo.create_run(workspace.workspace_id, uuid.uuid4(), "Test abort", "open_deep_research")
         # Worker starts
         await lifecycle.transition_run(workspace.workspace_id, run1.run_id, "planning")
         await lifecycle.transition_run(workspace.workspace_id, run1.run_id, "researching")
@@ -36,7 +36,7 @@ async def test_reliability_transitions():
             await lifecycle.transition_run(workspace.workspace_id, run1.run_id, "completed")
             
         # Test 2: Budget exhaustion transitions to partial
-        run2 = await repo.create_run(workspace.workspace_id, uuid.uuid4(), "Test budget", "legacy")
+        run2 = await repo.create_run(workspace.workspace_id, uuid.uuid4(), "Test budget", "open_deep_research")
         await lifecycle.transition_run(workspace.workspace_id, run2.run_id, "planning")
         await lifecycle.transition_run(workspace.workspace_id, run2.run_id, "researching")
         

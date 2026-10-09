@@ -40,8 +40,8 @@ async def test_env(db_session: AsyncSession):
     user_a = uuid.uuid4()
     user_b = uuid.uuid4()
 
-    ws_a = Workspace(workspace_id=uuid.uuid4(), owner_id=user_a, research_engine="legacy")
-    ws_b = Workspace(workspace_id=uuid.uuid4(), owner_id=user_b, research_engine="legacy")
+    ws_a = Workspace(workspace_id=uuid.uuid4(), owner_id=user_a, research_engine="open_deep_research")
+    ws_b = Workspace(workspace_id=uuid.uuid4(), owner_id=user_b, research_engine="open_deep_research")
     db_session.add(ws_a)
     db_session.add(ws_b)
     await db_session.commit()
@@ -85,6 +85,19 @@ class MockArqRedis:
 
     async def enqueue_job(self, function, *args, **kwargs):
         self.jobs.append((function, args, kwargs))
+    # Minimal sorted-set API used by ProviderRateLimiter (ODR admission enforces rate limits)
+    async def zrangebyscore(self, *args, **kwargs):
+        return []
+
+    async def zremrangebyscore(self, *args, **kwargs):
+        return 0
+
+    async def zadd(self, *args, **kwargs):
+        return 1
+
+    async def expire(self, *args, **kwargs):
+        return True
+
 
     async def publish(self, channel, message):
         self._published.append((channel, message))
@@ -272,28 +285,32 @@ async def test_research_turn_sse_streaming_redis_bridge(test_env, db_session: As
                     break
                 await asyncio.sleep(0.05)
             assert len(mock_redis.jobs) == 1
-            run_id = mock_redis.jobs[0][2]["run_id"]
+            # The worker is the sole creator of research ChatEvents (ADR 0004): it records them in
+            # PostgreSQL and publishes on turn_events:{turn_id}. Simulate exactly that.
+            from sqlalchemy import select
+            from app.services.chat.events import ChatEventService
+            async with async_session_maker() as lookup_session:
+                turn_id = (await lookup_session.execute(
+                    select(ConversationTurn.turn_id)
+                    .where(ConversationTurn.conversation_id == conv_a.conversation_id)
+                    .order_by(ConversationTurn.sequence.desc())
+                )).scalars().first()
+            assert turn_id is not None
 
-            # Wait for subscriber to be ready
-            channel = f"research_events:{run_id}"
+            # Wait for the SSE subscriber to be ready
+            channel = f"turn_events:{turn_id}"
             for _ in range(50):
                 if channel in TurnEventBroker._subscribers:
                     break
                 await asyncio.sleep(0.05)
+            assert channel in TurnEventBroker._subscribers
 
-            # Simulate worker publishing events to research_events:{run_id}
-            await TurnEventBroker.publish_local(channel, {
-                "event_type": "progress",
-                "payload": {"stage": "searching", "step": 1}
-            })
-            await TurnEventBroker.publish_local(channel, {
-                "event_type": "token",
-                "payload": {"content": "Found 3 consensus models."}
-            })
-            await TurnEventBroker.publish_local(channel, {
-                "event_type": "status_change",
-                "payload": {"status": "completed"}
-            })
+            async with async_session_maker() as worker_session:
+                event_service = ChatEventService(ChatEventRepository(worker_session), mock_redis)
+                await event_service.record_and_publish(turn_id, "progress", {"stage": "searching", "step": 1})
+                await event_service.record_and_publish(turn_id, "token", {"content": "Found 3 consensus models."})
+                await event_service.record_and_publish(turn_id, "status_change", {"status": "completed"})
+                await event_service.record_and_publish(turn_id, "done", {"status": "completed"})
 
             resp = await stream_task
             assert resp.status_code == 200

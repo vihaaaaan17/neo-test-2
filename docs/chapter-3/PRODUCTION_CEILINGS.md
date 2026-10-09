@@ -23,6 +23,8 @@ To confidently migrate from the legacy `ResearchModeOrchestrator` to the new Lan
 
 Before activating ODR, the legacy engine was run against the frozen corpus to establish a "ground truth" performance floor. The results are locked in [`legacy_baseline.json`](file:///d:/koding/codes/NeosisLM/tests/fixtures/benchmark/legacy_baseline.json).
 
+> **Historical (Chapter 5, Phase 1):** the legacy engine was removed (ADR 0005). `legacy_baseline.json` is immutable historical data and no longer corresponds to a runnable engine; `scripts/benchmark_runner.py` now runs Open Deep Research only, against a real provider.
+
 - **Average Cost**: $0.04 per prompt
 - **P95 Latency**: ~1.45 seconds (1445ms)
 - **Quality Score**: 9.0 (out of 9)

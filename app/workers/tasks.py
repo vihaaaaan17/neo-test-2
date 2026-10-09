@@ -59,6 +59,19 @@ from app.schemas.chat import (
 
 logger = logging.getLogger(__name__)
 
+# Terminal run states are owned by the worker. If an engine yields one of these as an event status it is
+# ignored (and logged) so there is exactly one terminal state and one terminal event per run.
+_ENGINE_TERMINAL_STATUSES = frozenset({"completed", "failed", "partial", "cancelled", "aborted_by_timeline_fence"})
+
+
+def _terminal_turn_message(status: str, reason: str) -> str | None:
+    """Assistant message for a turn whose research run ended without a report."""
+    if status == "failed":
+        return f"Research run failed: {reason}"
+    if status == "partial":
+        return f"Research run halted: {reason}"
+    return None
+
 
 # --------------------------------------------------------------------------- #
 # helpers
@@ -381,7 +394,6 @@ async def run_research_agent_job(
     from uuid import UUID
     import uuid
     from app.integrations.research_engine.factory import ResearchEngineFactory
-    from app.services.web_search import WebSearchTool
 
     job_id = ctx.get("job_id")
     if not job_id:
@@ -402,14 +414,6 @@ async def run_research_agent_job(
             await redis.publish(f"research_events:{run_id}", payload_str)
 
     await publish_event({"status": "starting", "message": "Initializing research agent..."})
-
-    # Get LLM Gateway (same pattern as compress_episodic_job)
-    async def llm_gateway(prompt: str) -> str:
-        llm_fn = ctx.get("llm_call")
-        if llm_fn is None:
-            # Fallback for tests if not provided
-            raise RuntimeError("llm_call not found in context")
-        return await llm_fn(prompt, model="gpt-4o", provider="openai")
 
     import time
     start_time = time.time()
@@ -437,6 +441,26 @@ async def run_research_agent_job(
         owner_id = run.owner_id
         engine_flag = run.engine
         actual_run_id = UUID(run_id)
+
+        # The worker resolves engine inputs (DB reads); adapters receive plain data.
+        prior_evidence_context = ""
+        try:
+            from app.repositories.research import ResearchRepository as _ContextRepository
+            from app.services.research.context import build_prior_evidence_context
+            prior_evidence_context = build_prior_evidence_context(
+                await _ContextRepository(session).list_evidence_for_run(UUID(workspace_id), actual_run_id)
+            )
+        except Exception as ctx_err:
+            logger.warning("Could not load prior evidence for run %s: %s", run_id, ctx_err)
+
+        if not research_context and getattr(run, "turn_id", None):
+            try:
+                from app.models.conversation import ConversationTurn
+                turn_row = await session.get(ConversationTurn, run.turn_id)
+                if turn_row and isinstance(turn_row.context_version, dict):
+                    research_context = turn_row.context_version.get("research_context") or turn_row.context_version
+            except Exception as ctx_err:
+                logger.warning("Could not load research_context from turn for run %s: %s", run_id, ctx_err)
 
     async def _bridge_chat_event(t_id: UUID | None, ev_type: str, payload: dict):
         if not t_id:
@@ -474,12 +498,11 @@ async def run_research_agent_job(
     # Instantiate the appropriate engine via factory
     engine = ResearchEngineFactory.get_engine(
         engine_name=engine_flag,
-        llm_gateway=llm_gateway,
-        search_tool=WebSearchTool(),
         redis_client=redis
     )
 
     cancel_task = None
+    consume_ref: dict = {}  # holds the child task consuming the engine stream so a cancel signal can stop it
     if redis and hasattr(redis, "pubsub"):
         async def _listen_for_cancellation():
             try:
@@ -488,6 +511,9 @@ async def run_research_agent_job(
                 async for msg in ps.listen():
                     if msg and msg.get("type") == "message":
                         logger.info("Received cancellation signal via Redis for run %s", actual_run_id)
+                        consume_task_ref = consume_ref.get("task")
+                        if consume_task_ref is not None and not consume_task_ref.done():
+                            consume_task_ref.cancel()
                         if hasattr(engine, "cancel"):
                             await engine.cancel()
                         break
@@ -496,87 +522,121 @@ async def run_research_agent_job(
         cancel_task = asyncio.create_task(_listen_for_cancellation())
 
     try:
-        final_graph = None
+        final_report = None
         final_status = "completed"
         final_reason = "Engine finished normally"
-        
-        async for event in engine.astream_events(
-            run_id=actual_run_id,
-            workspace_id=UUID(workspace_id),
-            objective=objective,
-            research_context=research_context,
-        ):
-            await publish_event(event)
-            status = event.get("status")
 
-            if run.turn_id:
-                if status == "planning":
-                    await _bridge_chat_event(
-                        run.turn_id,
-                        EVENT_TURN_RESEARCH_PLANNING,
-                        {"run_id": str(actual_run_id), "message": event.get("message", "Planning research")}
-                    )
-                elif status in ("executing", "researching"):
-                    await _bridge_chat_event(
-                        run.turn_id,
-                        EVENT_TURN_RESEARCHING,
-                        {"run_id": str(actual_run_id), "message": event.get("message", "Conducting research")}
-                    )
-                elif status == "synthesizing":
-                    await _bridge_chat_event(
-                        run.turn_id,
-                        EVENT_TURN_SYNTHESIZING,
-                        {"run_id": str(actual_run_id), "message": event.get("message", "Synthesizing research results")}
-                    )
+        async def _consume_engine() -> None:
+            nonlocal final_report
+            async for event in engine.astream_events(
+                run_id=actual_run_id,
+                workspace_id=UUID(workspace_id),
+                objective=objective,
+                research_context=research_context,
+                prior_evidence_context=prior_evidence_context,
+            ):
+                status = event.get("status")
 
-            # Structured scratchpad persistence and real-time streaming
-            sp_data = event.get("scratchpad_entry")
-            if sp_data and isinstance(sp_data, dict):
-                from app.services.chat.context import sanitize_scratchpad_content
-                from app.repositories.scratchpad import ScratchpadRepository
+                # The engine hands the report over as data and signals failure by raising.
+                if status == "final_report":
+                    final_report = event.get("report")
+                    continue
+                if status in _ENGINE_TERMINAL_STATUSES:
+                    logger.warning(
+                        "Engine yielded terminal status %r for run %s; ignored (the worker owns terminal state)",
+                        status, actual_run_id,
+                    )
+                    continue
 
-                entry_type = sp_data.get("entry_type", "observation")
-                raw_content = sp_data.get("content", "")
-                sanitized = sanitize_scratchpad_content(raw_content)
-                if sanitized and entry_type in ["note", "observation", "hypothesis", "investigation", "finding"]:
-                    async with async_session_maker() as sp_session:
-                        sp_repo = ScratchpadRepository(sp_session)
-                        sp_entry = await sp_repo.create_entry(
-                            workspace_id=UUID(workspace_id),
-                            conversation_id=run.conversation_id,
-                            turn_id=run.turn_id,
-                            run_id=actual_run_id,
-                            entry_type=entry_type,
-                            content=sanitized,
-                            is_pinned_to_workspace=bool(sp_data.get("is_pinned_to_workspace", False)),
-                            metadata=sp_data.get("metadata") or {}
+                await publish_event(event)
+
+                if run.turn_id:
+                    if status == "planning":
+                        await _bridge_chat_event(
+                            run.turn_id,
+                            EVENT_TURN_RESEARCH_PLANNING,
+                            {"run_id": str(actual_run_id), "message": event.get("message", "Planning research")}
                         )
-                        sp_payload = {
-                            "entry_id": str(sp_entry.entry_id),
-                            "entry_type": sp_entry.entry_type,
-                            "content": sp_entry.content,
-                            "is_pinned": sp_entry.is_pinned_to_workspace,
-                            "lifecycle": sp_entry.lifecycle,
-                            "metadata": sp_entry.metadata_ or {}
-                        }
-                        sp_event = {
-                            "event_type": "scratchpad_entry",
-                            "payload": sp_payload
-                        }
-                        if redis:
-                            sp_json = json.dumps(sp_event)
-                            await redis.publish(f"research_events:{actual_run_id}", sp_json)
+                    elif status in ("executing", "researching"):
+                        await _bridge_chat_event(
+                            run.turn_id,
+                            EVENT_TURN_RESEARCHING,
+                            {"run_id": str(actual_run_id), "message": event.get("message", "Conducting research")}
+                        )
+                    elif status == "synthesizing":
+                        await _bridge_chat_event(
+                            run.turn_id,
+                            EVENT_TURN_SYNTHESIZING,
+                            {"run_id": str(actual_run_id), "message": event.get("message", "Synthesizing research results")}
+                        )
+
+                # Structured scratchpad persistence and real-time streaming
+                sp_data = event.get("scratchpad_entry")
+                if sp_data and isinstance(sp_data, dict):
+                    from app.services.chat.context import sanitize_scratchpad_content
+                    from app.repositories.scratchpad import ScratchpadRepository
+
+                    entry_type = sp_data.get("entry_type", "observation")
+                    raw_content = sp_data.get("content", "")
+                    sanitized = sanitize_scratchpad_content(raw_content)
+                    if sanitized and entry_type in ["note", "observation", "hypothesis", "investigation", "finding"]:
+                        async with async_session_maker() as sp_session:
+                            sp_repo = ScratchpadRepository(sp_session)
+                            sp_entry = await sp_repo.create_entry(
+                                workspace_id=UUID(workspace_id),
+                                conversation_id=run.conversation_id,
+                                turn_id=run.turn_id,
+                                run_id=actual_run_id,
+                                entry_type=entry_type,
+                                content=sanitized,
+                                is_pinned_to_workspace=bool(sp_data.get("is_pinned_to_workspace", False)),
+                                metadata=sp_data.get("metadata") or {}
+                            )
+                            sp_payload = {
+                                "entry_id": str(sp_entry.entry_id),
+                                "entry_type": sp_entry.entry_type,
+                                "content": sp_entry.content,
+                                "is_pinned": sp_entry.is_pinned_to_workspace,
+                                "lifecycle": sp_entry.lifecycle,
+                                "metadata": sp_entry.metadata_ or {}
+                            }
+                            sp_event = {
+                                "event_type": "scratchpad_entry",
+                                "payload": sp_payload
+                            }
+                            if redis:
+                                sp_json = json.dumps(sp_event)
+                                await redis.publish(f"research_events:{actual_run_id}", sp_json)
+                                if run.turn_id:
+                                    await redis.publish(f"turn_events:{run.turn_id}", sp_json)
                             if run.turn_id:
-                                await redis.publish(f"turn_events:{run.turn_id}", sp_json)
-                        if run.turn_id:
-                            await _bridge_chat_event(run.turn_id, EVENT_SCRATCHPAD_ENTRY, sp_payload)
+                                await _bridge_chat_event(run.turn_id, EVENT_SCRATCHPAD_ENTRY, sp_payload)
 
-            if status in ("failed", "partial", "cancelled"):
-                final_status = status
-                final_reason = event.get("message", f"Engine returned {status}")
 
-            if status == "synthesizing" and "final_graph" in event:
-                final_graph = event["final_graph"]
+        # Run the engine stream in a child task owned by the worker so a cancel signal can stop it
+        # while the worker still performs normal finalization.
+        import contextlib
+        from app.integrations.research_engine.budget import ResearchBudgetExceeded
+
+        consume_task = asyncio.create_task(_consume_engine())
+        consume_ref["task"] = consume_task
+        try:
+            await consume_task
+        except asyncio.CancelledError:
+            if not consume_task.done():
+                consume_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await consume_task
+            final_status = "cancelled"
+            final_reason = "Research execution cancelled."
+        except ResearchBudgetExceeded as budget_err:
+            logger.warning("Research budget exceeded for run %s: %s", actual_run_id, budget_err)
+            final_status = "partial"
+            final_reason = f"Execution halted: {budget_err}"
+        except Exception as engine_err:
+            logger.exception("Research engine failed for run %s: %s", actual_run_id, engine_err)
+            final_status = "failed"
+            final_reason = f"Research engine failed: {engine_err}"
 
         # ---------------------------------------------------------
         # Finalize execution, transition state, and promote candidates
@@ -651,17 +711,41 @@ async def run_research_agent_job(
                 await publish_event({"status": "aborted_by_timeline_fence", "error": fence_reason})
                 return {"status": "aborted_by_timeline_fence", "reason": fence_reason}
 
-            # Transition state to final_status
+            # A completed run requires the engine's final report; the worker persists it (engine-agnostic).
+            if final_status == "completed" and not final_report:
+                final_status = "failed"
+                final_reason = "engine_finished_without_report"
             if final_status == "completed":
-                current_run = await repo.get_run(UUID(workspace_id), actual_run_id)
-                current_status = current_run.status.lower() if current_run else "pending"
-                stages = ["planning", "researching", "synthesizing", "finalizing"]
-                if current_status in stages or current_status == "pending":
-                    start_idx = -1 if current_status == "pending" else stages.index(current_status)
-                    for next_stage in stages[start_idx + 1:]:
-                        await lifecycle.transition_run(UUID(workspace_id), actual_run_id, next_stage, {"auto": True})
-            await lifecycle.transition_run(UUID(workspace_id), actual_run_id, final_status, {"reason": final_reason})
-            await session.commit()
+                await ResearchService(repo).finalize_report(
+                    workspace_id=UUID(workspace_id),
+                    run_id=actual_run_id,
+                    objective=objective,
+                    report=final_report,
+                )
+
+            # Transition state to final_status. Another writer (e.g. the API cancelling the turn) may already
+            # have made the run terminal; that is success for us, and we must not emit a second terminal event.
+            from app.services.research.lifecycle import InvalidTransitionError
+            try:
+                if final_status == "completed":
+                    current_run = await repo.get_run(UUID(workspace_id), actual_run_id)
+                    current_status = current_run.status.lower() if current_run else "pending"
+                    stages = ["planning", "researching", "synthesizing", "finalizing"]
+                    if current_status in stages or current_status == "pending":
+                        start_idx = -1 if current_status == "pending" else stages.index(current_status)
+                        for next_stage in stages[start_idx + 1:]:
+                            await lifecycle.transition_run(UUID(workspace_id), actual_run_id, next_stage, {"auto": True})
+                await lifecycle.transition_run(UUID(workspace_id), actual_run_id, final_status, {"reason": final_reason})
+                await session.commit()
+            except InvalidTransitionError as terminal_err:
+                await session.rollback()
+                terminal_run = await repo.get_run(UUID(workspace_id), actual_run_id)
+                already_status = terminal_run.status if terminal_run else final_status
+                logger.info(
+                    "Run %s already terminal (%s); worker finalization is a no-op: %s",
+                    actual_run_id, already_status, terminal_err,
+                )
+                return {"status": already_status, "workspace_id": workspace_id, "run_id": str(actual_run_id)}
             
             # ---------------------------------------------------------
             # In Phase 3: Finalize candidate artifacts in pending_review status
@@ -688,22 +772,6 @@ async def run_research_agent_job(
                         except Exception as exc:
                             logger.warning("Failed to normalize derivation for candidate %s: %s", cand.artifact_id, exc)
 
-                # If synthesis produced final_graph, ensure it is stored as graph_candidate (pending_review)
-                # rather than directly projecting into Neo4j
-                if final_graph:
-                    stmt = select(ResearchArtifact).where(
-                        ResearchArtifact.run_id == actual_run_id,
-                        ResearchArtifact.type == "graph_candidate"
-                    )
-                    existing_gc = (await session.execute(stmt)).scalars().first()
-                    if not existing_gc:
-                        await repo.create_artifact(
-                            workspace_id=UUID(workspace_id),
-                            run_id=actual_run_id,
-                            artifact_type="graph_candidate",
-                            payload=final_graph,
-                            promotion_status="pending_review",
-                        )
                 await session.commit()
 
             # Retrieve final research report content if available to attach as assistant summary
@@ -727,7 +795,7 @@ async def run_research_agent_job(
                 try:
                     from app.repositories.conversation import ConversationRepository
                     conv_repo = ConversationRepository(session)
-                    fail_msg = report_content or (f"Research run failed: {final_reason}" if final_status == "failed" else None)
+                    fail_msg = report_content or _terminal_turn_message(final_status, final_reason)
                     completed_turn = await conv_repo.set_turn_status(
                         turn_id=run.turn_id,
                         status=final_status,
@@ -741,7 +809,7 @@ async def run_research_agent_job(
 
                 if completed_turn:
                     turn_comp_event = EVENT_TURN_COMPLETED if final_status == "completed" else f"turn.{final_status}"
-                    fail_msg = report_content or (f"Research run failed: {final_reason}" if final_status == "failed" else None)
+                    fail_msg = report_content or _terminal_turn_message(final_status, final_reason)
                     await _bridge_chat_event(
                         run.turn_id,
                         turn_comp_event,

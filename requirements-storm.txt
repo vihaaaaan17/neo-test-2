@@ -1,0 +1,6 @@
+# Isolated environment for STORM (venv-storm). It cannot share the main environment:
+# knowledge-storm pins dspy_ai==2.4.9, which requires openai<2.0.0, while the app needs openai>=2.45.
+#   python -m venv venv-storm
+#   venv-storm/Scripts/pip install --only-binary litellm -r requirements-storm.txt
+knowledge-storm
+tavily-python

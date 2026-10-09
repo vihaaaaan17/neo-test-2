@@ -80,38 +80,49 @@ async def test_async_sse_research_flow(mock_user_id, mock_workspace_id):
             return MagicMock()
         def pubsub(self):
             return MockPubSub()
-            
+        # Minimal sorted-set API used by ProviderRateLimiter (ODR admission enforces rate limits)
+        async def zrangebyscore(self, *args, **kwargs):
+            return []
+        async def zremrangebyscore(self, *args, **kwargs):
+            return 0
+        async def zadd(self, *args, **kwargs):
+            return 1
+        async def expire(self, *args, **kwargs):
+            return True
+
     app.dependency_overrides[get_arq_redis] = lambda: MockArqRedis()
-    
-    mock_workspace = MagicMock()
-    mock_workspace.research_engine = "legacy"
-    mock_repo = MagicMock()
-    mock_repo.get_workspace = AsyncMock(return_value=mock_workspace)
-    app.dependency_overrides[get_workspace_repository] = lambda: mock_repo
-    app.dependency_overrides[get_research_repository] = lambda: MockResearchRepository()
 
-    
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        # 1. Enqueue job
-        resp = await ac.post(f"/api/v1/workspaces/{mock_workspace_id}/research", json={"objective": "Test"})
-        assert resp.status_code == 202
-        job_id = resp.json()["job_id"]
-        
-        # 2. Consume SSE Stream
-        async with ac.stream("GET", f"/api/v1/jobs/{job_id}/stream") as stream_resp:
-            assert stream_resp.status_code == 200
-            chunks = []
-            async for line in stream_resp.aiter_lines():
-                if line.startswith("data: "):
-                    data_str = line.removeprefix("data: ")
-                    chunks.append(json.loads(data_str))
-                    
-            assert len(chunks) == 3
-            assert chunks[0]["status"] == "starting"
-            assert chunks[1]["status"] == "planning"
-            assert chunks[2]["status"] == "completed"
+    # The legacy /research route delegates to ChatService, which writes real Conversation/ResearchRun rows,
+    # so the workspace must exist in Postgres (real repositories, no repository mocks).
+    from app.core.database import async_session_maker
+    from app.models.workspace import Workspace
+    async with async_session_maker() as session:
+        session.add(Workspace(workspace_id=mock_workspace_id, owner_id=mock_user_id, research_engine="open_deep_research"))
+        await session.commit()
 
-    app.dependency_overrides.pop(get_arq_redis, None)
-    app.dependency_overrides.pop(get_workspace_repository, None)
-    app.dependency_overrides.pop(get_research_repository, None)
-    app.dependency_overrides.pop(get_current_user, None)
+    # Overrides are removed in `finally` so a failure here cannot leak into later tests.
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            # 1. Enqueue job
+            resp = await ac.post(f"/api/v1/workspaces/{mock_workspace_id}/research", json={"objective": "Test"})
+            assert resp.status_code == 202
+            job_id = resp.json()["job_id"]
+
+            # 2. Consume SSE Stream
+            async with ac.stream("GET", f"/api/v1/jobs/{job_id}/stream") as stream_resp:
+                assert stream_resp.status_code == 200
+                chunks = []
+                async for line in stream_resp.aiter_lines():
+                    if line.startswith("data: "):
+                        data_str = line.removeprefix("data: ")
+                        chunks.append(json.loads(data_str))
+
+                assert len(chunks) == 3
+                assert chunks[0]["status"] == "starting"
+                assert chunks[1]["status"] == "planning"
+                assert chunks[2]["status"] == "completed"
+    finally:
+        app.dependency_overrides.pop(get_arq_redis, None)
+        app.dependency_overrides.pop(get_workspace_repository, None)
+        app.dependency_overrides.pop(get_research_repository, None)
+        app.dependency_overrides.pop(get_current_user, None)

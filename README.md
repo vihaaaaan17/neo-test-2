@@ -9,7 +9,7 @@ NeosisLM is an advanced, multi-agent AI research platform designed to combine so
 2. [Local Setup & Development](docs/setup.md)
    * How to start the FastAPI server, Arq background workers, and the Streamlit test UI.
 3. [Agents & Orchestrators](docs/orchestrators.md)
-   * Deep dive into the `ResearchModeOrchestrator` and `GroundModeOrchestrator` using LangGraph.
+   * Deep dive into Research Mode (Open Deep Research behind a thin adapter) and Ground Mode.
 4. [API & Integrations](docs/api.md)
    * Overview of the FastAPI routes, Workspace management, and background jobs.
 5. [Scaling & Migrations](docs/migrations.md)

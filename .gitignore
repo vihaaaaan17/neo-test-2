@@ -27,3 +27,4 @@ NeosisLm-sheets/
 # Ignore graphify internal cache, but track clean graph artifacts
 graphify-out/cache/
 app/graphify-out/
+venv-storm/

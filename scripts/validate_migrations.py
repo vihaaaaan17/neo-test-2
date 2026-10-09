@@ -4,7 +4,7 @@ scripts/validate_migrations.py
 
 Dual-mode Alembic Migration Verification Harness for Chapter 4 & 5.
 Audits:
-1. Strict DAG linearity (single root, single head, zero forks, zero cycles, 18 revisions).
+1. Strict DAG linearity (single root, single head, zero forks, zero cycles, 19 revisions).
 2. Existence and non-emptiness of upgrade() and downgrade() in every revision.
 3. Schema constraint integrity across all models (primary keys, foreign keys, and indexes).
 4. (Optional / Live DB) Dynamic round-trip migration verification (upgrade -> downgrade -> upgrade).
@@ -12,6 +12,7 @@ Audits:
 
 import os
 import sys
+import asyncio
 import ast
 import argparse
 import logging
@@ -286,7 +287,7 @@ async def run_live_database_roundtrip() -> Dict[str, Any]:
     alembic_cfg = Config(os.path.join(REPO_ROOT, "alembic.ini"))
     alembic_cfg.set_main_option("script_location", os.path.join(REPO_ROOT, "alembic"))
 
-    try:
+    def _roundtrip() -> None:
         logger.info("Running alembic upgrade head...")
         command.upgrade(alembic_cfg, "head")
         logger.info("Alembic upgrade head passed.")
@@ -298,6 +299,11 @@ async def run_live_database_roundtrip() -> Dict[str, Any]:
         logger.info("Re-running alembic upgrade head...")
         command.upgrade(alembic_cfg, "head")
         logger.info("Alembic re-upgrade passed.")
+
+    try:
+        # alembic's env.py calls asyncio.run() itself, which cannot nest inside this running loop,
+        # so run the blocking commands in a worker thread.
+        await asyncio.to_thread(_roundtrip)
         return {"status": "passed"}
     except Exception as e:
         logger.error(f"Live migration roundtrip failed: {e}")

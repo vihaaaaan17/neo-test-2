@@ -20,7 +20,7 @@ async def test_open_notebook_ingestion_and_search():
         
         with open(fixture_path, "rb") as f:
             files = {"file": ("sample.md", f, "text/markdown")}
-            res = await client.post("/api/sources", files=files)
+            res = await client.post("/api/sources", data={"type": "upload"}, files=files)
             
         assert res.status_code == 200, f"Source upload failed: {res.text}"
         source = res.json()

@@ -76,3 +76,27 @@ Ensure `.env` contains the required infrastructure keys:
 2. Confirm the returned file URI has format `s3://neosislm-dev/{workspace_id}/{file_uuid}-{filename}`.
 3. In Streamlit's **Storage / Ingestion Integration** tab, click **Verify Object in MinIO** to download and compare the raw bytes and SHA256 checksum.
 4. Verify the ARQ worker runs `parse_and_chunk_job` and status transitions from `pending` -> `processing` -> `completed`.
+
+## Running the Tests
+
+Run the whole suite in one process (about a minute; per-file runs are much slower because of import time):
+
+```bash
+pytest tests -q -p no:cacheprovider
+```
+
+The offline Open Deep Research harness (`tests/harness/odr_offline.py`) runs the real vendored ODR graph with a fake model and fake
+Tavily client, so `tests/unit/integrations/research_engine/test_odr_offline_harness.py` needs no network or API keys.
+
+### Real-provider smoke gate
+
+Needs the full stack running (Docker services, API on :8000, ARQ worker) and a configured LLM provider plus `TAVILY_API_KEY`:
+
+```bash
+RUN_REAL_PROVIDER_SMOKE=1 pytest tests/smoke -m real_provider -q -p no:cacheprovider
+```
+
+It is skipped otherwise. It verifies a real research run end to end (completion, event stream, evidence provenance, persisted report,
+no research material promoted into Ground evidence, unsupported engines rejected, cancellation ends terminal, exactly one terminal
+state/event). `SMOKE_API_BASE_URL` overrides the API address.
+

@@ -63,9 +63,10 @@ def test_research_run_schema_and_migration():
     import alembic.script
     alembic_cfg = alembic.config.Config("alembic.ini")
     script = alembic.script.ScriptDirectory.from_config(alembic_cfg)
-    head_rev = script.get_current_head()
-    assert head_rev == "f7a8b9c0d1e2"
+    # The migration that introduces timeline_epoch (not whatever the current head is).
+    head_rev = "f7a8b9c0d1e2"
     head_step = script.get_revision(head_rev)
+    assert head_step is not None
     # Verify migration file content contains timeline_epoch on research_runs
     with open(head_step.path, "r", encoding="utf-8") as f:
         mig_content = f.read()

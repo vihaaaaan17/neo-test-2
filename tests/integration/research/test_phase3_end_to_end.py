@@ -19,17 +19,11 @@ from app.services.research.lifecycle import ResearchLifecycleService
 class MockODREngine(ResearchEngine):
     async def astream_events(self, run_id: uuid.UUID, workspace_id: uuid.UUID, objective: str, research_context: Any = None, **kwargs) -> AsyncGenerator[dict[str, Any], None]:
         yield {"status": "starting", "message": "starting"}
-        
-        # Simulate final report generation persistence
-        async with async_session_maker() as session:
-            repo = ResearchRepository(session)
-            await repo.create_report(workspace_id, run_id, objective, "Mock final report")
-            await repo.create_artifact(
-                workspace_id, run_id, "memory_candidate", {"text": "Mock final report", "domain": "deep_research"}
-            )
-            
-        yield {"status": "synthesizing", "message": "done", "summary": "Mock final report"}
-        
+
+        # New contract: the engine hands the report to the worker as data; the worker persists it.
+        yield {"status": "synthesizing", "message": "done"}
+        yield {"status": "final_report", "report": "Mock final report"}
+
     async def cancel(self) -> None:
         pass
 

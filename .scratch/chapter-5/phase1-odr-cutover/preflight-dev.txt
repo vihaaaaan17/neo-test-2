@@ -1,0 +1,23 @@
+== workspaces by research_engine ==
+  'legacy': 1171
+      -> will be migrated to 'open_deep_research' by the cutover migration
+
+== research_runs by (engine, status) ==
+  'legacy'                 'completed'                    69
+  'legacy'                 'failed'                       1
+  'legacy'                 'pending'                      1
+  'odr'                    'completed'                    12
+  'odr'                    'failed'                       2
+  'open_deep_research'     'cancelled'                    4
+  'open_deep_research'     'completed'                    2
+  'open_deep_research'     'failed'                       5
+  'open_deep_research'     'running'                      3
+  'test'                   'completed'                    69
+  'test_engine'            'completed'                    32
+
+== non-terminal runs on engines other than 'open_deep_research' ==
+  run=9e9ada4b-b5f8-4311-86f4-7fb0b06ff7b5 workspace=d7ee80e5-b664-46d0-bbf3-10fb36ea6d4c engine='legacy' status='pending' updated_at=2026-10-06 19:17:54.320800+00:00
+
+== summary ==
+ATTENTION:
+  - 1 non-terminal run(s) on removed/unsupported engines; let existing reconciliation handle them (or fail them explicitly) before deleting the legacy engine

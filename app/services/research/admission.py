@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from app.repositories.research import ResearchRepository
 from app.models.research import ResearchRun
+from app.integrations.research_engine.engine import SUPPORTED_ENGINES
 from app.services.research.quota import ResearchQuotaService
 from app.services.research.rate_limiter import ProviderRateLimiter
 
@@ -39,6 +40,13 @@ class ResearchAdmissionController:
         """
         Admits a new research run after checking quotas and rate limits.
         """
+        # 0. Reject unsupported engines before any quota is consumed or any run is created
+        if engine not in SUPPORTED_ENGINES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="unsupported_research_engine"
+            )
+
         # 1. Enforce user concurrency quota
         if await self.quota_service.enforce_user_quota(owner_id) == "QUOTA_EXCEEDED":
             raise HTTPException(
@@ -61,17 +69,17 @@ class ResearchAdmissionController:
             )
 
         # 4. Enforce provider rate limits
-        if engine == "open_deep_research":
-            if not await self.rate_limiter.enforce_rate_limit("llm", owner_id):
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="LLM provider rate limit exceeded"
-                )
-            if not await self.rate_limiter.enforce_rate_limit("search", workspace_id):
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Search provider rate limit exceeded"
-                )
+        # Every supported engine calls the LLM and search providers.
+        if not await self.rate_limiter.enforce_rate_limit("llm", owner_id):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="LLM provider rate limit exceeded"
+            )
+        if not await self.rate_limiter.enforce_rate_limit("search", workspace_id):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Search provider rate limit exceeded"
+            )
 
         # 5. Create canonical ResearchRun
         return await self.repository.create_run(

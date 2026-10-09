@@ -61,7 +61,7 @@ async def test_research_worker_synchronous_event_bridging_and_completion():
             }
         }
         yield {"status": "synthesizing", "message": "Synthesizing report"}
-        yield {"status": "completed", "message": "Research complete"}
+        yield {"status": "final_report", "report": "Superconductors operate up to 138K at ambient pressure."}
 
     mock_engine = MagicMock()
     mock_engine.astream_events = mock_stream_events
@@ -79,6 +79,7 @@ async def test_research_worker_synchronous_event_bridging_and_completion():
          patch("app.repositories.scratchpad.ScratchpadRepository") as mock_sp_repo_cls, \
          patch("app.repositories.research.ResearchRepository") as mock_res_repo_cls, \
          patch("app.services.research.lifecycle.ResearchLifecycleService") as mock_lifecycle_cls, \
+         patch("app.services.research.service.ResearchService.finalize_report", new_callable=AsyncMock), \
          patch("app.services.research.derivation.DerivationService") as mock_derivation_cls, \
          patch("app.repositories.conversation.ConversationRepository") as mock_conv_repo_cls, \
          patch("app.services.chat.events.ChatEventService") as mock_event_service_cls:

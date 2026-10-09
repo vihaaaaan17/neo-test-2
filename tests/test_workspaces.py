@@ -27,7 +27,7 @@ class MockWorkspace:
         self.workspace_id = uuid4()
         self.owner_id = owner_id
         self.status = "active"
-        self.research_engine = "legacy"
+        self.research_engine = "open_deep_research"
         self.created_at = datetime.now(timezone.utc)
         self.updated_at = datetime.now(timezone.utc)
 
@@ -293,34 +293,57 @@ def test_upload_file_cross_tenant_isolation():
     finally:
         app.dependency_overrides[get_current_user] = mock_get_current_user
 
-def test_start_research():
-    create_response = client.post("/api/v1/workspaces/", json={})
-    workspace_id = create_response.json()["workspace_id"]
-    
-    response = client.post(
-        f"/api/v1/workspaces/{workspace_id}/research", 
-        json={"objective": "Test objective"}
-    )
-    
+@pytest.mark.asyncio
+async def test_start_research():
+    """The legacy /research route delegates to ChatService, which persists real rows, so use a real workspace."""
+    from uuid import UUID
+    from httpx import AsyncClient, ASGITransport
+    from app.core.database import async_session_maker
+    from app.models.workspace import Workspace
+    from app.models.research import ResearchRun
+
+    class RateLimitedArqRedis(MockArqRedis):
+        # Minimal sorted-set API used by ProviderRateLimiter (ODR admission enforces rate limits)
+        async def zrangebyscore(self, *args, **kwargs):
+            return []
+        async def zremrangebyscore(self, *args, **kwargs):
+            return 0
+        async def zadd(self, *args, **kwargs):
+            return 1
+        async def expire(self, *args, **kwargs):
+            return True
+
+    arq = RateLimitedArqRedis()
+    # Real repositories for this test; the autouse fixture restores the module's overrides afterwards.
+    app.dependency_overrides.pop(get_workspace_repository, None)
+    app.dependency_overrides.pop(get_research_repository, None)
+    app.dependency_overrides[get_arq_redis] = lambda: arq
+
+    workspace_id = uuid4()
+    async with async_session_maker() as session:
+        session.add(Workspace(workspace_id=workspace_id, owner_id=TEST_USER_ID, research_engine="open_deep_research"))
+        await session.commit()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.post(f"/api/v1/workspaces/{workspace_id}/research", json={"objective": "Test objective"})
+
     assert response.status_code == 202
+    assert response.headers.get("Deprecation") == "true"
     data = response.json()
     assert "job_id" in data
     assert "run_id" in data
-    
     run_id = data["run_id"]
-    
-    # Verify the run was created in the mock DB
-    from uuid import UUID
-    run = mock_research_repo.db.get(UUID(run_id))
-    assert run is not None
-    assert str(run.workspace_id) == workspace_id
-    assert run.objective == "Test objective"
-    
-    # Verify the job was enqueued with the correct run_id
-    job_names = [job[0] for job in mock_arq_redis.jobs]
-    assert "run_research_agent_job" in job_names
-    
-    research_job = [job for job in mock_arq_redis.jobs if job[0] == "run_research_agent_job"][-1]
-    assert research_job[2]["run_id"] == run_id
-    assert research_job[2]["workspace_id"] == workspace_id
 
+    # Verify the run was created in the database
+    async with async_session_maker() as session:
+        run = await session.get(ResearchRun, UUID(run_id))
+    assert run is not None
+    assert run.workspace_id == workspace_id
+    assert run.objective == "Test objective"
+    assert run.engine == "open_deep_research"
+
+    # Verify the job was enqueued with the correct run_id
+    research_jobs = [job for job in arq.jobs if job[0] == "run_research_agent_job"]
+    assert research_jobs, arq.jobs
+    assert research_jobs[-1][2]["run_id"] == run_id
+    assert research_jobs[-1][2]["workspace_id"] == str(workspace_id)

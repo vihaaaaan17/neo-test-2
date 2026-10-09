@@ -121,7 +121,8 @@ async def test_chat_existing_conversation(setup_workspace_with_on, db_session: A
             mock_execute.assert_called_once_with(
                 session_id="session:789",
                 notebook_id=ws_binding.open_notebook_notebook_id,
-                message="Next part"
+                message="Next part",
+                context_config={}
             )
 
 async def test_chat_session_expired(setup_workspace_with_on, db_session: AsyncSession):

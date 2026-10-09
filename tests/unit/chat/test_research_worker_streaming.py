@@ -177,10 +177,7 @@ async def test_worker_persists_structured_scratchpad_and_publishes_event():
                 "metadata": {"source": "engine"}
             }
         }
-        yield {
-            "status": "completed",
-            "message": "Finished"
-        }
+        yield {"status": "final_report", "report": "Report body"}
 
     mock_engine = MagicMock()
     mock_engine.astream_events = mock_stream_events
@@ -205,6 +202,7 @@ async def test_worker_persists_structured_scratchpad_and_publishes_event():
         mock_res_service = mock_res_service_cls.return_value
         mock_res_service.promote_memory_candidates = AsyncMock()
         mock_res_service.promote_graph_candidates = AsyncMock()
+        mock_res_service.finalize_report = AsyncMock()
 
         mock_session = AsyncMock()
         mock_session_cls.return_value.__aenter__.return_value = mock_session
@@ -292,7 +290,7 @@ async def test_worker_rejects_raw_chain_of_thought_scratchpad():
                 "content": "<thought>I will now query Google for YBCO data and see what comes back</thought>"
             }
         }
-        yield {"status": "completed"}
+        yield {"status": "final_report", "report": "Report body"}
 
     mock_engine = MagicMock()
     mock_engine.astream_events = mock_cot_stream
@@ -309,6 +307,7 @@ async def test_worker_rejects_raw_chain_of_thought_scratchpad():
         mock_res_service = mock_res_service_cls.return_value
         mock_res_service.promote_memory_candidates = AsyncMock()
         mock_res_service.promote_graph_candidates = AsyncMock()
+        mock_res_service.finalize_report = AsyncMock()
 
         mock_session = AsyncMock()
         mock_session_cls.return_value.__aenter__.return_value = mock_session

@@ -2,6 +2,9 @@ from typing import AsyncGenerator, Any
 import abc
 from uuid import UUID
 
+# Engines Neosis can run. The single allow-list used by admission and the factory.
+SUPPORTED_ENGINES = ("open_deep_research", "storm", "gpt_researcher")
+
 class ResearchEngine(abc.ABC):
     """
     Abstract interface for all research engines in Neosis.

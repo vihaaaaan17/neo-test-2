@@ -29,7 +29,7 @@ async def test_worker_restart_recovery():
         await session.commit()
 
         # Create a run and transition it to researching
-        run = await repo.create_run(workspace.workspace_id, uuid.uuid4(), "Test restart", "legacy")
+        run = await repo.create_run(workspace.workspace_id, uuid.uuid4(), "Test restart", "open_deep_research")
         await lifecycle.transition_run(workspace.workspace_id, run.run_id, "planning")
         await lifecycle.transition_run(workspace.workspace_id, run.run_id, "researching")
 
@@ -62,7 +62,7 @@ async def test_redis_saturation_handling():
         # The system should not crash; events should be persisted to Postgres
         last_run = None
         for i in range(10):
-            last_run = await repo.create_run(workspace.workspace_id, uuid.uuid4(), f"Saturation test {i}", "legacy")
+            last_run = await repo.create_run(workspace.workspace_id, uuid.uuid4(), f"Saturation test {i}", "open_deep_research")
             await lifecycle.transition_run(workspace.workspace_id, last_run.run_id, "planning")
             await lifecycle.transition_run(workspace.workspace_id, last_run.run_id, "researching")
             await lifecycle.transition_run(workspace.workspace_id, last_run.run_id, "synthesizing")
@@ -98,7 +98,7 @@ async def test_db_pool_limit_handling():
         # Create multiple runs to simulate DB pool pressure
         runs = []
         for i in range(5):
-            run = await repo.create_run(workspace.workspace_id, uuid.uuid4(), f"Test DB pool {i}", "legacy")
+            run = await repo.create_run(workspace.workspace_id, uuid.uuid4(), f"Test DB pool {i}", "open_deep_research")
             runs.append(run)
 
         # Transition all runs to completed
@@ -130,7 +130,7 @@ async def test_cancellation_propagation():
         session.add(workspace)
         await session.commit()
 
-        run = await repo.create_run(workspace.workspace_id, uuid.uuid4(), "Test cancellation", "legacy")
+        run = await repo.create_run(workspace.workspace_id, uuid.uuid4(), "Test cancellation", "open_deep_research")
         await lifecycle.transition_run(workspace.workspace_id, run.run_id, "planning")
         await lifecycle.transition_run(workspace.workspace_id, run.run_id, "researching")
 
@@ -158,7 +158,7 @@ async def test_partial_completion_on_budget_exhaustion():
         session.add(workspace)
         await session.commit()
 
-        run = await repo.create_run(workspace.workspace_id, uuid.uuid4(), "Test budget exhaustion", "legacy")
+        run = await repo.create_run(workspace.workspace_id, uuid.uuid4(), "Test budget exhaustion", "open_deep_research")
         await lifecycle.transition_run(workspace.workspace_id, run.run_id, "planning")
         await lifecycle.transition_run(workspace.workspace_id, run.run_id, "researching")
 
@@ -186,7 +186,7 @@ async def test_unknown_error_handling():
         session.add(workspace)
         await session.commit()
 
-        run = await repo.create_run(workspace.workspace_id, uuid.uuid4(), "Test unknown error", "legacy")
+        run = await repo.create_run(workspace.workspace_id, uuid.uuid4(), "Test unknown error", "open_deep_research")
         await lifecycle.transition_run(workspace.workspace_id, run.run_id, "planning")
         await lifecycle.transition_run(workspace.workspace_id, run.run_id, "researching")
 

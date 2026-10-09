@@ -20,13 +20,13 @@ def versions_dir():
 
 def test_migration_dag_linearity_and_single_head(versions_dir):
     """
-    Asserts all 18 Alembic revisions form a strictly linear DAG with a single root and single head.
+    Asserts all 20 Alembic revisions form a strictly linear DAG with a single root and single head.
     """
     audit = audit_dag_linearity(versions_dir)
-    assert audit["total_revisions"] == 18
+    assert audit["total_revisions"] == 20
     assert audit["root"] == "f23c3a900272"
-    assert audit["head"] == "f7a8b9c0d1e2"
-    assert len(audit["ordered_chain"]) == 18
+    assert audit["head"] == "5c1e7a9d2b30"
+    assert len(audit["ordered_chain"]) == 20
     assert audit["ordered_chain"][0] == audit["root"]
     assert audit["ordered_chain"][-1] == audit["head"]
 
